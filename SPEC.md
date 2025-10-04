@@ -2,13 +2,21 @@
 
 ## Overview
 
-Dotsesses is an Avalonia UI desktop application for visualization of
+Dotsesses is fun user interface for the visualization of
 aggregate student grades as dotplot histograms with drill-down capability
 and interactive cursors to show breaks in the grade curve. The goal is to
 make it easy to see the distribution of aggregate student scores, their individual components, and assign
 fair letter grades that reasonable resemble to schools curve policy.
 
+The name is a play on incorrect pluralization of "dot". The general theme is playful and
+reminiscent of early grade school. Crayons, finger-paint, and recess - we are here to have fun!!!
+
 ## Data Model
+
+### Conventions
+
+- All []'s should be exposed as IReadOnlyCollection's unless otherwise stated. 
+- immutable means use a record class or whatever is the hot new immutable way to do it
 
 ### StudentAssessment
 
@@ -31,7 +39,7 @@ fair letter grades that reasonable resemble to schools curve policy.
 
 ### immutable Grade
 
-- LetterGrade - A, A-, B+, B, B-, C+, D, D-,F
+- LetterGrade - A, A-, B+, B, B-, C+, C, D, D-,F
 - Order - A=0, A-=1, etc
 
 ### immutable GradeCutoff
@@ -62,7 +70,9 @@ of the main window.
 
 The aggregate score will be used to assign a discrete x-axis position. The lowest
 score will be on the far left side (with some padding). The highest score will be
-on the far right with padding.
+on the far right with padding. There should always be numerical space
+to the left of the lowest aggregate score. This is so that additional cursors for lower grades
+can always be added to the left.
 
 ### Y-Axis positioning
 
@@ -92,13 +102,73 @@ The container will fill from left to right and then down. There will be a vertic
 when there are additional rows of cards that can not be fit. The drill-down container should be
 stretched horizontally.
 
-### Cursors
+### Curve Compliance
 
-#### Appearance
+A grid in the far right bottom corner will show the LetterGrades, the counts from the School Curve Policy,
+the current CutoffCount, and the absolute deviation if > 0. 
+This table should be stored in the main windows data model.
+
+### Cursors
+- Cursors are shown when LetterGrades are Enabled in the UI. IOW, if I uncheck D-, that cursor goes away.
 - Dashed vertical cursors will show the selected grade cutoffs.
-- GradeLetr
-- The user will be able to slide them
-left and right - but they can never overlap. For example, cursor A can never 
+- LetterGrade for the cursor will be displayed as a text annotation between the cursor
+and its right neighbor centered vertically and horizontally. For the highest grades (lowest index), the 
+horizontal centering is between the cursor and right boundary.
+- The lowest grade is special. The cursor is not displayed and its annotation is displayed horizontally 
+centered between the plots lower left boundary and the second lowest Grade.
+It is still vertically centered.
+- The LetterGrade annotations will be semi-transparent and have a large font 
+compared with other text.
+- The user will be able to slide them left and right - but they can never overlap.
+  - For example, cursor A can never be moved left of or on top of A-. 
+  - They should always be at least 1 apart. 
+- Sorting initial placement is based on the DefaultCurve
+
+### Initial placement of cursors
+
+This should be done such that the counts are close to the school defaults. Cursors not
+in the school defaults should not be enabled by default. When they are enabled, they should always be placed
+left of the letter grades higher than themselves. Perhaps at 1 point less. If cursors are enabled that are
+not on the far left, all the enabled cursors should be reset to even spacing across the dataset.
+
+## Update Behavior
+
+When updates are made to cursors, the ClassAssessment.GradeCutoff will be built from the
+current cursor selections, a background calculator will be given the StudentAssessments
+and the GradeCutoff's. It will return a IReadOnlyCollection<CutoffCount>. This
+will be assigned to the ClassAssessment.CutoffCount. The main windows view model will then update
+the curve compliance table.
+
+## Loading Of Data
+
+### Grades
+Eventually, we will load student, grade, and curve data from Excel files. For now,
+lets just create random data with some patterning. Assume 100 students. Their grades should break down into:
+
+- Quiz Total (20 pts)
+- Participation Total (20 pts)
+- Final (300 pt)
+
+I want to have a tri-modal distribution: 5% Super-stars that score >250 in aggregate,
+75% broad middle of the roaders with scores between 150-225, and 20% losers that score 50-125.
+
+There should also be some attributes that breakdown like this by group:
+
+- Super-Stars
+  - "Submitted Outline" : "Yes"
+  - "Mid-Term": "✔✔+"
+
+- Roaders
+    - "Submitted Outline" : 70% "Yes" 30% "No"
+    - "Mid-Term": "✔✔+" : 70% "✔+" 20% "✔" 10% "✔-"
+
+- Losers
+    - "Submitted Outline" : 10% "Yes" 90% "No"
+    - "Mid-Term": "✔✔+" : 20% "✔" 80% "✔-"
+
+### Default School Curve
+
+Just give me a standard curve of A, A-, B+, B, B-, C+, and C. No grades below this are mandatory. 
 
 ## Technical Stack
 
