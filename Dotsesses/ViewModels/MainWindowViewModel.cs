@@ -12,17 +12,37 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public MainWindowViewModel()
     {
-        Data = new PlotModel { Title = "Scatter Plot Example" };
+        Data = new PlotModel
+        {
+            Title = "Scatter Plot Example",
+            Background = OxyColors.Black,
+            TextColor = OxyColors.White,
+            PlotAreaBorderColor = OxyColors.White
+        };
 
-        // Add axes
-        Data.Axes.Add(new LinearAxis { Position = AxisPosition.Bottom, Title = "X" });
-        Data.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Title = "Y" });
+        // Add axes with dark theme colors
+        Data.Axes.Add(new LinearAxis
+        {
+            Position = AxisPosition.Bottom,
+            Title = "X",
+            AxislineColor = OxyColors.White,
+            TicklineColor = OxyColors.White,
+            TextColor = OxyColors.White
+        });
+        Data.Axes.Add(new LinearAxis
+        {
+            Position = AxisPosition.Left,
+            Title = "Y",
+            AxislineColor = OxyColors.White,
+            TicklineColor = OxyColors.White,
+            TextColor = OxyColors.White
+        });
 
         var scatterSeries = new ScatterSeries
         {
             MarkerType = MarkerType.Circle,
             MarkerSize = 4,
-            MarkerFill = OxyColors.Blue
+            MarkerFill = OxyColors.Cyan
         };
 
         // Add some sample data points (double pairs)
