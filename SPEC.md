@@ -96,49 +96,141 @@ Export to Excel with columns for student ID, aggregate score, individual scores,
 - All arrays expose as IReadOnlyCollection unless otherwise stated.
 - "immutable" means use record classes or the current preferred immutable pattern.
 
+### Class Hierarchy
+
+```mermaid
+classDiagram
+    ClassAssessment --> StudentAssessment
+    ClassAssessment --> GradeCutoff
+    ClassAssessment --> CutoffCount
+    StudentAssessment --> Score
+    StudentAssessment --> StudentAttribute
+    GradeCutoff --> Grade
+    CutoffCount --> Grade
+
+    class ClassAssessment {
+        +StudentAssessment[] Assessments
+        +GradeCutoff[] CurrentCutoffs
+        +CutoffCount[] DefaultCurve
+        +CutoffCount[] Current
+        +Dictionary~string,GradeCutoff[]~ SavedCutoffs
+        +Dictionary~int,MuppetNameInfo~ MuppetNameMap
+    }
+
+    class StudentAssessment {
+        +int Id
+        +int AggregateGrade
+        +Score[] Scores
+        +StudentAttribute[] Attributes
+        +string MuppetName
+    }
+
+    class Score {
+        +string Name
+        +int? Index
+        +double Value
+    }
+
+    class StudentAttribute {
+        +string Name
+        +int? Index
+        +string Value
+    }
+
+    class Grade {
+        +LetterGrade LetterGrade
+        +int Order
+    }
+
+    class GradeCutoff {
+        +Grade Grade
+        +int Score
+    }
+
+    class CutoffCount {
+        +Grade Grade
+        +int Count
+    }
+```
+
 ### StudentAssessment
 
-- int Id
-- int AggregateGrade - **calculated property with caching**, sum of Scores (converted to int)
-- Score[] Scores - individual numeric scores
-- StudentAttribute[] Attributes - non-numeric data like "Accommodation"
-- string MuppetName - whimsical identifier (see MuppetName Generation)
+```csharp
+class StudentAssessment
+{
+    int Id
+    int AggregateGrade              // calculated property with caching, sum of Scores (converted to int)
+    Score[] Scores                  // individual numeric scores
+    StudentAttribute[] Attributes   // non-numeric data like "Accommodation"
+    string MuppetName               // whimsical identifier (see MuppetName Generation)
+}
+```
 
 ### immutable Score
 
-- string Name
-- int? Index - for Quiz 1, Quiz 2, etc (null for single scores like "Final")
-- double Value
+```csharp
+record Score
+{
+    string Name    // e.g., "Quiz", "Final"
+    int? Index     // for Quiz 1, Quiz 2, etc (null for single scores like "Final")
+    double Value
+}
+```
 
 ### immutable StudentAttribute
 
-- string Name
-- int? Index - for Attended Study Session 1, Attended Study Session 2, etc
-- string Value - Yes, No, Maybe, etc
+```csharp
+record StudentAttribute
+{
+    string Name    // e.g., "Submitted Outline", "Mid-Term"
+    int? Index     // for Attended Study Session 1, Attended Study Session 2, etc
+    string Value   // e.g., "Yes", "No", "Maybe", "✔✔+"
+}
+```
 
 ### immutable Grade
 
-- LetterGrade - A, A-, B+, B, B-, C+, C, D, D-,F
-- Order - A=0, A-=1, etc
+```csharp
+record Grade
+{
+    LetterGrade LetterGrade   // A, A-, B+, B, B-, C+, C, D, D-, F
+    int Order                  // A=0, A-=1, etc
+}
+```
 
 ### immutable GradeCutoff
 
-- Grade Grade
-- int Score
+```csharp
+record GradeCutoff
+{
+    Grade Grade
+    int Score   // actual score threshold for this grade (e.g., "A = 285")
+}
+```
 
 ### immutable CutoffCount
 
-- Grade
-- Count
+```csharp
+record CutoffCount
+{
+    Grade Grade
+    int Count   // number of students in this grade
+}
+```
 
 ### ClassAssessment
 
-- StudentAssessment[] Assessments
-- GradeCutoff[] CurrentCutoffs - actual score thresholds for each grade (e.g., "A = 285")
-- CutoffCount[] DefaultCurve - school's default grade distribution
-- CutoffCount[] Current - counts of students in each grade with current cutoffs
-- Dictionary<string, GradeCutoff[]> SavedCutoffs - user-named saved cutoff configurations
-- Dictionary<int, MuppetNameInfo> MuppetNameMap - mapping of student ID to MuppetName data
+```csharp
+class ClassAssessment
+{
+    StudentAssessment[] Assessments                    // all student assessments
+    GradeCutoff[] CurrentCutoffs                       // actual score thresholds for each grade
+    CutoffCount[] DefaultCurve                         // school's default grade distribution
+    CutoffCount[] Current                              // counts of students in each grade with current cutoffs
+    Dictionary<string, GradeCutoff[]> SavedCutoffs     // user-named saved cutoff configurations
+    Dictionary<int, MuppetNameInfo> MuppetNameMap      // mapping of student ID to MuppetName data
+}
+```
 
 ### MuppetName Generation
 
