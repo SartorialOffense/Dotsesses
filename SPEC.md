@@ -249,22 +249,21 @@ class ClassAssessment
 
 Each student gets a whimsical "MuppetName" instead of showing their numeric ID.
 
-**Structure:** `[Size/Color/Adjective] [Character] [Emojis]`
+**Structure:** `[Muppet Name] [Emojis]`
 
 **Examples:**
-- "Large Purple Kermit 🐸🎭🎪"
-- "Tiny Blue Cookie Monster 🍪🎨🎈"
-- "Fuzzy Orange Elmo 🔴🎪🎨"
+- "Kermit the Frog 🐸🎭🎪"
+- "Cookie Monster 🍪🎨🎈"
+- "Elmo 🔴🎪🎨"
 
 **Generation Algorithm:**
 1. Order students by ID
-2. Use constant seed for random generator
-3. For each student, randomly select unique combination:
-   - Descriptor (size/color/adjective)
-   - Character (candy, cute animal, muppet, cartoon character)
-   - 1-3 emojis
+2. Use constant seed (42) for random generator
+3. For each student, randomly select from Muppet Wiki character list:
+   - Unique Muppet name
+   - 1-3 random emojis
 4. Ensure uniqueness within the class (if duplicate, reroll)
-5. Store mapping in ClassAssessment
+5. Store as MuppetNameInfo (name + emojis) in ClassAssessment
 
 **Note:** Student IDs don't need consistent MuppetNames across different ClassAssessments.
 
@@ -276,6 +275,9 @@ Each student gets a whimsical "MuppetName" instead of showing their numeric ID.
 - **UI Framework**: Avalonia 11.3.6
 - **MVVM Toolkit**: CommunityToolkit.Mvvm 8.2.1
 - **Plotting Library**: OxyPlot.Avalonia 2.1.0-Avalonia11
+- **Excel Export**: ClosedXML
+- **Logging**: Serilog with rolling file appenders
+- **Testing**: xUnit
 - **Theme**: Dark theme variant
 
 ### MVVM Pattern
@@ -291,9 +293,9 @@ Each student gets a whimsical "MuppetName" instead of showing their numeric ID.
 
 ### Logging
 
-- Log through ILog interface
+- Use Serilog with ILog interface wrapper
 - Log all UI user inputs at debug level
-- Use rolling file appenders for debug and info levels
+- Rolling file appenders for debug and info levels
 - Cap log files at 100K or 30 days
 
 ### Exception Handling
