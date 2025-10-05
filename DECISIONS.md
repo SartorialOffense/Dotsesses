@@ -106,6 +106,25 @@ This document tracks implementation decisions made during autonomous development
    - Student cards populate on selection
    - All state synchronized between views
 
-**Note:** MouseDown event on PlotModel is deprecated (CS0618 warning). Will need to migrate to newer event handling in future OxyPlot versions.
+**Note:** MouseDown/MouseMove/MouseUp events on PlotModel are deprecated (CS0618 warnings). Will need to migrate to newer event handling in future OxyPlot versions.
 
-**Next Steps:** Cursor dragging, validation, debouncing, Excel export
+## Phase 7: Additional Interactive Features - COMPLETED
+
+**Completed:**
+1. **Fixed Initial Cursor Rendering** ✓
+   - Reordered initialization: cursors/compliance before dotplot
+   - Cursors now render correctly on window load
+
+2. **Dot Color Changes on Selection** ✓
+   - Two scatter series: black fill (unselected), cyan fill (selected)
+   - UpdateDotplotPoints() called after ToggleStudent
+   - Visual feedback on selection/deselection
+
+3. **Cursor Dragging** ✓
+   - Mouse down near cursor (within 3 units) starts drag
+   - Mouse move updates cursor position with validation
+   - CursorValidation.ValidateMovement enforces minimum spacing
+   - Mouse up finalizes position and recalculates compliance
+   - Compliance grid updates CurrentCount automatically
+
+**Next Steps:** Debouncing for cursor updates, Excel export, persist saved cutoffs

@@ -19,6 +19,8 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly CutoffCountCalculator _cutoffCountCalculator;
     private readonly InitialCutoffCalculator _initialCutoffCalculator;
     private readonly CursorValidation _cursorValidation;
+    private CursorViewModel? _draggingCursor;
+    private bool _isDraggingCursor;
 
     [ObservableProperty]
     private ClassAssessment _classAssessment = null!;
@@ -49,9 +51,9 @@ public partial class MainWindowViewModel : ViewModelBase
         _complianceRows = new ObservableCollection<ComplianceRowViewModel>();
 
         InitializeWithSyntheticData();
-        InitializeDotplot();
         InitializeCursors();
         InitializeComplianceGrid();
+        InitializeDotplot();
     }
 
     private void InitializeWithSyntheticData()
@@ -89,8 +91,10 @@ public partial class MainWindowViewModel : ViewModelBase
             PlotAreaBorderColor = OxyColors.White
         };
 
-        // Enable mouse events for point selection
+        // Enable mouse events for point selection and cursor dragging
         DotplotModel.MouseDown += OnDotplotMouseDown;
+        DotplotModel.MouseMove += OnDotplotMouseMove;
+        DotplotModel.MouseUp += OnDotplotMouseUp;
 
         // X-axis: Score range with padding
         var minScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade);
@@ -132,14 +136,25 @@ public partial class MainWindowViewModel : ViewModelBase
             .GroupBy(a => a.AggregateGrade)
             .OrderBy(g => g.Key);
 
-        var scatterSeries = new ScatterSeries
+        // Create two series: one for unselected (black fill), one for selected (cyan fill)
+        var unselectedSeries = new ScatterSeries
+        {
+            MarkerType = MarkerType.Circle,
+            MarkerSize = 8,
+            MarkerFill = OxyColors.Black,
+            MarkerStroke = OxyColors.White,
+            MarkerStrokeThickness = 1,
+            TrackerFormatString = "{Tag}"
+        };
+
+        var selectedSeries = new ScatterSeries
         {
             MarkerType = MarkerType.Circle,
             MarkerSize = 8,
             MarkerFill = OxyColors.Cyan,
             MarkerStroke = OxyColors.White,
             MarkerStrokeThickness = 1,
-            TrackerFormatString = "{Tag}\nScore: {2:0}"
+            TrackerFormatString = "{Tag}"
         };
 
         foreach (var group in scoreGroups)
@@ -151,12 +166,20 @@ public partial class MainWindowViewModel : ViewModelBase
                 double yPos = i * 2;
                 var student = studentsAtScore[i];
                 var muppetName = ClassAssessment.MuppetNameMap.TryGetValue(student.Id, out var info) ? info.Name : "Unknown";
-                
-                scatterSeries.Points.Add(new ScatterPoint(group.Key, yPos, tag: $"{muppetName}\nScore: {student.AggregateGrade}"));
+
+                // Add to appropriate series based on selection state
+                var isSelected = SelectedStudents.Any(s => s.Assessment.Id == student.Id);
+                var point = new ScatterPoint(group.Key, yPos, tag: $"{muppetName}\nScore: {student.AggregateGrade}");
+
+                if (isSelected)
+                    selectedSeries.Points.Add(point);
+                else
+                    unselectedSeries.Points.Add(point);
             }
         }
 
-        DotplotModel.Series.Add(scatterSeries);
+        DotplotModel.Series.Add(unselectedSeries);
+        DotplotModel.Series.Add(selectedSeries);
         DotplotModel.InvalidatePlot(true);
     }
 
@@ -265,6 +288,9 @@ public partial class MainWindowViewModel : ViewModelBase
             var grade = GetGradeForStudent(student);
             SelectedStudents.Add(new StudentCardViewModel(student, grade));
         }
+
+        // Update dotplot to reflect selection color changes
+        UpdateDotplotPoints();
     }
 
     [RelayCommand]
@@ -299,15 +325,98 @@ public partial class MainWindowViewModel : ViewModelBase
         if (series == null)
             return;
 
-        // Find the nearest point to the click
-        var point = series.InverseTransform(e.Position);
-        var nearestPoint = FindNearestStudent(point.X, point.Y);
+        // Check if clicking near a cursor first (within 3 units)
+        var clickPos = series.InverseTransform(e.Position);
+        var nearestCursor = FindNearestCursor(clickPos.X);
+
+        if (nearestCursor.cursor != null && nearestCursor.distance < 3)
+        {
+            // Start dragging cursor
+            _draggingCursor = nearestCursor.cursor;
+            _isDraggingCursor = true;
+            e.Handled = true;
+            return;
+        }
+
+        // Otherwise, try to select a student
+        var nearestPoint = FindNearestStudent(clickPos.X, clickPos.Y);
         
         if (nearestPoint != null)
         {
             ToggleStudent(nearestPoint);
             e.Handled = true;
         }
+    }
+
+    private void OnDotplotMouseMove(object? sender, OxyMouseEventArgs e)
+    {
+        if (!_isDraggingCursor || _draggingCursor == null)
+            return;
+
+        var series = DotplotModel.Series.FirstOrDefault() as ScatterSeries;
+        if (series == null)
+            return;
+
+        var pos = series.InverseTransform(e.Position);
+        var newScore = (int)Math.Round(pos.X);
+
+        // Validate cursor movement
+        var allCutoffs = Cursors
+            .Select(c => new GradeCutoff(c.Grade, c == _draggingCursor ? newScore : c.Score))
+            .ToList();
+
+        var validatedScore = _cursorValidation.ValidateMovement(_draggingCursor.Grade, newScore, allCutoffs);
+
+        _draggingCursor.Score = validatedScore;
+        UpdateCursors();
+        e.Handled = true;
+    }
+
+    private void OnDotplotMouseUp(object? sender, OxyMouseEventArgs e)
+    {
+        if (_isDraggingCursor && _draggingCursor != null)
+        {
+            // Finalize cursor drag - update cutoffs and recalculate compliance
+            var updatedCutoffs = Cursors
+                .Select(c => new GradeCutoff(c.Grade, c.Score))
+                .ToList();
+
+            ClassAssessment.CurrentCutoffs = updatedCutoffs;
+            var newCurrent = _cutoffCountCalculator.Calculate(ClassAssessment.Assessments, updatedCutoffs);
+            ClassAssessment.Current = newCurrent;
+
+            // Update compliance grid
+            foreach (var row in ComplianceRows)
+            {
+                var currentEntry = ClassAssessment.Current.FirstOrDefault(cc => cc.Grade.Equals(row.Grade));
+                if (currentEntry != null)
+                {
+                    row.CurrentCount = currentEntry.Count;
+                }
+            }
+
+            _isDraggingCursor = false;
+            _draggingCursor = null;
+            e.Handled = true;
+        }
+    }
+
+    private (CursorViewModel? cursor, double distance) FindNearestCursor(double xPos)
+    {
+        CursorViewModel? nearest = null;
+        double minDistance = double.MaxValue;
+
+        foreach (var cursor in Cursors.Where(c => c.IsEnabled))
+        {
+            double distance = Math.Abs(cursor.Score - xPos);
+            if (distance < minDistance)
+            {
+                minDistance = distance;
+                nearest = cursor;
+            }
+        }
+
+        return (nearest, minDistance);
     }
 
     private StudentAssessment? FindNearestStudent(double clickX, double clickY)

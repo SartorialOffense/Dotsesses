@@ -46,9 +46,10 @@ public class MainWindowViewModelTests
         // Act
         var viewModel = new MainWindowViewModel();
 
-        // Assert
-        Assert.Single(viewModel.DotplotModel.Series);
+        // Assert - now has 2 series (unselected and selected)
+        Assert.Equal(2, viewModel.DotplotModel.Series.Count);
         Assert.IsType<OxyPlot.Series.ScatterSeries>(viewModel.DotplotModel.Series[0]);
+        Assert.IsType<OxyPlot.Series.ScatterSeries>(viewModel.DotplotModel.Series[1]);
     }
 
     [Fact]
@@ -56,11 +57,14 @@ public class MainWindowViewModelTests
     {
         // Act
         var viewModel = new MainWindowViewModel();
-        var series = viewModel.DotplotModel.Series[0] as OxyPlot.Series.ScatterSeries;
+        var unselectedSeries = viewModel.DotplotModel.Series[0] as OxyPlot.Series.ScatterSeries;
+        var selectedSeries = viewModel.DotplotModel.Series[1] as OxyPlot.Series.ScatterSeries;
 
-        // Assert
-        Assert.NotNull(series);
-        Assert.Equal(100, series.Points.Count);
+        // Assert - initially all students are unselected
+        Assert.NotNull(unselectedSeries);
+        Assert.NotNull(selectedSeries);
+        Assert.Equal(100, unselectedSeries.Points.Count);
+        Assert.Equal(0, selectedSeries.Points.Count);
     }
 
     [Fact]
