@@ -7,6 +7,7 @@ using Dotsesses.Calculators;
 using Dotsesses.Models;
 using Dotsesses.Services;
 using OxyPlot;
+using OxyPlot.Annotations;
 using OxyPlot.Axes;
 using OxyPlot.Series;
 
@@ -115,6 +116,7 @@ public partial class MainWindowViewModel : ViewModelBase
         });
 
         UpdateDotplotPoints();
+        UpdateCursors();
     }
 
     private void UpdateDotplotPoints()
@@ -148,6 +150,30 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         DotplotModel.Series.Add(scatterSeries);
+        DotplotModel.InvalidatePlot(true);
+    }
+
+    private void UpdateCursors()
+    {
+        // Clear existing annotations
+        DotplotModel.Annotations.Clear();
+
+        // Add vertical line annotations for each enabled cursor
+        foreach (var cursor in Cursors.Where(c => c.IsEnabled))
+        {
+            var line = new LineAnnotation
+            {
+                Type = LineAnnotationType.Vertical,
+                X = cursor.Score,
+                Color = OxyColors.White,
+                LineStyle = LineStyle.Dash,
+                StrokeThickness = 2,
+                Text = cursor.Grade.LetterGrade.ToString(),
+                TextColor = OxyColors.White
+            };
+            DotplotModel.Annotations.Add(line);
+        }
+
         DotplotModel.InvalidatePlot(true);
     }
 

@@ -4,16 +4,227 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:oxy="clr-namespace:OxyPlot.Avalonia;assembly=OxyPlot.Avalonia"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
         x:Class="Dotsesses.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="Dotsesses">
+        Title="Dotsesses - Grade Distribution"
+        Width="1200" Height="800">
+
     <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-    <oxy:PlotView Model="{Binding DotplotModel, Mode=OneWay}" />
+    <Grid RowDefinitions="2*,*">
+        <!-- Top Row: Dotplot and Compliance Grid -->
+        <SplitView Grid.Row="0"
+                   IsPaneOpen="{Binding IsCompliancePaneOpen}"
+                   DisplayMode="Inline"
+                   OpenPaneLength="300"
+                   PanePlacement="Right">
+
+            <!-- Main Content: Dotplot -->
+            <SplitView.Content>
+                <Border Background="#1E1E1E" Padding="10">
+                    <oxy:PlotView Model="{Binding DotplotModel}" />
+                </Border>
+            </SplitView.Content>
+
+            <!-- Pane: Compliance Grid -->
+            <SplitView.Pane>
+                <Border Background="#2D2D30" BorderBrush="#3F3F46" BorderThickness="1,0,0,0">
+                    <Grid RowDefinitions="Auto,*">
+                        <!-- Pane Header -->
+                        <Border Grid.Row="0" Background="#252526" Padding="10">
+                            <TextBlock Text="Curve Compliance"
+                                     FontSize="16"
+                                     FontWeight="SemiBold"
+                                     Foreground="White"/>
+                        </Border>
+
+                        <!-- Compliance Grid -->
+                        <ScrollViewer Grid.Row="1" Padding="10">
+                            <ItemsControl ItemsSource="{Binding ComplianceRows}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Padding="5" Margin="0,2">
+                                            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
+                                                <!-- Checkbox -->
+                                                <CheckBox Grid.Column="0"
+                                                         IsChecked="{Binding IsEnabled}"
+                                                         Margin="0,0,10,0"
+                                                         VerticalAlignment="Center"/>
+
+                                                <!-- Grade -->
+                                                <TextBlock Grid.Column="1"
+                                                          Text="{Binding Grade.LetterGrade}"
+                                                          Foreground="White"
+                                                          VerticalAlignment="Center"
+                                                          FontWeight="Medium"/>
+
+                                                <!-- Target Count -->
+                                                <TextBlock Grid.Column="2"
+                                                          Text="{Binding TargetCount}"
+                                                          Foreground="#CCCCCC"
+                                                          Margin="10,0"
+                                                          VerticalAlignment="Center"
+                                                          MinWidth="30"
+                                                          TextAlignment="Right"/>
+
+                                                <!-- Current Count -->
+                                                <TextBlock Grid.Column="3"
+                                                          Text="{Binding CurrentCount}"
+                                                          Foreground="White"
+                                                          Margin="10,0"
+                                                          VerticalAlignment="Center"
+                                                          MinWidth="30"
+                                                          TextAlignment="Right"
+                                                          FontWeight="SemiBold"/>
+
+                                                <!-- Deviation -->
+                                                <TextBlock Grid.Column="4"
+                                                          Text="{Binding Deviation, StringFormat='+{0}'}"
+                                                          Foreground="#FF6B6B"
+                                                          Margin="10,0,0,0"
+                                                          VerticalAlignment="Center"
+                                                          MinWidth="30"
+                                                          IsVisible="{Binding HasDeviation}"
+                                                          FontWeight="Bold"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </SplitView.Pane>
+        </SplitView>
+
+        <!-- Toggle Button for Compliance Pane -->
+        <Button Grid.Row="0"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Margin="10"
+                Padding="10"
+                Command="{Binding ToggleCompliancePaneCommand}"
+                Background="#2D2D30"
+                Foreground="White"
+                ToolTip.Tip="Toggle Compliance Panel">
+            <TextBlock Text="☰" FontSize="16" />
+        </Button>
+
+        <!-- Bottom Row: Selected Student Cards -->
+        <Border Grid.Row="1" Background="#252526" BorderBrush="#3F3F46" BorderThickness="0,1,0,0">
+            <Grid RowDefinitions="Auto,*">
+                <!-- Header -->
+                <Border Grid.Row="0" Background="#1E1E1E" Padding="10">
+                    <TextBlock Text="Selected Students"
+                             FontSize="16"
+                             FontWeight="SemiBold"
+                             Foreground="White"/>
+                </Border>
+
+                <!-- Student Cards -->
+                <ScrollViewer Grid.Row="1" Padding="10">
+                    <ItemsControl ItemsSource="{Binding SelectedStudents}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="#2D2D30"
+                                       BorderBrush="#3F3F46"
+                                       BorderThickness="1"
+                                       CornerRadius="4"
+                                       Padding="15"
+                                       Margin="5"
+                                       Width="350">
+                                    <Grid RowDefinitions="Auto,Auto">
+                                        <!-- Header: Name and Grade -->
+                                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+                                            <TextBlock Grid.Column="0"
+                                                     Text="{Binding Assessment.MuppetName}"
+                                                     Foreground="White"
+                                                     FontWeight="SemiBold"
+                                                     FontSize="14"
+                                                     TextWrapping="Wrap"/>
+                                            <Border Grid.Column="1"
+                                                   Background="#007ACC"
+                                                   CornerRadius="3"
+                                                   Padding="8,4"
+                                                   Margin="10,0,0,0">
+                                                <TextBlock Text="{Binding AssignedGrade}"
+                                                         Foreground="White"
+                                                         FontWeight="Bold"
+                                                         FontSize="14"/>
+                                            </Border>
+                                        </Grid>
+
+                                        <!-- Two-column table: Scores | Attributes -->
+                                        <Grid Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="15">
+                                            <!-- Scores Column -->
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="Scores"
+                                                         Foreground="#CCCCCC"
+                                                         FontSize="12"
+                                                         FontWeight="SemiBold"
+                                                         Margin="0,0,0,5"/>
+                                                <ItemsControl ItemsSource="{Binding Assessment.Scores}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                                                                <TextBlock Grid.Column="0"
+                                                                         Text="{Binding Name}"
+                                                                         Foreground="#AAAAAA"
+                                                                         FontSize="11"/>
+                                                                <TextBlock Grid.Column="1"
+                                                                         Text="{Binding Value}"
+                                                                         Foreground="White"
+                                                                         FontSize="11"
+                                                                         FontWeight="Medium"/>
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+
+                                            <!-- Attributes Column -->
+                                            <StackPanel Grid.Column="1">
+                                                <TextBlock Text="Attributes"
+                                                         Foreground="#CCCCCC"
+                                                         FontSize="12"
+                                                         FontWeight="SemiBold"
+                                                         Margin="0,0,0,5"/>
+                                                <ItemsControl ItemsSource="{Binding Assessment.Attributes}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                                                                <TextBlock Grid.Column="0"
+                                                                         Text="{Binding Name}"
+                                                                         Foreground="#AAAAAA"
+                                                                         FontSize="11"/>
+                                                                <TextBlock Grid.Column="1"
+                                                                         Text="{Binding Value}"
+                                                                         Foreground="White"
+                                                                         FontSize="11"
+                                                                         FontWeight="Medium"/>
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+    </Grid>
 </Window>
