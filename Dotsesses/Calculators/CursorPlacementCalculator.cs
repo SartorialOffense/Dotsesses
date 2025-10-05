@@ -28,26 +28,28 @@ public class CursorPlacementCalculator
 
         var sorted = existingCutoffs.OrderBy(c => c.Grade.Order).ToList();
 
-        // Find neighbors
-        var lowerGrade = sorted.LastOrDefault(c => c.Grade.Order < gradeToEnable.Order);
-        var higherGrade = sorted.FirstOrDefault(c => c.Grade.Order > gradeToEnable.Order);
+        // Find neighbors by grade order
+        // Better grade (lower order number, higher score) - e.g., A when enabling B
+        var betterGrade = sorted.LastOrDefault(c => c.Grade.Order < gradeToEnable.Order);
+        // Worse grade (higher order number, lower score) - e.g., C when enabling B
+        var worseGrade = sorted.FirstOrDefault(c => c.Grade.Order > gradeToEnable.Order);
 
         int proposedScore;
 
-        if (lowerGrade != null && higherGrade != null)
+        if (betterGrade != null && worseGrade != null)
         {
             // Between two cursors - place at midpoint
-            proposedScore = (lowerGrade.Score + higherGrade.Score) / 2;
+            proposedScore = (betterGrade.Score + worseGrade.Score) / 2;
         }
-        else if (higherGrade != null)
+        else if (worseGrade != null)
         {
-            // At bottom edge - place below highest cursor
-            proposedScore = Math.Max(minScore, higherGrade.Score - 10);
+            // At top edge (best grade) - place above the worse grade's cursor
+            proposedScore = Math.Min(maxScore, worseGrade.Score + 10);
         }
-        else if (lowerGrade != null)
+        else if (betterGrade != null)
         {
-            // At top edge - place above lowest cursor
-            proposedScore = Math.Min(maxScore, lowerGrade.Score + 10);
+            // At bottom edge (worst grade) - place below the better grade's cursor
+            proposedScore = Math.Max(minScore, betterGrade.Score - 10);
         }
         else
         {

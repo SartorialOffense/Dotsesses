@@ -55,7 +55,7 @@ public class InitialCutoffCalculator
                 }
             }
 
-            // Cutoff is the minimum score in this grade's range
+            // Cutoff is the minimum score for students who received this grade (accounting for ties)
             int cutoffScore = sortedStudents[endIndex - 1].AggregateGrade;
             cutoffs.Add(new GradeCutoff(curveEntry.Grade, cutoffScore));
 

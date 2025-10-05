@@ -6,13 +6,5 @@ namespace Dotsesses.Models;
 /// <param name="Name">Score name (e.g., "Quiz", "Final")</param>
 /// <param name="Index">Optional index for multiple scores of same type (e.g., Quiz 1, Quiz 2)</param>
 /// <param name="Value">Numeric score value</param>
-public record Score(string Name, int? Index, double Value)
-{
-    public Score(string Name, int? Index, double Value) : this()
-    {
-        ArgumentNullException.ThrowIfNull(Name);
-        this.Name = Name;
-        this.Index = Index;
-        this.Value = Value;
-    }
-}
+public record Score(string Name, int? Index, double Value);
+

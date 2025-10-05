@@ -26,27 +26,29 @@ public class CursorValidation
 
         var others = allCutoffs.Where(c => c.Grade.Order != gradeToMove.Order).ToList();
 
-        // Find adjacent cursors
-        var lowerGrade = others
-            .Where(c => c.Grade.Order < gradeToMove.Order)
-            .OrderByDescending(c => c.Grade.Order)
-            .FirstOrDefault();
-
-        var higherGrade = others
+        // Find adjacent cursors by score (not grade order)
+        // Lower score cursor (grade with higher order number, like C vs B)
+        var lowerScoreCursor = others
             .Where(c => c.Grade.Order > gradeToMove.Order)
             .OrderBy(c => c.Grade.Order)
             .FirstOrDefault();
 
+        // Higher score cursor (grade with lower order number, like A vs B)
+        var higherScoreCursor = others
+            .Where(c => c.Grade.Order < gradeToMove.Order)
+            .OrderByDescending(c => c.Grade.Order)
+            .FirstOrDefault();
+
         // Enforce minimum spacing
-        if (lowerGrade != null)
+        if (lowerScoreCursor != null)
         {
-            int minAllowed = lowerGrade.Score + MinimumCursorSpacing;
+            int minAllowed = lowerScoreCursor.Score + MinimumCursorSpacing;
             proposedScore = Math.Max(proposedScore, minAllowed);
         }
 
-        if (higherGrade != null)
+        if (higherScoreCursor != null)
         {
-            int maxAllowed = higherGrade.Score - MinimumCursorSpacing;
+            int maxAllowed = higherScoreCursor.Score - MinimumCursorSpacing;
             proposedScore = Math.Min(proposedScore, maxAllowed);
         }
 
