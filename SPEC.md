@@ -38,19 +38,32 @@ Hovering over a point displays a formatted summary table of the student's scores
 
 Click a point to toggle selection. **Selection persists when cursors move.**
 
+### Layout
+
+The main window uses a two-row layout:
+
+**Top Row:**
+- Left: Dotplot (stretches to fill available width)
+- Right: Curve Compliance grid in a collapsible SplitView pane
+  - When collapsed, dotplot uses full width
+  - Standard Avalonia SplitView with hamburger menu toggle
+
+**Bottom Row:**
+- Selected student cards span full width below both dotplot and compliance grid
+
 ### Drill Down
 
-The area below the dotplot shows selected students as cards in a horizontally-stretched container.
-Cards flow left to right, then down. A vertical scrollbar appears when cards don't fit.
+Selected students appear as rectangular cards with embedded tables.
+Cards flow left to right, then wrap to next row. A vertical scrollbar appears when cards don't fit.
 
-**Card Content (top to bottom):**
-1. MuppetName and assigned grade (header)
-2. Scores table (consistently sorted)
-3. Attributes table (consistently sorted)
+**Card Content:**
+1. Header: MuppetName and assigned grade
+2. Two-column table: Scores (left) | Attributes (right)
+3. Vertical spacing between cards
 
 ### Curve Compliance
 
-A grid in the bottom right corner shows:
+The collapsible SplitView pane shows:
 - Letter grades
 - Target counts (from school's curve policy)
 - Current counts
