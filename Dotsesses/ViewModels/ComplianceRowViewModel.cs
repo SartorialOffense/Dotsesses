@@ -24,13 +24,16 @@ public partial class ComplianceRowViewModel : ObservableObject
 
     public bool HasDeviation => Deviation > 0;
 
-    public ComplianceRowViewModel(Grade grade, int targetCount, int currentCount, bool isEnabled)
+    public ComplianceRowViewModel(Grade grade, int targetCount, int currentCount, bool isEnabled, Action? onEnabledChanged = null)
     {
         _grade = grade;
         _targetCount = targetCount;
         _currentCount = currentCount;
         _isEnabled = isEnabled;
+        _onEnabledChanged = onEnabledChanged;
     }
+
+    private readonly Action? _onEnabledChanged;
 
     partial void OnCurrentCountChanged(int value)
     {
@@ -42,5 +45,10 @@ public partial class ComplianceRowViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(Deviation));
         OnPropertyChanged(nameof(HasDeviation));
+    }
+
+    partial void OnIsEnabledChanged(bool value)
+    {
+        _onEnabledChanged?.Invoke();
     }
 }

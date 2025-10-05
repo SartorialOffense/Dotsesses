@@ -70,4 +70,42 @@ This document tracks implementation decisions made during autonomous development
    - Persist selection across cursor changes
    - Export to Excel functionality
 
-**Next Steps:** UI layout and XAML work to bring the ViewModels to life
+## Phase 6: Interactive Features - COMPLETED
+
+**Completed:**
+1. **Cursors on Dotplot** ✓
+   - Gold vertical line annotations (255, 215, 0) for visibility
+   - Semi-transparent grade labels with dark backgrounds
+   - Cursors sync with compliance grid checkboxes
+
+2. **Full Layout** ✓
+   - Two-row Grid: dotplot/compliance (top), student cards (bottom)
+   - SplitView with 300px right pane for compliance grid
+   - Hamburger toggle button for compliance pane
+   - Dark theme throughout (#1E1E1E, #2D2D30, #252526)
+
+3. **Compliance Grid UI** ✓
+   - ItemsControl with checkboxes for each grade
+   - Shows Grade, Target Count, Current Count, Deviation
+   - Checkboxes wired to enable/disable cursors
+   - Red deviation indicators (#FF6B6B) when not compliant
+
+4. **Student Cards** ✓
+   - Two-column card layout: Scores | Attributes
+   - Click-to-select on dotplot points (within 5-unit radius)
+   - Cards display in WrapPanel with 350px width
+   - Assigned grade badge in blue (#007ACC)
+
+5. **Hover Tooltips** ✓
+   - Muppet name and score displayed on hover
+   - OxyPlot default dark tracker styling
+
+6. **Interactive Features** ✓
+   - Checkbox changes trigger cursor visibility updates
+   - Dotplot click selects/deselects students
+   - Student cards populate on selection
+   - All state synchronized between views
+
+**Note:** MouseDown event on PlotModel is deprecated (CS0618 warning). Will need to migrate to newer event handling in future OxyPlot versions.
+
+**Next Steps:** Cursor dragging, validation, debouncing, Excel export

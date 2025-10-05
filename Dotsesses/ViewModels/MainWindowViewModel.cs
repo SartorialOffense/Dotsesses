@@ -89,6 +89,9 @@ public partial class MainWindowViewModel : ViewModelBase
             PlotAreaBorderColor = OxyColors.White
         };
 
+        // Enable mouse events for point selection
+        DotplotModel.MouseDown += OnDotplotMouseDown;
+
         // X-axis: Score range with padding
         var minScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade);
         var maxScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade);
@@ -135,7 +138,8 @@ public partial class MainWindowViewModel : ViewModelBase
             MarkerSize = 8,
             MarkerFill = OxyColors.Cyan,
             MarkerStroke = OxyColors.White,
-            MarkerStrokeThickness = 1
+            MarkerStrokeThickness = 1,
+            TrackerFormatString = "{Tag}\nScore: {2:0}"
         };
 
         foreach (var group in scoreGroups)
@@ -145,7 +149,10 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 // Y position: stack vertically with spacing (double the marker size)
                 double yPos = i * 2;
-                scatterSeries.Points.Add(new ScatterPoint(group.Key, yPos));
+                var student = studentsAtScore[i];
+                var muppetName = ClassAssessment.MuppetNameMap.TryGetValue(student.Id, out var info) ? info.Name : "Unknown";
+                
+                scatterSeries.Points.Add(new ScatterPoint(group.Key, yPos, tag: $"{muppetName}\nScore: {student.AggregateGrade}"));
             }
         }
 
@@ -165,13 +172,25 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 Type = LineAnnotationType.Vertical,
                 X = cursor.Score,
-                Color = OxyColors.White,
+                Color = OxyColor.FromRgb(255, 215, 0), // Gold color for visibility
                 LineStyle = LineStyle.Dash,
-                StrokeThickness = 2,
-                Text = cursor.Grade.LetterGrade.ToString(),
-                TextColor = OxyColors.White
+                StrokeThickness = 2
             };
             DotplotModel.Annotations.Add(line);
+
+            // Add semi-transparent text annotation for grade label
+            var label = new TextAnnotation
+            {
+                Text = cursor.Grade.LetterGrade.ToString(),
+                TextPosition = new DataPoint(cursor.Score, -1),
+                TextColor = OxyColor.FromArgb(180, 255, 255, 255), // Semi-transparent white
+                FontSize = 18,
+                FontWeight = OxyPlot.FontWeights.Bold,
+                Background = OxyColor.FromArgb(100, 0, 0, 0), // Semi-transparent black background
+                Padding = new OxyThickness(4),
+                TextHorizontalAlignment = OxyPlot.HorizontalAlignment.Center
+            };
+            DotplotModel.Annotations.Add(label);
         }
 
         DotplotModel.InvalidatePlot(true);
@@ -206,9 +225,30 @@ public partial class MainWindowViewModel : ViewModelBase
                 grade,
                 targetCount,
                 currentCount,
-                isEnabled
+                isEnabled,
+                OnComplianceCheckboxChanged
             ));
         }
+    }
+
+    private void OnComplianceCheckboxChanged()
+    {
+        UpdateCursorsFromComplianceGrid();
+        UpdateDotplotPoints();
+    }
+
+    private void UpdateCursorsFromComplianceGrid()
+    {
+        // Sync cursor enabled state with compliance grid checkboxes
+        foreach (var row in ComplianceRows)
+        {
+            var cursor = Cursors.FirstOrDefault(c => c.Grade.Equals(row.Grade));
+            if (cursor != null)
+            {
+                cursor.IsEnabled = row.IsEnabled;
+            }
+        }
+        UpdateCursors();
     }
 
     [RelayCommand]
@@ -248,5 +288,55 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         return "F";
+    }
+
+    private void OnDotplotMouseDown(object? sender, OxyMouseDownEventArgs e)
+    {
+        if (e.ChangedButton != OxyMouseButton.Left)
+            return;
+
+        var series = DotplotModel.Series.FirstOrDefault() as ScatterSeries;
+        if (series == null)
+            return;
+
+        // Find the nearest point to the click
+        var point = series.InverseTransform(e.Position);
+        var nearestPoint = FindNearestStudent(point.X, point.Y);
+        
+        if (nearestPoint != null)
+        {
+            ToggleStudent(nearestPoint);
+            e.Handled = true;
+        }
+    }
+
+    private StudentAssessment? FindNearestStudent(double clickX, double clickY)
+    {
+        // Group students by score to find Y positions
+        var scoreGroups = ClassAssessment.Assessments
+            .GroupBy(a => a.AggregateGrade)
+            .OrderBy(g => g.Key)
+            .ToList();
+
+        double minDistance = double.MaxValue;
+        StudentAssessment? nearest = null;
+
+        foreach (var group in scoreGroups)
+        {
+            var studentsAtScore = group.OrderBy(s => s.Id).ToList();
+            for (int i = 0; i < studentsAtScore.Count; i++)
+            {
+                double yPos = i * 2;
+                double distance = Math.Sqrt(Math.Pow(group.Key - clickX, 2) + Math.Pow(yPos - clickY, 2));
+                
+                if (distance < minDistance && distance < 5) // Within 5 units
+                {
+                    minDistance = distance;
+                    nearest = studentsAtScore[i];
+                }
+            }
+        }
+
+        return nearest;
     }
 }
