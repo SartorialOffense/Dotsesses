@@ -250,7 +250,6 @@ Just give me a standard curve of A, A-, B+, B, B-, C+, and C. No grades below th
 - ViewModels inherit from `ViewModelBase` (extends `ObservableObject`)
 - Convention-based View resolution via `ViewLocator`
 - Compiled bindings enabled by default
-- **Unit testing required** for ViewModels and calculation classes
 
 ### Current Features
 
@@ -260,6 +259,45 @@ Just give me a standard curve of A, A-, B+, B, B-, C+, and C. No grades below th
 - Linear axes with customizable titles and colors
 - Scatter series with cyan markers for visibility
 - Sample data: 8 data points demonstrating basic plotting
+
+## Testing
+
+### Unit test all calculators
+
+### Unit test all view models
+
+- Cursor changes with validation of student grade counts
+- Cursor changes at a variety of speeds
+
+### View Testing
+
+- The window view should be capable of saving png snapshots to a temp folder and providing file path to a caller.
+This is so that the agent (Claude Code) can close the loop when doing UI design. This implies that the window must
+called from a fit-for-purpose testing exe that is invokable with command line arguments to drive initial
+state for evaluation. 
+
+## Logging
+
+- Logging through ILog interface
+- All UI user inputs must be logged at debug level
+- Logging will be done to rolling file appenders for the debug and info levels
+- Log files will be capped at 100K in length or 30 days
+
+## Dependency Injection
+
+- Use microsoft's framework
+- Single class for dependency configuration
+
+## Exception handling
+
+- Exceptions will be allowed to rise up to a global application handler
+- The handler will inform the user of the problem and display the error in a manner that
+allows them to copy information to the clipboard for later debugging. This will include a stack trace.
+
+## Export
+
+It will be possible to export an Excel file containing all the student id's, their aggregate and
+individual scores, attributes and final grades as columns.
 
 ## Project Structure
 
