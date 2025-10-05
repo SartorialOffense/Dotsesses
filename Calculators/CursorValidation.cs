@@ -1,0 +1,75 @@
+namespace Dotsesses.Calculators;
+
+using Dotsesses.Models;
+
+/// <summary>
+/// Validates cursor movements and enforces constraints.
+/// </summary>
+public class CursorValidation
+{
+    private const int MinimumCursorSpacing = 1;
+
+    /// <summary>
+    /// Validates a proposed cursor movement.
+    /// </summary>
+    /// <param name="gradeToMove">Grade being moved</param>
+    /// <param name="proposedScore">New score position</param>
+    /// <param name="allCutoffs">All current cutoffs including the one being moved</param>
+    /// <returns>Validated score (may be adjusted to prevent overlap)</returns>
+    public int ValidateMovement(
+        Grade gradeToMove,
+        int proposedScore,
+        IReadOnlyCollection<GradeCutoff> allCutoffs)
+    {
+        ArgumentNullException.ThrowIfNull(gradeToMove);
+        ArgumentNullException.ThrowIfNull(allCutoffs);
+
+        var others = allCutoffs.Where(c => c.Grade.Order != gradeToMove.Order).ToList();
+
+        // Find adjacent cursors
+        var lowerGrade = others
+            .Where(c => c.Grade.Order < gradeToMove.Order)
+            .OrderByDescending(c => c.Grade.Order)
+            .FirstOrDefault();
+
+        var higherGrade = others
+            .Where(c => c.Grade.Order > gradeToMove.Order)
+            .OrderBy(c => c.Grade.Order)
+            .FirstOrDefault();
+
+        // Enforce minimum spacing
+        if (lowerGrade != null)
+        {
+            int minAllowed = lowerGrade.Score + MinimumCursorSpacing;
+            proposedScore = Math.Max(proposedScore, minAllowed);
+        }
+
+        if (higherGrade != null)
+        {
+            int maxAllowed = higherGrade.Score - MinimumCursorSpacing;
+            proposedScore = Math.Min(proposedScore, maxAllowed);
+        }
+
+        return proposedScore;
+    }
+
+    /// <summary>
+    /// Checks if a set of cutoffs is valid (no overlaps, proper spacing).
+    /// </summary>
+    public bool IsValid(IReadOnlyCollection<GradeCutoff> cutoffs)
+    {
+        ArgumentNullException.ThrowIfNull(cutoffs);
+
+        var sorted = cutoffs.OrderByDescending(c => c.Score).ToList();
+
+        for (int i = 0; i < sorted.Count - 1; i++)
+        {
+            if (sorted[i].Score - sorted[i + 1].Score < MinimumCursorSpacing)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+}
