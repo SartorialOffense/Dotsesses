@@ -19,6 +19,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly CutoffCountCalculator _cutoffCountCalculator;
     private readonly InitialCutoffCalculator _initialCutoffCalculator;
     private readonly CursorValidation _cursorValidation;
+    private readonly CursorPlacementCalculator _cursorPlacementCalculator;
     private CursorViewModel? _draggingCursor;
     private bool _isDraggingCursor;
 
@@ -45,6 +46,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _cutoffCountCalculator = new CutoffCountCalculator();
         _initialCutoffCalculator = new InitialCutoffCalculator();
         _cursorValidation = new CursorValidation();
+        _cursorPlacementCalculator = new CursorPlacementCalculator();
 
         _cursors = new ObservableCollection<CursorViewModel>();
         _selectedStudents = new ObservableCollection<StudentCardViewModel>();
@@ -140,18 +142,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void UpdateDotplotPoints()
     {
-        // Clear existing series and annotations
+        // Clear existing series
         DotplotModel.Series.Clear();
-
-        // Keep cursor annotations, but remove selection bars
-        var cursorAnnotations = DotplotModel.Annotations
-            .Where(a => a is LineAnnotation || a is TextAnnotation)
-            .ToList();
-        DotplotModel.Annotations.Clear();
-        foreach (var annotation in cursorAnnotations)
-        {
-            DotplotModel.Annotations.Add(annotation);
-        }
 
         // Group students by aggregate score and stack vertically
         var scoreGroups = ClassAssessment.Assessments
@@ -160,8 +152,20 @@ public partial class MainWindowViewModel : ViewModelBase
 
         // Marker size: 3x smaller than original (8) means ~2.67
         var markerSize = 8.0 / 3.0;
+        var crosshairSize = markerSize * 2;
 
-        // Create series for unselected dots (white fill)
+        // Create series for selected students (crosshairs behind)
+        var selectedSeries = new ScatterSeries
+        {
+            MarkerType = MarkerType.Cross,
+            MarkerSize = crosshairSize,
+            MarkerFill = OxyColor.FromRgb(70, 130, 180), // Medium blue
+            MarkerStroke = OxyColor.FromRgb(70, 130, 180),
+            MarkerStrokeThickness = 2,
+            TrackerFormatString = "{Tag}"
+        };
+
+        // Create series for all dots (white fill, on top)
         var dotSeries = new ScatterSeries
         {
             MarkerType = MarkerType.Circle,
@@ -187,44 +191,28 @@ public partial class MainWindowViewModel : ViewModelBase
                 var muppetName = ClassAssessment.MuppetNameMap.TryGetValue(student.Id, out var info) ? info.Name : "Unknown";
 
                 var point = new ScatterPoint(group.Key, yPos, tag: $"{muppetName}\nScore: {student.AggregateGrade}");
-                dotSeries.Points.Add(point);
 
-                // Add selection indicator (medium blue vertical bar behind dot)
+                // Add to both series if selected, otherwise just main series
                 var isSelected = SelectedStudents.Any(s => s.Assessment.Id == student.Id);
                 if (isSelected)
                 {
-                    var selectionBar = new RectangleAnnotation
-                    {
-                        MinimumX = group.Key - 0.15,
-                        MaximumX = group.Key + 0.15,
-                        MinimumY = yPos - markerSize / 2,
-                        MaximumY = yPos + markerSize / 2 * 2, // 2x dot height
-                        Fill = OxyColor.FromRgb(70, 130, 180), // Medium blue (steel blue)
-                        Stroke = OxyColors.Transparent,
-                        Layer = AnnotationLayer.BelowSeries
-                    };
-                    DotplotModel.Annotations.Add(selectionBar);
+                    selectedSeries.Points.Add(point);
                 }
+
+                dotSeries.Points.Add(point);
             }
         }
 
+        // Add selected series first (behind), then main dots
+        DotplotModel.Series.Add(selectedSeries);
         DotplotModel.Series.Add(dotSeries);
         DotplotModel.InvalidatePlot(true);
     }
 
     private void UpdateCursors()
     {
-        // Clear cursor annotations only (keep selection bars)
-        var selectionBars = DotplotModel.Annotations
-            .Where(a => a is RectangleAnnotation)
-            .ToList();
-
+        // Clear all annotations
         DotplotModel.Annotations.Clear();
-
-        foreach (var bar in selectionBars)
-        {
-            DotplotModel.Annotations.Add(bar);
-        }
 
         // Add vertical line annotations for each enabled cursor
         foreach (var cursor in Cursors.Where(c => c.IsEnabled))
@@ -299,13 +287,17 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void InitializeCursors()
     {
-        // Create cursors for grades in DefaultCurve (enabled by default)
+        // Create cursors for ALL grades, enabled based on DefaultCurve
+        var allGrades = new DefaultCurveGenerator().GetAllGrades();
         var defaultGrades = ClassAssessment.DefaultCurve.Select(cc => cc.Grade).ToHashSet();
 
-        foreach (var cutoff in ClassAssessment.CurrentCutoffs)
+        foreach (var grade in allGrades)
         {
-            bool isEnabled = defaultGrades.Contains(cutoff.Grade);
-            Cursors.Add(new CursorViewModel(cutoff.Grade, cutoff.Score, isEnabled));
+            var cutoff = ClassAssessment.CurrentCutoffs.FirstOrDefault(c => c.Grade.Equals(grade));
+            bool isEnabled = defaultGrades.Contains(grade);
+            int score = cutoff?.Score ?? 0; // Will be calculated when enabled
+
+            Cursors.Add(new CursorViewModel(grade, score, isEnabled));
         }
     }
 
@@ -341,15 +333,64 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void UpdateCursorsFromComplianceGrid()
     {
-        // Sync cursor enabled state with compliance grid checkboxes
+        // Track newly enabled grades that need cursor placement
+        var newlyEnabled = new List<Grade>();
+
         foreach (var row in ComplianceRows)
         {
             var cursor = Cursors.FirstOrDefault(c => c.Grade.Equals(row.Grade));
             if (cursor != null)
             {
+                bool wasEnabled = cursor.IsEnabled;
                 cursor.IsEnabled = row.IsEnabled;
+
+                // If newly enabled and has no valid score, track it
+                if (!wasEnabled && row.IsEnabled && cursor.Score == 0)
+                {
+                    newlyEnabled.Add(cursor.Grade);
+                }
             }
         }
+
+        // Calculate positions for newly enabled cursors
+        if (newlyEnabled.Any())
+        {
+            var minScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade);
+            var maxScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade);
+
+            foreach (var grade in newlyEnabled)
+            {
+                var existingCutoffs = Cursors
+                    .Where(c => c.IsEnabled && !newlyEnabled.Contains(c.Grade))
+                    .Select(c => new GradeCutoff(c.Grade, c.Score))
+                    .ToList();
+
+                var newCutoffs = _cursorPlacementCalculator.PlaceNewCursor(
+                    grade,
+                    existingCutoffs,
+                    minScore,
+                    maxScore);
+
+                // Update cursor with new score
+                var cursor = Cursors.FirstOrDefault(c => c.Grade.Equals(grade));
+                var newCutoff = newCutoffs.FirstOrDefault(c => c.Grade.Equals(grade));
+                if (cursor != null && newCutoff != null)
+                {
+                    cursor.Score = newCutoff.Score;
+                }
+
+                // If placement reset all cursors, update them too
+                foreach (var cutoff in newCutoffs)
+                {
+                    var c = Cursors.FirstOrDefault(cur => cur.Grade.Equals(cutoff.Grade));
+                    if (c != null)
+                    {
+                        c.Score = cutoff.Score;
+                    }
+                }
+            }
+        }
+
         UpdateCursors();
     }
 

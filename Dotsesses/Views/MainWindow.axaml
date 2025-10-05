@@ -227,14 +227,13 @@
                                             <ItemsControl ItemsSource="{Binding Assessment.Attributes}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                                                        <Grid ColumnDefinitions="*,Auto" Margin="0,2" TextElement.Foreground="White">
                                                             <TextBlock Grid.Column="0"
                                                                      Text="{Binding Name}"
                                                                      Foreground="#AAAAAA"
                                                                      FontSize="11"/>
                                                             <TextBlock Grid.Column="1"
                                                                      Text="{Binding Value}"
-                                                                     Foreground="White"
                                                                      FontSize="11"
                                                                      FontWeight="Medium"/>
                                                         </Grid>

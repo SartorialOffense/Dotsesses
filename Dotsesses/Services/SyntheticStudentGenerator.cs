@@ -130,20 +130,20 @@ public class SyntheticStudentGenerator
             {
                 case PerformanceTier.High:
                     outline = "Yes";
-                    midTerm = "✔✔+";
+                    midTerm = "✓✓+";
                     break;
 
                 case PerformanceTier.Middle:
                     outline = _random.NextDouble() < 0.7 ? "Yes" : "No";
                     double midRoll = _random.NextDouble();
-                    midTerm = midRoll < 0.7 ? "✔✔+" :
-                             midRoll < 0.9 ? "✔+" : "✔";
+                    midTerm = midRoll < 0.7 ? "✓✓+" :
+                             midRoll < 0.9 ? "✓+" : "✓";
                     break;
 
                 case PerformanceTier.Low:
                 default:
                     outline = _random.NextDouble() < 0.1 ? "Yes" : "No";
-                    midTerm = _random.NextDouble() < 0.2 ? "✔" : "✔-";
+                    midTerm = _random.NextDouble() < 0.2 ? "✓" : "✓-";
                     break;
             }
         }
@@ -152,9 +152,9 @@ public class SyntheticStudentGenerator
             // Independent roll
             outline = _random.NextDouble() < 0.5 ? "Yes" : "No";
             double roll = _random.NextDouble();
-            midTerm = roll < 0.25 ? "✔✔+" :
-                     roll < 0.50 ? "✔+" :
-                     roll < 0.75 ? "✔" : "✔-";
+            midTerm = roll < 0.25 ? "✓✓+" :
+                     roll < 0.50 ? "✓+" :
+                     roll < 0.75 ? "✓" : "✓-";
         }
 
         return new List<StudentAttribute>
