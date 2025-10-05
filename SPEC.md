@@ -26,6 +26,10 @@ Aggregate score determines x-axis position. Lowest score on the left, highest on
 
 Students with identical aggregate scores stack vertically, ordered by student ID for consistent positioning across redraws. Dot spacing is double the marker size.
 
+**Bin Offset:** Bins with odd aggregate scores (e.g., 281, 283, 285) receive a +0.1 y-axis offset. All dots in that bin shift up by 0.1 to make adjacent bins more visually distinct.
+
+**Y-Axis Padding:** Top and bottom padding equals `max_students_in_bin × 0.1`. For example, if the maximum number of students at any score is 8, padding is 0.8 on both top and bottom.
+
 #### Scaling
 
 Dotplot stretches horizontally and autoscales vertically to fit the maximum number of students in a bin.
@@ -38,15 +42,41 @@ Hovering over a point displays a formatted summary table of the student's scores
 
 Click a point to toggle selection. **Selection persists when cursors move.**
 
+**Visual Indicator:** Selected students display a medium blue vertical bar (height = 2× dot diameter) drawn behind the dot as a non-interactive annotation. Each selected student gets its own vertical bar, which may overlap with other bars or extend over nearby dots.
+
+#### Dot Appearance
+
+- **Size:** Marker radius is 3× smaller than default to reduce overlap
+- **Color:** Solid white
+- **Background:** RGB(24, 24, 24) matching all other controls
+
+#### Axis Display
+
+- **X-Axis:** Bottom axis line only (no tick marks, no labels)
+- **Y-Axis:** Hidden (no line, no ticks, no labels)
+- **Borders:** Bottom border only (top, left, and right borders removed)
+- **Title:** None
+
+#### Toolbar
+
+Above the dotplot, left-aligned:
+- **Clear Selections Button:** Displays eraser symbol (⌫) with tooltip "Clear all selections"
+
 ### Layout
 
-The main window uses a two-row layout:
+The main window uses a two-row layout with a resizable splitter:
 
 **Top Row:**
 - Left: Dotplot (stretches to fill available width)
+  - Minimum height: 20% of initial height
+  - Maximum height: Initial height
 - Right: Curve Compliance grid in a collapsible SplitView pane
   - When collapsed, dotplot uses full width
   - Standard Avalonia SplitView with hamburger menu toggle
+
+**Splitter:**
+- Subtle horizontal splitter between top row and bottom row
+- Dragging adjusts heights: dotplot stretches, compliance grid gets scrollbar when too short
 
 **Bottom Row:**
 - Selected student cards span full width below both dotplot and compliance grid
@@ -58,28 +88,43 @@ Cards flow left to right, then wrap to next row. A vertical scrollbar appears wh
 
 **Card Content:**
 1. Header: MuppetName and assigned grade
-2. Two-column table: Scores (left) | Attributes (right)
+2. Two-column table (Name | Value):
+   - Scores appear first
+   - Thin light gray separator line
+   - Attributes appear below
+   - No section headers ("Scores" / "Attributes")
+   - Check symbols match text color (not dark gray)
 3. Vertical spacing between cards
+
+**Background:** RGB(24, 24, 24)
 
 ### Curve Compliance
 
 The collapsible SplitView pane shows:
-- Letter grades
+- Letter grades (display as "D-" not "DMinus")
 - Target counts (from school's curve policy)
 - Current counts
 - Absolute deviation (only if > 0)
+  - Negative deviations (below target): Light blue color
+  - Positive deviations (above target): Red color
 
 **Grade Checkboxes:** Checkboxes to the left of the table control which grades are enabled. Unchecking a grade hides its cursor and recalculates binning.
+
+**Table Styling:**
+- Vertical spacing: 50% of default
+- Proper column alignment and spacing
+- Background: RGB(24, 24, 24)
 
 ### Cursors
 
 - Dashed vertical cursors show grade cutoffs (only when enabled via checkboxes).
 - Letter grade labels appear centered between each cursor and its right neighbor. For the highest grade, the label is centered between the cursor and right boundary.
 - The lowest grade has no cursor. Its label is centered between the left boundary and the second-lowest grade's cursor.
-- Labels are **semi-transparent (fixed level)** and use a larger font than other text.
+- Labels are **semi-transparent (fixed level)**, use a larger font than other text, and must be visible (not black on dark background).
 - Cursors are draggable but cannot overlap.
   - Example: cursor for A cannot move left of or onto A-.
   - **Cursors must be at least 1 point apart** on the score scale.
+- **Enabling/disabling cursors triggers recalculation** of grade assignments.
 
 #### Initial Placement of Cursors
 
