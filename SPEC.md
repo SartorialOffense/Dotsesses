@@ -2,57 +2,46 @@
 
 ## Overview
 
-Dotsesses is fun user interface for the visualization of
-aggregate student grades as dotplot histograms with drill-down capability
-and interactive cursors to show breaks in the grade curve. The goal is to
-make it easy to see the distribution of aggregate student scores, their individual components, and assign
-fair letter grades that reasonable resemble to schools curve policy.
+Dotsesses visualizes aggregate student grades as dotplot histograms with drill-down
+and interactive cursors for grade cutoffs. It shows score distributions,
+individual components, and helps assign letter grades that match the school's curve policy.
 
-The name is a play on incorrect pluralization of "dot". The general theme is playful and
-reminiscent of early grade school. Crayons, finger-paint, and recess - we are here to have fun!!!
+The name is a play on incorrect pluralization of "dot". The theme is playful and
+reminiscent of early grade school.
 
 ## User Experience
 
 ### Dotplot Visualization
 
-The scores will be distributed horizontally on a
-dotplot histogram (from now on referred to as the "dotplot") that stretches across the top
+Scores are distributed horizontally on a dotplot histogram that stretches across the top
 of the main window.
 
 #### X-Axis Positioning
 
-The aggregate score will be used to assign a discrete x-axis position. The lowest
-score will be on the far left side (with some padding). The highest score will be
-on the far right with padding.
+Aggregate score determines x-axis position. Lowest score on the left, highest on the right, both with padding.
 
-**Padding:** Use the total number of letter grades (10) as the left padding amount to ensure space for all possible grade cursors.
+**Padding:** Use 10 units on the left (total number of letter grades) to leave space for all grade cursors.
 
-#### Y-Axis positioning
+#### Y-Axis Positioning
 
-The Y-axis position will be determined by the number of students in the x-position.
-Students with identical aggregate scores stack vertically at that x-position, ordered by student ID for stable positioning across redraws. The spacing of the dots should be double the marker size.
+Students with identical aggregate scores stack vertically, ordered by student ID for consistent positioning across redraws. Dot spacing is double the marker size.
 
 #### Scaling
 
-The dotplot should be stretched horizontally and autoscale vertically to fit the
-maximum number of students in a bin.
+Dotplot stretches horizontally and autoscales vertically to fit the maximum number of students in a bin.
 
 #### Hover
 
-Hovering the mouse over a point will display a formatted summary table of the student's
-scores and attributes. These should be organized by the name and index (if present).
+Hovering over a point displays a formatted summary table of the student's scores and attributes, organized by name and index (if present).
 
 #### Selection
 
-Students may be toggled into selected/deselected states by clicking. **Selection persists when cursors are moved.**
+Click a point to toggle selection. **Selection persists when cursors move.**
 
 ### Drill Down
 
-The area below the dotplot will be used for drill-down and comparison of students that are selected.
-The individual students will be displayed as cards that are automatically laid out into a container.
-The container will fill from left to right and then down. There will be a vertical scrollbar displayed
-when there are additional rows of cards that can not be fit. The drill-down container should be
-stretched horizontally.
+The area below the dotplot shows selected students as cards in a horizontally-stretched container.
+Cards flow left to right, then down. A vertical scrollbar appears when cards don't fit.
 
 **Card Content (top to bottom):**
 1. MuppetName and assigned grade (header)
@@ -61,28 +50,22 @@ stretched horizontally.
 
 ### Curve Compliance
 
-A grid in the far right bottom corner will show:
-- LetterGrades
-- Counts from the School Curve Policy (default)
-- Current CutoffCount
+A grid in the bottom right corner shows:
+- Letter grades
+- Target counts (from school's curve policy)
+- Current counts
 - Absolute deviation (only if > 0)
 
-**Grade Checkboxes:** To the left of the compliance table, display checkboxes for each letter grade. Unchecking a grade hides its cursor and recalculates binning.
+**Grade Checkboxes:** Checkboxes to the left of the table control which grades are enabled. Unchecking a grade hides its cursor and recalculates binning.
 
 ### Cursors
 
-- Cursors are shown when LetterGrades are enabled via checkboxes. Unchecking a grade removes its cursor.
-- Dashed vertical cursors will show the selected grade cutoffs.
-- LetterGrade for the cursor will be displayed as a text annotation between the cursor
-and its right neighbor centered vertically and horizontally. For the highest grades (lowest index), the
-horizontal centering is between the cursor and right boundary.
-- The lowest grade is special. The cursor is not displayed and its annotation is displayed horizontally
-centered between the plots lower left boundary and the second lowest Grade.
-It is still vertically centered.
-- The LetterGrade annotations will be **semi-transparent with fixed transparency level** and have a large font
-compared with other text.
-- The user will be able to slide them left and right - but they can never overlap.
-  - For example, cursor A can never be moved left of or on top of A-.
+- Dashed vertical cursors show grade cutoffs (only when enabled via checkboxes).
+- Letter grade labels appear centered between each cursor and its right neighbor. For the highest grade, the label is centered between the cursor and right boundary.
+- The lowest grade has no cursor. Its label is centered between the left boundary and the second-lowest grade's cursor.
+- Labels are **semi-transparent (fixed level)** and use a larger font than other text.
+- Cursors are draggable but cannot overlap.
+  - Example: cursor for A cannot move left of or onto A-.
   - **Cursors must be at least 1 point apart** on the score scale.
 
 #### Initial Placement of Cursors
@@ -104,23 +87,22 @@ When a disabled cursor is enabled:
 
 ### Export
 
-It will be possible to export an Excel file containing all the student id's, their aggregate and
-individual scores, attributes and final grades as columns.
+Export to Excel with columns for student ID, aggregate score, individual scores, attributes, and final grade.
 
 ## Data Model
 
 ### Conventions
 
-- All []'s should be exposed as IReadOnlyCollection's unless otherwise stated.
-- immutable means use a record class or whatever is the hot new immutable way to do it
+- All arrays expose as IReadOnlyCollection unless otherwise stated.
+- "immutable" means use record classes or the current preferred immutable pattern.
 
 ### StudentAssessment
 
 - int Id
 - int AggregateGrade - **calculated property with caching**, sum of Scores (converted to int)
-- Score[] Scores - individual numeric scores (Quiz)
-- StudentAttribute[] Attributes - like 'Accommodation'
-- string MuppetName - fun whimsical identifier (see MuppetName Generation below)
+- Score[] Scores - individual numeric scores
+- StudentAttribute[] Attributes - non-numeric data like "Accommodation"
+- string MuppetName - whimsical identifier (see MuppetName Generation)
 
 ### immutable Score
 
@@ -160,7 +142,7 @@ individual scores, attributes and final grades as columns.
 
 ### MuppetName Generation
 
-To make the interface more playful, each student gets a whimsical "MuppetName" instead of showing boring numeric IDs.
+Each student gets a whimsical "MuppetName" instead of showing their numeric ID.
 
 **Structure:** `[Size/Color/Adjective] [Character] [Emojis]`
 
@@ -204,41 +186,40 @@ To make the interface more playful, each student gets a whimsical "MuppetName" i
 
 ### Logging
 
-- Logging through ILog interface
-- All UI user inputs must be logged at debug level
-- Logging will be done to rolling file appenders for the debug and info levels
-- Log files will be capped at 100K in length or 30 days
+- Log through ILog interface
+- Log all UI user inputs at debug level
+- Use rolling file appenders for debug and info levels
+- Cap log files at 100K or 30 days
 
 ### Exception Handling
 
-- Exceptions will be allowed to rise up to a global application handler
-- The handler will inform the user of the problem and display the error in a manner that
-allows them to copy information to the clipboard for later debugging. This will include a stack trace.
+- Exceptions rise to a global application handler
+- Handler displays error message with stack trace that can be copied to clipboard
 
 ### Update Behavior
 
 #### Cursor Movement Calculation
 
-**Smart async updates with 25ms delay and cancellation:**
+Async updates with 25ms delay and cancellation:
 
 1. Trigger calculation on cursor move
-2. Wait 25ms (async)
-3. Check cancellation token on UI context (cursor moved again?)
+2. Wait 25ms
+3. Check cancellation token (cursor moved again?)
 4. If cancelled, abort
-5. If not cancelled, perform recalculation on background task
-6. Check cancellation token again before UI update
+5. If not cancelled, recalculate on background thread
+6. Check cancellation token before UI update
 7. Update UI only if not cancelled
 
-**Result:** Smooth, responsive updates without unnecessary calculations during rapid cursor movement.
+Avoids unnecessary calculations during rapid cursor movement.
 
 #### Update Flow
 
-When updates are made to cursors:
-1. Build GradeCutoff[] from current cursor positions
+When cursors change:
+1. Build GradeCutoff[] from cursor positions
 2. Background calculator receives StudentAssessments and GradeCutoffs
 3. Returns IReadOnlyCollection<CutoffCount>
 4. Assign to ClassAssessment.Current
-5. Update curve compliance table in UI
+5. Update compliance table
 
 ### Project Structure
 
@@ -258,37 +239,37 @@ Dotsesses/
 
 #### Grades
 
-Eventually, we will load student, grade, and curve data from Excel files. For now,
-lets just create random data with some patterning. Assume 100 students. Their grades should break down into:
-
+Generate random data for 100 students with three score components:
 - Quiz Total (20 pts)
 - Participation Total (20 pts)
 - Final (300 pt)
 
-I want to have a tri-modal distribution: 5% Super-stars that score >250 in aggregate,
-75% broad middle of the roaders with scores between 150-225, and 20% losers that score 50-125.
+Tri-modal distribution:
+- 5% high performers: aggregate score >250
+- 75% middle: aggregate score 150-225
+- 20% low performers: aggregate score 50-125
 
 #### Attributes
 
-Attributes should be generated with **60% correlation, 40% independent** to add realistic variation:
+Generate with **60% correlation, 40% independent** for realistic variation:
 
-- **Super-Stars (5%)**
+- **High performers (5%)**
   - "Submitted Outline" : "Yes"
   - "Mid-Term": "✔✔+"
 
-- **Roaders (75%)**
-  - "Submitted Outline" : 70% "Yes" 30% "No"
+- **Middle (75%)**
+  - "Submitted Outline" : 70% "Yes", 30% "No"
   - "Mid-Term": 70% "✔✔+", 20% "✔+", 10% "✔"
 
-- **Losers (20%)**
-  - "Submitted Outline" : 10% "Yes" 90% "No"
+- **Low performers (20%)**
+  - "Submitted Outline" : 10% "Yes", 90% "No"
   - "Mid-Term": 20% "✔", 80% "✔-"
 
-**Implementation:** For 60% of students, make attributes correlate with performance group. For 40%, roll independently.
+**Implementation:** 60% of students get attributes matching their performance group. 40% roll independently.
 
 #### Default School Curve
 
-Just give me a standard curve of A, A-, B+, B, B-, C+, and C. No grades below this are mandatory.
+Standard curve: A, A-, B+, B, B-, C+, and C. Grades below C are not required.
 
 ## Testing Strategy
 
@@ -304,10 +285,7 @@ Just give me a standard curve of A, A-, B+, B, B-, C+, and C. No grades below th
 
 ### View Testing
 
-The window view should be capable of saving png snapshots to a temp folder and providing file path to a caller.
-This is so that the agent (Claude Code) can close the loop when doing UI design. This implies that the window must
-called from a fit-for-purpose testing exe that is invokable with command line arguments to drive initial
-state for evaluation.
+The window must save PNG snapshots to a temp folder and return the file path. This allows Claude Code to verify UI design. The window must be callable from a test executable that accepts command line arguments to set initial state.
 
 ## Design History
 
