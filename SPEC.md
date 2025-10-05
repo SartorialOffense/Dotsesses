@@ -11,6 +11,102 @@ fair letter grades that reasonable resemble to schools curve policy.
 The name is a play on incorrect pluralization of "dot". The general theme is playful and
 reminiscent of early grade school. Crayons, finger-paint, and recess - we are here to have fun!!!
 
+## User Experience
+
+### Dotplot Visualization
+
+The scores will be distributed horizontally on a
+dotplot histogram (from now on referred to as the "dotplot") that stretches across the top
+of the main window.
+
+#### X-Axis Positioning
+
+The aggregate score will be used to assign a discrete x-axis position. The lowest
+score will be on the far left side (with some padding). The highest score will be
+on the far right with padding.
+
+**Padding:** Use the total number of letter grades (10) as the left padding amount to ensure space for all possible grade cursors.
+
+#### Y-Axis positioning
+
+The Y-axis position will be determined by the number of students in the x-position.
+Students with identical aggregate scores stack vertically at that x-position, ordered by student ID for stable positioning across redraws. The spacing of the dots should be double the marker size.
+
+#### Scaling
+
+The dotplot should be stretched horizontally and autoscale vertically to fit the
+maximum number of students in a bin.
+
+#### Hover
+
+Hovering the mouse over a point will display a formatted summary table of the student's
+scores and attributes. These should be organized by the name and index (if present).
+
+#### Selection
+
+Students may be toggled into selected/deselected states by clicking. **Selection persists when cursors are moved.**
+
+### Drill Down
+
+The area below the dotplot will be used for drill-down and comparison of students that are selected.
+The individual students will be displayed as cards that are automatically laid out into a container.
+The container will fill from left to right and then down. There will be a vertical scrollbar displayed
+when there are additional rows of cards that can not be fit. The drill-down container should be
+stretched horizontally.
+
+**Card Content (top to bottom):**
+1. MuppetName and assigned grade (header)
+2. Scores table (consistently sorted)
+3. Attributes table (consistently sorted)
+
+### Curve Compliance
+
+A grid in the far right bottom corner will show:
+- LetterGrades
+- Counts from the School Curve Policy (default)
+- Current CutoffCount
+- Absolute deviation (only if > 0)
+
+**Grade Checkboxes:** To the left of the compliance table, display checkboxes for each letter grade. Unchecking a grade hides its cursor and recalculates binning.
+
+### Cursors
+
+- Cursors are shown when LetterGrades are enabled via checkboxes. Unchecking a grade removes its cursor.
+- Dashed vertical cursors will show the selected grade cutoffs.
+- LetterGrade for the cursor will be displayed as a text annotation between the cursor
+and its right neighbor centered vertically and horizontally. For the highest grades (lowest index), the
+horizontal centering is between the cursor and right boundary.
+- The lowest grade is special. The cursor is not displayed and its annotation is displayed horizontally
+centered between the plots lower left boundary and the second lowest Grade.
+It is still vertically centered.
+- The LetterGrade annotations will be **semi-transparent with fixed transparency level** and have a large font
+compared with other text.
+- The user will be able to slide them left and right - but they can never overlap.
+  - For example, cursor A can never be moved left of or on top of A-.
+  - **Cursors must be at least 1 point apart** on the score scale.
+
+#### Initial Placement of Cursors
+
+Algorithm:
+1. Start with grades in the DefaultCurve
+2. For each grade (starting from highest), assign cutoff to match target count
+3. Allow overflow if multiple students are tied at boundary (fairness - don't split tied students)
+4. Grades not in DefaultCurve start disabled
+
+#### Enabling Additional Cursors
+
+When a disabled cursor is enabled:
+
+1. **If between existing cursors:** Place at middle of score range between neighbors
+   - Example: A- at 280, B+ at 260 → place B at 270
+2. **If at edge:** Place to the left/right of existing cursors
+3. **If placement causes overlap:** Reset ALL enabled cursors to even spacing across score range (min to max)
+
+### Export
+
+It will be possible to export an Excel file containing all the student id's, their aggregate and
+individual scores, attributes and final grades as columns.
+
 ## Data Model
 
 ### Conventions
@@ -85,98 +181,43 @@ To make the interface more playful, each student gets a whimsical "MuppetName" i
 
 **Note:** Student IDs don't need consistent MuppetNames across different ClassAssessments.
 
-## Presentation of Data
+## Technical Architecture
 
-The scores will be distributed horizontally on a
-dotplot histogram (from now on referred to as the "dotplot") that stretches across the top
-of the main window.
+### Technology Stack
 
-### X-Axis Positioning
+- **Framework**: .NET 9.0
+- **UI Framework**: Avalonia 11.3.6
+- **MVVM Toolkit**: CommunityToolkit.Mvvm 8.2.1
+- **Plotting Library**: OxyPlot.Avalonia 2.1.0-Avalonia11
+- **Theme**: Dark theme variant
 
-The aggregate score will be used to assign a discrete x-axis position. The lowest
-score will be on the far left side (with some padding). The highest score will be
-on the far right with padding.
+### MVVM Pattern
 
-**Padding:** Use the total number of letter grades (10) as the left padding amount to ensure space for all possible grade cursors.
+- ViewModels inherit from `ViewModelBase` (extends `ObservableObject`)
+- Convention-based View resolution via `ViewLocator`
+- Compiled bindings enabled by default
 
-### Y-Axis positioning
+### Dependency Injection
 
-The Y-axis position will be determined by the number of students in the x-position.
-Students with identical aggregate scores stack vertically at that x-position, ordered by student ID for stable positioning across redraws. The spacing of the dots should be double the marker size.
+- Use Microsoft's framework
+- Single class for dependency configuration
 
-### Scaling
+### Logging
 
-The dotplot should be stretched horizontally and autoscale vertically to fit the
-maximum number of students in a bin.
+- Logging through ILog interface
+- All UI user inputs must be logged at debug level
+- Logging will be done to rolling file appenders for the debug and info levels
+- Log files will be capped at 100K in length or 30 days
 
-### Hover
+### Exception Handling
 
-Hovering the mouse over a point will display a formatted summary table of the student's
-scores and attributes. These should be organized by the name and index (if present).
+- Exceptions will be allowed to rise up to a global application handler
+- The handler will inform the user of the problem and display the error in a manner that
+allows them to copy information to the clipboard for later debugging. This will include a stack trace.
 
-### Selection
+### Update Behavior
 
-Students may be toggled into selected/deselected states by clicking. **Selection persists when cursors are moved.**
-
-### Drill Down
-
-The area below the dotplot will be used for drill-down and comparison of students that are selected.
-The individual students will be displayed as cards that are automatically laid out into a container.
-The container will fill from left to right and then down. There will be a vertical scrollbar displayed
-when there are additional rows of cards that can not be fit. The drill-down container should be
-stretched horizontally.
-
-**Card Content (top to bottom):**
-1. MuppetName and assigned grade (header)
-2. Scores table (consistently sorted)
-3. Attributes table (consistently sorted)
-
-### Curve Compliance
-
-A grid in the far right bottom corner will show:
-- LetterGrades
-- Counts from the School Curve Policy (default)
-- Current CutoffCount
-- Absolute deviation (only if > 0)
-
-**Grade Checkboxes:** To the left of the compliance table, display checkboxes for each letter grade. Unchecking a grade hides its cursor and recalculates binning.
-
-### Cursors
-
-- Cursors are shown when LetterGrades are enabled via checkboxes. Unchecking a grade removes its cursor.
-- Dashed vertical cursors will show the selected grade cutoffs.
-- LetterGrade for the cursor will be displayed as a text annotation between the cursor
-and its right neighbor centered vertically and horizontally. For the highest grades (lowest index), the
-horizontal centering is between the cursor and right boundary.
-- The lowest grade is special. The cursor is not displayed and its annotation is displayed horizontally
-centered between the plots lower left boundary and the second lowest Grade.
-It is still vertically centered.
-- The LetterGrade annotations will be **semi-transparent with fixed transparency level** and have a large font
-compared with other text.
-- The user will be able to slide them left and right - but they can never overlap.
-  - For example, cursor A can never be moved left of or on top of A-.
-  - **Cursors must be at least 1 point apart** on the score scale.
-
-### Initial Placement of Cursors
-
-Algorithm:
-1. Start with grades in the DefaultCurve
-2. For each grade (starting from highest), assign cutoff to match target count
-3. Allow overflow if multiple students are tied at boundary (fairness - don't split tied students)
-4. Grades not in DefaultCurve start disabled
-
-### Enabling Additional Cursors
-
-When a disabled cursor is enabled:
-
-1. **If between existing cursors:** Place at middle of score range between neighbors
-   - Example: A- at 280, B+ at 260 → place B at 270
-2. **If at edge:** Place to the left/right of existing cursors
-3. **If placement causes overlap:** Reset ALL enabled cursors to even spacing across score range (min to max)
-
-## Update Behavior
-
-### Cursor Movement Calculation
+#### Cursor Movement Calculation
 
 **Smart async updates with 25ms delay and cancellation:**
 
@@ -190,7 +231,7 @@ When a disabled cursor is enabled:
 
 **Result:** Smooth, responsive updates without unnecessary calculations during rapid cursor movement.
 
-### Update Flow
+#### Update Flow
 
 When updates are made to cursors:
 1. Build GradeCutoff[] from current cursor positions
@@ -199,9 +240,23 @@ When updates are made to cursors:
 4. Assign to ClassAssessment.Current
 5. Update curve compliance table in UI
 
-## Loading Of Data
+### Project Structure
 
-### Grades
+```
+Dotsesses/
+├── ViewModels/       # MVVM ViewModels
+├── Views/            # Avalonia UserControls and Windows
+├── Models/           # Data models
+├── Calculators/      # Grade calculation logic
+├── Services/         # Data generation, MuppetName generation
+└── Assets/           # Application resources
+```
+
+## Implementation Details
+
+### Synthetic Test Data
+
+#### Grades
 
 Eventually, we will load student, grade, and curve data from Excel files. For now,
 lets just create random data with some patterning. Assume 100 students. Their grades should break down into:
@@ -213,7 +268,7 @@ lets just create random data with some patterning. Assume 100 students. Their gr
 I want to have a tri-modal distribution: 5% Super-stars that score >250 in aggregate,
 75% broad middle of the roaders with scores between 150-225, and 20% losers that score 50-125.
 
-### Attributes (Synthetic Test Data)
+#### Attributes
 
 Attributes should be generated with **60% correlation, 40% independent** to add realistic variation:
 
@@ -231,85 +286,28 @@ Attributes should be generated with **60% correlation, 40% independent** to add 
 
 **Implementation:** For 60% of students, make attributes correlate with performance group. For 40%, roll independently.
 
-### Default School Curve
+#### Default School Curve
 
 Just give me a standard curve of A, A-, B+, B, B-, C+, and C. No grades below this are mandatory.
 
-## Technical Stack
+## Testing Strategy
 
-- **Framework**: .NET 9.0
-- **UI Framework**: Avalonia 11.3.6
-- **MVVM Toolkit**: CommunityToolkit.Mvvm 8.2.1
-- **Plotting Library**: OxyPlot.Avalonia 2.1.0-Avalonia11
-- **Theme**: Dark theme variant
-- **Testing**: Unit tests required for calculation classes and ViewModels
+### Unit Testing
 
-## Architecture
+#### Calculators
+- All calculator classes must have unit tests
 
-### MVVM Pattern
-- ViewModels inherit from `ViewModelBase` (extends `ObservableObject`)
-- Convention-based View resolution via `ViewLocator`
-- Compiled bindings enabled by default
-
-### Current Features
-
-#### Scatter Plot Visualization
-- PlotModel with configurable data series
-- Dark theme with black background and white text
-- Linear axes with customizable titles and colors
-- Scatter series with cyan markers for visibility
-- Sample data: 8 data points demonstrating basic plotting
-
-## Testing
-
-### Unit test all calculators
-
-### Unit test all view models
-
+#### ViewModels
+- All ViewModels must have unit tests
 - Cursor changes with validation of student grade counts
 - Cursor changes at a variety of speeds
 
 ### View Testing
 
-- The window view should be capable of saving png snapshots to a temp folder and providing file path to a caller.
+The window view should be capable of saving png snapshots to a temp folder and providing file path to a caller.
 This is so that the agent (Claude Code) can close the loop when doing UI design. This implies that the window must
 called from a fit-for-purpose testing exe that is invokable with command line arguments to drive initial
-state for evaluation. 
-
-## Logging
-
-- Logging through ILog interface
-- All UI user inputs must be logged at debug level
-- Logging will be done to rolling file appenders for the debug and info levels
-- Log files will be capped at 100K in length or 30 days
-
-## Dependency Injection
-
-- Use microsoft's framework
-- Single class for dependency configuration
-
-## Exception handling
-
-- Exceptions will be allowed to rise up to a global application handler
-- The handler will inform the user of the problem and display the error in a manner that
-allows them to copy information to the clipboard for later debugging. This will include a stack trace.
-
-## Export
-
-It will be possible to export an Excel file containing all the student id's, their aggregate and
-individual scores, attributes and final grades as columns.
-
-## Project Structure
-
-```
-Dotsesses/
-├── ViewModels/       # MVVM ViewModels
-├── Views/            # Avalonia UserControls and Windows
-├── Models/           # Data models
-├── Calculators/      # Grade calculation logic
-├── Services/         # Data generation, MuppetName generation
-└── Assets/           # Application resources
-```
+state for evaluation.
 
 ## Design History
 
