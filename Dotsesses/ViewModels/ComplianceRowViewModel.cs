@@ -22,6 +22,8 @@ public partial class ComplianceRowViewModel : ObservableObject
 
     public int Deviation => Math.Abs(CurrentCount - TargetCount);
 
+    public int SignedDeviation => CurrentCount - TargetCount;
+
     public bool HasDeviation => Deviation > 0;
 
     public ComplianceRowViewModel(Grade grade, int targetCount, int currentCount, bool isEnabled, Action? onEnabledChanged = null)
@@ -38,12 +40,14 @@ public partial class ComplianceRowViewModel : ObservableObject
     partial void OnCurrentCountChanged(int value)
     {
         OnPropertyChanged(nameof(Deviation));
+        OnPropertyChanged(nameof(SignedDeviation));
         OnPropertyChanged(nameof(HasDeviation));
     }
 
     partial void OnTargetCountChanged(int value)
     {
         OnPropertyChanged(nameof(Deviation));
+        OnPropertyChanged(nameof(SignedDeviation));
         OnPropertyChanged(nameof(HasDeviation));
     }
 

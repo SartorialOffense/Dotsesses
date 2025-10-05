@@ -83,11 +83,13 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void InitializeDotplot()
     {
+        var backgroundColor = OxyColor.FromRgb(24, 24, 24);
+
         DotplotModel = new PlotModel
         {
-            Title = "Student Grade Distribution",
-            Background = OxyColors.Black,
-            TextColor = OxyColors.White,
+            Background = backgroundColor,
+            PlotAreaBackground = backgroundColor,
+            PlotAreaBorderThickness = new OxyThickness(0, 0, 0, 1), // Bottom border only
             PlotAreaBorderColor = OxyColors.White
         };
 
@@ -96,30 +98,40 @@ public partial class MainWindowViewModel : ViewModelBase
         DotplotModel.MouseMove += OnDotplotMouseMove;
         DotplotModel.MouseUp += OnDotplotMouseUp;
 
+        // Calculate Y-axis padding based on max students in a bin
+        var scoreGroups = ClassAssessment.Assessments.GroupBy(a => a.AggregateGrade);
+        var maxStudentsInBin = scoreGroups.Max(g => g.Count());
+        var yPadding = maxStudentsInBin * 0.1;
+
         // X-axis: Score range with padding
         var minScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade);
         var maxScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade);
-        var padding = 10; // Left padding for cursors
+        var xPadding = 10; // Left padding for cursors
 
         DotplotModel.Axes.Add(new LinearAxis
         {
             Position = AxisPosition.Bottom,
-            Title = "Aggregate Score",
-            Minimum = minScore - padding,
-            Maximum = maxScore + padding,
+            Minimum = minScore - xPadding,
+            Maximum = maxScore + xPadding,
             AxislineColor = OxyColors.White,
-            TicklineColor = OxyColors.White,
-            TextColor = OxyColors.White
+            AxislineStyle = LineStyle.Solid,
+            TickStyle = TickStyle.None,
+            MajorGridlineStyle = LineStyle.None,
+            MinorGridlineStyle = LineStyle.None,
+            TextColor = OxyColors.Transparent // Hide labels
         });
 
-        // Y-axis: Will autoscale based on maximum stack height
+        // Y-axis: Hidden completely
         DotplotModel.Axes.Add(new LinearAxis
         {
             Position = AxisPosition.Left,
-            Title = "Student Count",
-            AxislineColor = OxyColors.White,
-            TicklineColor = OxyColors.White,
-            TextColor = OxyColors.White
+            Minimum = -yPadding,
+            Maximum = (maxStudentsInBin - 1) * 2 + yPadding, // Account for spacing and top padding
+            AxislineStyle = LineStyle.None,
+            TickStyle = TickStyle.None,
+            MajorGridlineStyle = LineStyle.None,
+            MinorGridlineStyle = LineStyle.None,
+            TextColor = OxyColors.Transparent
         });
 
         UpdateDotplotPoints();
@@ -128,65 +140,91 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void UpdateDotplotPoints()
     {
-        // Clear existing series
+        // Clear existing series and annotations
         DotplotModel.Series.Clear();
+
+        // Keep cursor annotations, but remove selection bars
+        var cursorAnnotations = DotplotModel.Annotations
+            .Where(a => a is LineAnnotation || a is TextAnnotation)
+            .ToList();
+        DotplotModel.Annotations.Clear();
+        foreach (var annotation in cursorAnnotations)
+        {
+            DotplotModel.Annotations.Add(annotation);
+        }
 
         // Group students by aggregate score and stack vertically
         var scoreGroups = ClassAssessment.Assessments
             .GroupBy(a => a.AggregateGrade)
             .OrderBy(g => g.Key);
 
-        // Create two series: one for unselected (black fill), one for selected (cyan fill)
-        var unselectedSeries = new ScatterSeries
-        {
-            MarkerType = MarkerType.Circle,
-            MarkerSize = 8,
-            MarkerFill = OxyColors.Black,
-            MarkerStroke = OxyColors.White,
-            MarkerStrokeThickness = 1,
-            TrackerFormatString = "{Tag}"
-        };
+        // Marker size: 3x smaller than original (8) means ~2.67
+        var markerSize = 8.0 / 3.0;
 
-        var selectedSeries = new ScatterSeries
+        // Create series for unselected dots (white fill)
+        var dotSeries = new ScatterSeries
         {
             MarkerType = MarkerType.Circle,
-            MarkerSize = 8,
-            MarkerFill = OxyColors.Cyan,
+            MarkerSize = markerSize,
+            MarkerFill = OxyColors.White,
             MarkerStroke = OxyColors.White,
-            MarkerStrokeThickness = 1,
+            MarkerStrokeThickness = 0.5,
             TrackerFormatString = "{Tag}"
         };
 
         foreach (var group in scoreGroups)
         {
             var studentsAtScore = group.OrderBy(s => s.Id).ToList();
+
+            // Apply bin offset for odd aggregate scores
+            var binOffset = group.Key % 2 == 1 ? 0.1 : 0.0;
+
             for (int i = 0; i < studentsAtScore.Count; i++)
             {
                 // Y position: stack vertically with spacing (double the marker size)
-                double yPos = i * 2;
+                double yPos = i * 2 + binOffset;
                 var student = studentsAtScore[i];
                 var muppetName = ClassAssessment.MuppetNameMap.TryGetValue(student.Id, out var info) ? info.Name : "Unknown";
 
-                // Add to appropriate series based on selection state
-                var isSelected = SelectedStudents.Any(s => s.Assessment.Id == student.Id);
                 var point = new ScatterPoint(group.Key, yPos, tag: $"{muppetName}\nScore: {student.AggregateGrade}");
+                dotSeries.Points.Add(point);
 
+                // Add selection indicator (medium blue vertical bar behind dot)
+                var isSelected = SelectedStudents.Any(s => s.Assessment.Id == student.Id);
                 if (isSelected)
-                    selectedSeries.Points.Add(point);
-                else
-                    unselectedSeries.Points.Add(point);
+                {
+                    var selectionBar = new RectangleAnnotation
+                    {
+                        MinimumX = group.Key - 0.15,
+                        MaximumX = group.Key + 0.15,
+                        MinimumY = yPos - markerSize / 2,
+                        MaximumY = yPos + markerSize / 2 * 2, // 2x dot height
+                        Fill = OxyColor.FromRgb(70, 130, 180), // Medium blue (steel blue)
+                        Stroke = OxyColors.Transparent,
+                        Layer = AnnotationLayer.BelowSeries
+                    };
+                    DotplotModel.Annotations.Add(selectionBar);
+                }
             }
         }
 
-        DotplotModel.Series.Add(unselectedSeries);
-        DotplotModel.Series.Add(selectedSeries);
+        DotplotModel.Series.Add(dotSeries);
         DotplotModel.InvalidatePlot(true);
     }
 
     private void UpdateCursors()
     {
-        // Clear existing annotations
+        // Clear cursor annotations only (keep selection bars)
+        var selectionBars = DotplotModel.Annotations
+            .Where(a => a is RectangleAnnotation)
+            .ToList();
+
         DotplotModel.Annotations.Clear();
+
+        foreach (var bar in selectionBars)
+        {
+            DotplotModel.Annotations.Add(bar);
+        }
 
         // Add vertical line annotations for each enabled cursor
         foreach (var cursor in Cursors.Where(c => c.IsEnabled))
@@ -200,18 +238,58 @@ public partial class MainWindowViewModel : ViewModelBase
                 StrokeThickness = 2
             };
             DotplotModel.Annotations.Add(line);
+        }
 
-            // Add semi-transparent text annotation for grade label
+        // Add grade labels between cursors
+        var enabledCursors = Cursors.Where(c => c.IsEnabled).OrderBy(c => c.Score).ToList();
+        var minScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade) - 10;
+        var maxScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade) + 10;
+
+        for (int i = 0; i < enabledCursors.Count; i++)
+        {
+            var cursor = enabledCursors[i];
+            double labelX;
+
+            if (i == 0)
+            {
+                // Lowest grade: centered between left boundary and first cursor
+                labelX = (minScore + cursor.Score) / 2;
+            }
+            else
+            {
+                // Other grades: centered between this cursor and previous cursor
+                labelX = (enabledCursors[i - 1].Score + cursor.Score) / 2;
+            }
+
             var label = new TextAnnotation
             {
-                Text = cursor.Grade.LetterGrade.ToString(),
-                TextPosition = new DataPoint(cursor.Score, -1),
+                Text = cursor.Grade.DisplayName,
+                TextPosition = new DataPoint(labelX, 0),
                 TextColor = OxyColor.FromArgb(180, 255, 255, 255), // Semi-transparent white
-                FontSize = 18,
-                FontWeight = OxyPlot.FontWeights.Bold,
-                Background = OxyColor.FromArgb(100, 0, 0, 0), // Semi-transparent black background
-                Padding = new OxyThickness(4),
-                TextHorizontalAlignment = OxyPlot.HorizontalAlignment.Center
+                FontSize = 20,
+                FontWeight = FontWeights.Bold,
+                TextHorizontalAlignment = HorizontalAlignment.Center
+            };
+            DotplotModel.Annotations.Add(label);
+        }
+
+        // Add label for highest grade (between last cursor and right boundary)
+        if (enabledCursors.Any())
+        {
+            var lastCursor = enabledCursors.Last();
+            var labelX = (lastCursor.Score + maxScore) / 2;
+
+            // Find the highest grade (lowest order number) to display
+            var highestGrade = enabledCursors.OrderBy(c => c.Grade.Order).First().Grade;
+
+            var label = new TextAnnotation
+            {
+                Text = highestGrade.DisplayName,
+                TextPosition = new DataPoint(labelX, 0),
+                TextColor = OxyColor.FromArgb(180, 255, 255, 255), // Semi-transparent white
+                FontSize = 20,
+                FontWeight = FontWeights.Bold,
+                TextHorizontalAlignment = HorizontalAlignment.Center
             };
             DotplotModel.Annotations.Add(label);
         }
@@ -257,6 +335,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private void OnComplianceCheckboxChanged()
     {
         UpdateCursorsFromComplianceGrid();
+        RecalculateGradeCounts();
         UpdateDotplotPoints();
     }
 
@@ -272,6 +351,26 @@ public partial class MainWindowViewModel : ViewModelBase
             }
         }
         UpdateCursors();
+    }
+
+    private void RecalculateGradeCounts()
+    {
+        // Build cutoffs from enabled cursors
+        var enabledCutoffs = Cursors
+            .Where(c => c.IsEnabled)
+            .Select(c => new GradeCutoff(c.Grade, c.Score))
+            .ToList();
+
+        ClassAssessment.CurrentCutoffs = enabledCutoffs;
+        var newCurrent = _cutoffCountCalculator.Calculate(ClassAssessment.Assessments, enabledCutoffs);
+        ClassAssessment.Current = newCurrent;
+
+        // Update compliance grid with new counts
+        foreach (var row in ComplianceRows)
+        {
+            var currentEntry = ClassAssessment.Current.FirstOrDefault(cc => cc.Grade.Equals(row.Grade));
+            row.CurrentCount = currentEntry?.Count ?? 0;
+        }
     }
 
     [RelayCommand]
@@ -297,6 +396,13 @@ public partial class MainWindowViewModel : ViewModelBase
     private void ToggleCompliancePane()
     {
         IsCompliancePaneOpen = !IsCompliancePaneOpen;
+    }
+
+    [RelayCommand]
+    private void ClearSelections()
+    {
+        SelectedStudents.Clear();
+        UpdateDotplotPoints();
     }
 
     private string GetGradeForStudent(StudentAssessment student)
@@ -433,11 +539,13 @@ public partial class MainWindowViewModel : ViewModelBase
         foreach (var group in scoreGroups)
         {
             var studentsAtScore = group.OrderBy(s => s.Id).ToList();
+            var binOffset = group.Key % 2 == 1 ? 0.1 : 0.0;
+
             for (int i = 0; i < studentsAtScore.Count; i++)
             {
-                double yPos = i * 2;
+                double yPos = i * 2 + binOffset;
                 double distance = Math.Sqrt(Math.Pow(group.Key - clickX, 2) + Math.Pow(yPos - clickY, 2));
-                
+
                 if (distance < minDistance && distance < 5) // Within 5 units
                 {
                     minDistance = distance;
