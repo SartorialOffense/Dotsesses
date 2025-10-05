@@ -1,63 +1,226 @@
-﻿using OxyPlot;
+namespace Dotsesses.ViewModels;
+
+using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Dotsesses.Calculators;
+using Dotsesses.Models;
+using Dotsesses.Services;
+using OxyPlot;
 using OxyPlot.Axes;
 using OxyPlot.Series;
 
-namespace Dotsesses.ViewModels;
-
+/// <summary>
+/// Main window ViewModel coordinating dotplot, cursors, drill-down, and compliance.
+/// </summary>
 public partial class MainWindowViewModel : ViewModelBase
 {
-    public string Greeting { get; } = "Welcome to Avalonia!";
+    private readonly CutoffCountCalculator _cutoffCountCalculator;
+    private readonly InitialCutoffCalculator _initialCutoffCalculator;
+    private readonly CursorValidation _cursorValidation;
 
-    public PlotModel Data { get; private set; }
+    [ObservableProperty]
+    private ClassAssessment _classAssessment = null!;
+
+    [ObservableProperty]
+    private PlotModel _dotplotModel = null!;
+
+    [ObservableProperty]
+    private ObservableCollection<CursorViewModel> _cursors;
+
+    [ObservableProperty]
+    private ObservableCollection<StudentCardViewModel> _selectedStudents;
+
+    [ObservableProperty]
+    private ObservableCollection<ComplianceRowViewModel> _complianceRows;
+
+    [ObservableProperty]
+    private bool _isCompliancePaneOpen = true;
 
     public MainWindowViewModel()
     {
-        Data = new PlotModel
+        _cutoffCountCalculator = new CutoffCountCalculator();
+        _initialCutoffCalculator = new InitialCutoffCalculator();
+        _cursorValidation = new CursorValidation();
+
+        _cursors = new ObservableCollection<CursorViewModel>();
+        _selectedStudents = new ObservableCollection<StudentCardViewModel>();
+        _complianceRows = new ObservableCollection<ComplianceRowViewModel>();
+
+        InitializeWithSyntheticData();
+        InitializeDotplot();
+        InitializeCursors();
+        InitializeComplianceGrid();
+    }
+
+    private void InitializeWithSyntheticData()
+    {
+        var generator = new SyntheticStudentGenerator();
+        var students = generator.Generate();
+
+        var curveGenerator = new DefaultCurveGenerator();
+        var defaultCurve = curveGenerator.Generate();
+
+        var initialCutoffs = _initialCutoffCalculator.Calculate(students, defaultCurve);
+        var current = _cutoffCountCalculator.Calculate(students, initialCutoffs);
+
+        // Get MuppetName map from generator
+        var muppetNameGenerator = new MuppetNameGenerator();
+        var studentIds = students.Select(s => s.Id).OrderBy(id => id);
+        var muppetNameMap = muppetNameGenerator.Generate(studentIds);
+
+        ClassAssessment = new ClassAssessment(
+            students,
+            initialCutoffs,
+            defaultCurve,
+            current,
+            muppetNameMap
+        );
+    }
+
+    private void InitializeDotplot()
+    {
+        DotplotModel = new PlotModel
         {
-            Title = "Scatter Plot Example",
+            Title = "Student Grade Distribution",
             Background = OxyColors.Black,
             TextColor = OxyColors.White,
             PlotAreaBorderColor = OxyColors.White
         };
 
-        // Add axes with dark theme colors
-        Data.Axes.Add(new LinearAxis
+        // X-axis: Score range with padding
+        var minScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade);
+        var maxScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade);
+        var padding = 10; // Left padding for cursors
+
+        DotplotModel.Axes.Add(new LinearAxis
         {
             Position = AxisPosition.Bottom,
-            Title = "X",
+            Title = "Aggregate Score",
+            Minimum = minScore - padding,
+            Maximum = maxScore + padding,
             AxislineColor = OxyColors.White,
             TicklineColor = OxyColors.White,
             TextColor = OxyColors.White
         });
-        Data.Axes.Add(new LinearAxis
+
+        // Y-axis: Will autoscale based on maximum stack height
+        DotplotModel.Axes.Add(new LinearAxis
         {
             Position = AxisPosition.Left,
-            Title = "Y",
+            Title = "Student Count",
             AxislineColor = OxyColors.White,
             TicklineColor = OxyColors.White,
             TextColor = OxyColors.White
         });
+
+        UpdateDotplotPoints();
+    }
+
+    private void UpdateDotplotPoints()
+    {
+        // Clear existing series
+        DotplotModel.Series.Clear();
+
+        // Group students by aggregate score and stack vertically
+        var scoreGroups = ClassAssessment.Assessments
+            .GroupBy(a => a.AggregateGrade)
+            .OrderBy(g => g.Key);
 
         var scatterSeries = new ScatterSeries
         {
             MarkerType = MarkerType.Circle,
-            MarkerSize = 4,
-            MarkerFill = OxyColors.Cyan
+            MarkerSize = 8,
+            MarkerFill = OxyColors.Cyan,
+            MarkerStroke = OxyColors.White,
+            MarkerStrokeThickness = 1
         };
 
-        // Add some sample data points (double pairs)
-        scatterSeries.Points.Add(new ScatterPoint(1.0, 2.0));
-        scatterSeries.Points.Add(new ScatterPoint(2.0, 4.5));
-        scatterSeries.Points.Add(new ScatterPoint(3.0, 3.5));
-        scatterSeries.Points.Add(new ScatterPoint(4.0, 6.0));
-        scatterSeries.Points.Add(new ScatterPoint(5.0, 5.5));
-        scatterSeries.Points.Add(new ScatterPoint(6.0, 7.0));
-        scatterSeries.Points.Add(new ScatterPoint(7.0, 8.5));
-        scatterSeries.Points.Add(new ScatterPoint(8.0, 8.0));
+        foreach (var group in scoreGroups)
+        {
+            var studentsAtScore = group.OrderBy(s => s.Id).ToList();
+            for (int i = 0; i < studentsAtScore.Count; i++)
+            {
+                // Y position: stack vertically with spacing (double the marker size)
+                double yPos = i * 2;
+                scatterSeries.Points.Add(new ScatterPoint(group.Key, yPos));
+            }
+        }
 
-        Data.Series.Add(scatterSeries);
+        DotplotModel.Series.Add(scatterSeries);
+        DotplotModel.InvalidatePlot(true);
+    }
 
-        // Invalidate the plot to ensure it renders
-        Data.InvalidatePlot(true);
+    private void InitializeCursors()
+    {
+        // Create cursors for grades in DefaultCurve (enabled by default)
+        var defaultGrades = ClassAssessment.DefaultCurve.Select(cc => cc.Grade).ToHashSet();
+
+        foreach (var cutoff in ClassAssessment.CurrentCutoffs)
+        {
+            bool isEnabled = defaultGrades.Contains(cutoff.Grade);
+            Cursors.Add(new CursorViewModel(cutoff.Grade, cutoff.Score, isEnabled));
+        }
+    }
+
+    private void InitializeComplianceGrid()
+    {
+        var allGrades = new DefaultCurveGenerator().GetAllGrades();
+
+        foreach (var grade in allGrades)
+        {
+            var defaultEntry = ClassAssessment.DefaultCurve.FirstOrDefault(cc => cc.Grade.Equals(grade));
+            var currentEntry = ClassAssessment.Current.FirstOrDefault(cc => cc.Grade.Equals(grade));
+
+            int targetCount = defaultEntry?.Count ?? 0;
+            int currentCount = currentEntry?.Count ?? 0;
+            bool isEnabled = defaultEntry != null;
+
+            ComplianceRows.Add(new ComplianceRowViewModel(
+                grade,
+                targetCount,
+                currentCount,
+                isEnabled
+            ));
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleStudent(StudentAssessment student)
+    {
+        var existing = SelectedStudents.FirstOrDefault(s => s.Assessment.Id == student.Id);
+        if (existing != null)
+        {
+            SelectedStudents.Remove(existing);
+        }
+        else
+        {
+            // Determine assigned grade based on current cutoffs
+            var grade = GetGradeForStudent(student);
+            SelectedStudents.Add(new StudentCardViewModel(student, grade));
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleCompliancePane()
+    {
+        IsCompliancePaneOpen = !IsCompliancePaneOpen;
+    }
+
+    private string GetGradeForStudent(StudentAssessment student)
+    {
+        var sortedCutoffs = ClassAssessment.CurrentCutoffs
+            .OrderByDescending(c => c.Score)
+            .ToList();
+
+        foreach (var cutoff in sortedCutoffs)
+        {
+            if (student.AggregateGrade >= cutoff.Score)
+            {
+                return cutoff.Grade.LetterGrade.ToString();
+            }
+        }
+
+        return "F";
     }
 }

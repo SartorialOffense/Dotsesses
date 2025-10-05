@@ -12,19 +12,20 @@ public class MainWindowViewModelTests
         var viewModel = new MainWindowViewModel();
 
         // Assert
-        Assert.NotNull(viewModel.Data);
-        Assert.Equal("Scatter Plot Example", viewModel.Data.Title);
-        Assert.Equal(OxyColors.Black, viewModel.Data.Background);
+        Assert.NotNull(viewModel.DotplotModel);
+        Assert.Equal("Student Grade Distribution", viewModel.DotplotModel.Title);
+        Assert.Equal(OxyColors.Black, viewModel.DotplotModel.Background);
     }
 
     [Fact]
-    public void Constructor_InitializesGreeting()
+    public void Constructor_LoadsSyntheticData()
     {
         // Act
         var viewModel = new MainWindowViewModel();
 
         // Assert
-        Assert.Equal("Welcome to Avalonia!", viewModel.Greeting);
+        Assert.NotNull(viewModel.ClassAssessment);
+        Assert.Equal(100, viewModel.ClassAssessment.Assessments.Count);
     }
 
     [Fact]
@@ -34,9 +35,9 @@ public class MainWindowViewModelTests
         var viewModel = new MainWindowViewModel();
 
         // Assert
-        Assert.Equal(2, viewModel.Data.Axes.Count);
-        Assert.Contains(viewModel.Data.Axes, a => a.Position == OxyPlot.Axes.AxisPosition.Bottom);
-        Assert.Contains(viewModel.Data.Axes, a => a.Position == OxyPlot.Axes.AxisPosition.Left);
+        Assert.Equal(2, viewModel.DotplotModel.Axes.Count);
+        Assert.Contains(viewModel.DotplotModel.Axes, a => a.Position == OxyPlot.Axes.AxisPosition.Bottom);
+        Assert.Contains(viewModel.DotplotModel.Axes, a => a.Position == OxyPlot.Axes.AxisPosition.Left);
     }
 
     [Fact]
@@ -46,20 +47,20 @@ public class MainWindowViewModelTests
         var viewModel = new MainWindowViewModel();
 
         // Assert
-        Assert.Single(viewModel.Data.Series);
-        Assert.IsType<OxyPlot.Series.ScatterSeries>(viewModel.Data.Series[0]);
+        Assert.Single(viewModel.DotplotModel.Series);
+        Assert.IsType<OxyPlot.Series.ScatterSeries>(viewModel.DotplotModel.Series[0]);
     }
 
     [Fact]
-    public void ScatterSeries_HasDataPoints()
+    public void ScatterSeries_Has100Students()
     {
         // Act
         var viewModel = new MainWindowViewModel();
-        var series = viewModel.Data.Series[0] as OxyPlot.Series.ScatterSeries;
+        var series = viewModel.DotplotModel.Series[0] as OxyPlot.Series.ScatterSeries;
 
         // Assert
         Assert.NotNull(series);
-        Assert.Equal(8, series.Points.Count);
+        Assert.Equal(100, series.Points.Count);
     }
 
     [Fact]
@@ -69,8 +70,41 @@ public class MainWindowViewModelTests
         var viewModel = new MainWindowViewModel();
 
         // Assert
-        Assert.Equal(OxyColors.Black, viewModel.Data.Background);
-        Assert.Equal(OxyColors.White, viewModel.Data.TextColor);
-        Assert.Equal(OxyColors.White, viewModel.Data.PlotAreaBorderColor);
+        Assert.Equal(OxyColors.Black, viewModel.DotplotModel.Background);
+        Assert.Equal(OxyColors.White, viewModel.DotplotModel.TextColor);
+        Assert.Equal(OxyColors.White, viewModel.DotplotModel.PlotAreaBorderColor);
+    }
+
+    [Fact]
+    public void Constructor_InitializesCursors()
+    {
+        // Act
+        var viewModel = new MainWindowViewModel();
+
+        // Assert
+        Assert.NotNull(viewModel.Cursors);
+        Assert.NotEmpty(viewModel.Cursors);
+    }
+
+    [Fact]
+    public void Constructor_InitializesComplianceGrid()
+    {
+        // Act
+        var viewModel = new MainWindowViewModel();
+
+        // Assert
+        Assert.NotNull(viewModel.ComplianceRows);
+        Assert.Equal(10, viewModel.ComplianceRows.Count); // All grades A through F
+    }
+
+    [Fact]
+    public void SelectedStudents_InitiallyEmpty()
+    {
+        // Act
+        var viewModel = new MainWindowViewModel();
+
+        // Assert
+        Assert.NotNull(viewModel.SelectedStudents);
+        Assert.Empty(viewModel.SelectedStudents);
     }
 }

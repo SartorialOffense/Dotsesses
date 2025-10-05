@@ -15,5 +15,5 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-    <oxy:PlotView Model="{Binding Data, Mode=OneWay}" />
+    <oxy:PlotView Model="{Binding DotplotModel, Mode=OneWay}" />
 </Window>
