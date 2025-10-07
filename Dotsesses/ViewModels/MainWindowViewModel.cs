@@ -98,7 +98,9 @@ public partial class MainWindowViewModel : ViewModelBase
             Background = backgroundColor,
             PlotAreaBackground = backgroundColor,
             PlotAreaBorderThickness = new OxyThickness(1), // Full outline
-            PlotAreaBorderColor = OxyColor.FromRgb(60, 60, 60) // Thin gray
+            PlotAreaBorderColor = OxyColor.FromRgb(60, 60, 60), // Thin gray
+            Padding = new OxyThickness(0), // Remove padding around plot area
+            PlotMargins = new OxyThickness(0) // Remove margins around plot area
         };
 
         // Enable mouse events for point selection and cursor dragging
@@ -144,7 +146,9 @@ public partial class MainWindowViewModel : ViewModelBase
             MinorGridlineStyle = LineStyle.None,
             TextColor = OxyColors.Transparent,
             StartPosition = 0,
-            EndPosition = 1
+            EndPosition = 1,
+            MinimumPadding = 0,
+            MaximumPadding = 0
         };
         DotplotModel.Axes.Add(sharedXAxis);
 
@@ -161,7 +165,9 @@ public partial class MainWindowViewModel : ViewModelBase
             MinorGridlineStyle = LineStyle.None,
             TextColor = OxyColors.Transparent,
             StartPosition = statsStart,
-            EndPosition = statsEnd
+            EndPosition = statsEnd,
+            MinimumPadding = 0,
+            MaximumPadding = 0
         };
         DotplotModel.Axes.Add(statsYAxis);
 
@@ -178,7 +184,9 @@ public partial class MainWindowViewModel : ViewModelBase
             MinorGridlineStyle = LineStyle.None,
             TextColor = OxyColors.Transparent,
             StartPosition = dotStart,
-            EndPosition = dotEnd
+            EndPosition = dotEnd,
+            MinimumPadding = 0,
+            MaximumPadding = 0
         };
         DotplotModel.Axes.Add(dotYAxis);
 
@@ -195,7 +203,9 @@ public partial class MainWindowViewModel : ViewModelBase
             MinorGridlineStyle = LineStyle.None,
             TextColor = OxyColors.Transparent,
             StartPosition = cursorStart,
-            EndPosition = cursorEnd
+            EndPosition = cursorEnd,
+            MinimumPadding = 0,
+            MaximumPadding = 0
         };
         DotplotModel.Axes.Add(cursorYAxis);
 
@@ -281,8 +291,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         // Clear only cursor-related annotations (keep statistics)
         var statsAnnotations = DotplotModel.Annotations
-            .Where(a => a.YAxisKey == "StatsY" || 
-                       (a is LineAnnotation line && line.YAxisKey == "DotY" && line.Layer == AnnotationLayer.BelowSeries))
+            .Where(a => a.YAxisKey == "StatsY")
             .ToList();
         
         DotplotModel.Annotations.Clear();
@@ -301,6 +310,22 @@ public partial class MainWindowViewModel : ViewModelBase
         var cursorYAxis = DotplotModel.Axes.FirstOrDefault(a => a.Key == "CursorY");
 
         if (dotYAxis == null || cursorYAxis == null) return;
+
+        // ===== Thin Rectangle Around Cursor Area =====
+        var cursorRect = new RectangleAnnotation
+        {
+            MinimumX = minScore,
+            MaximumX = maxScore,
+            MinimumY = 0,
+            MaximumY = 1,
+            Fill = OxyColors.Transparent,
+            Stroke = OxyColor.FromRgb(60, 60, 60), // Thin gray border
+            StrokeThickness = 1,
+            XAxisKey = "SharedX",
+            YAxisKey = "CursorY",
+            Layer = AnnotationLayer.BelowSeries
+        };
+        DotplotModel.Annotations.Add(cursorRect);
 
         // ===== Grade Region Bands in Dot Display =====
         // Alternating pattern: transparent and light gray RGB(36, 36, 36)
@@ -411,7 +436,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     Text = grade.DisplayName,
                     TextPosition = new DataPoint(labelX, 0.5),
                     TextColor = OxyColors.White,
-                    FontSize = 20,
+                    FontSize = 16,
                     FontWeight = FontWeights.Bold,
                     TextHorizontalAlignment = HorizontalAlignment.Center,
                     TextVerticalAlignment = VerticalAlignment.Middle,
@@ -432,39 +457,34 @@ public partial class MainWindowViewModel : ViewModelBase
         var mean = scores.Average();
         var stdDev = Math.Sqrt(scores.Average(s => Math.Pow(s - mean, 2)));
         
-
         var minScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade) - 10;
         var maxScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade) + 10;
 
         var lightGray = OxyColor.FromRgb(180, 180, 180);
-        var lineColor = OxyColor.FromArgb(0x80, 180, 180, 180); // Alpha 0x80
 
-        var dotYAxis = DotplotModel.Axes.FirstOrDefault(a => a.Key == "DotY");
-        if (dotYAxis == null) return;
-
-        // ===== Mean Line (in DotDisplay) =====
-        var meanLine = new LineAnnotation
+        // ===== Thin Rectangle Around Stats Area =====
+        var statsRect = new RectangleAnnotation
         {
-            Type = LineAnnotationType.Vertical,
-            X = mean,
-            Color = lineColor,
-            LineStyle = LineStyle.Dash,
+            MinimumX = minScore,
+            MaximumX = maxScore,
+            MinimumY = 0,
+            MaximumY = 1,
+            Fill = OxyColors.Transparent,
+            Stroke = OxyColor.FromRgb(60, 60, 60), // Thin gray border
             StrokeThickness = 1,
             XAxisKey = "SharedX",
-            YAxisKey = "DotY",
-            MinimumY = dotYAxis.Minimum,
-            MaximumY = dotYAxis.Maximum,
+            YAxisKey = "StatsY",
             Layer = AnnotationLayer.BelowSeries
         };
-        DotplotModel.Annotations.Add(meanLine);
+        DotplotModel.Annotations.Add(statsRect);
 
-        // Mean label (in StatsY, vertically centered)
+        // ===== Mean Label =====
         var meanLabel = new TextAnnotation
         {
             Text = "μ",
             TextPosition = new DataPoint(mean, 0.5),
             TextColor = lightGray,
-            FontSize = 14,
+            FontSize = 16,
             TextHorizontalAlignment = HorizontalAlignment.Center,
             TextVerticalAlignment = VerticalAlignment.Middle,
             XAxisKey = "SharedX",
@@ -472,34 +492,19 @@ public partial class MainWindowViewModel : ViewModelBase
         };
         DotplotModel.Annotations.Add(meanLabel);
 
-        // ===== Standard Deviation Lines (in DotDisplay) =====
+        // ===== Standard Deviation Labels =====
         // Positive std devs
         int posStdCount = 1;
         while (mean + posStdCount * stdDev <= maxScore)
         {
             var x = mean + posStdCount * stdDev;
-            
-            var line = new LineAnnotation
-            {
-                Type = LineAnnotationType.Vertical,
-                X = x,
-                Color = lineColor,
-                LineStyle = LineStyle.Dash,
-                StrokeThickness = 1,
-                XAxisKey = "SharedX",
-                YAxisKey = "DotY",
-                MinimumY = dotYAxis.Minimum,
-                MaximumY = dotYAxis.Maximum,
-                Layer = AnnotationLayer.BelowSeries
-            };
-            DotplotModel.Annotations.Add(line);
 
             var label = new TextAnnotation
             {
                 Text = $"+{posStdCount}σ",
                 TextPosition = new DataPoint(x, 0.5),
                 TextColor = lightGray,
-                FontSize = 12,
+                FontSize = 14,
                 TextHorizontalAlignment = HorizontalAlignment.Center,
                 TextVerticalAlignment = VerticalAlignment.Middle,
                 XAxisKey = "SharedX",
@@ -515,28 +520,13 @@ public partial class MainWindowViewModel : ViewModelBase
         while (mean - negStdCount * stdDev >= minScore)
         {
             var x = mean - negStdCount * stdDev;
-            
-            var line = new LineAnnotation
-            {
-                Type = LineAnnotationType.Vertical,
-                X = x,
-                Color = lineColor,
-                LineStyle = LineStyle.Dash,
-                StrokeThickness = 1,
-                XAxisKey = "SharedX",
-                YAxisKey = "DotY",
-                MinimumY = dotYAxis.Minimum,
-                MaximumY = dotYAxis.Maximum,
-                Layer = AnnotationLayer.BelowSeries
-            };
-            DotplotModel.Annotations.Add(line);
 
             var label = new TextAnnotation
             {
                 Text = $"-{negStdCount}σ",
                 TextPosition = new DataPoint(x, 0.5),
                 TextColor = lightGray,
-                FontSize = 12,
+                FontSize = 14,
                 TextHorizontalAlignment = HorizontalAlignment.Center,
                 TextVerticalAlignment = VerticalAlignment.Middle,
                 XAxisKey = "SharedX",
@@ -546,8 +536,6 @@ public partial class MainWindowViewModel : ViewModelBase
 
             negStdCount++;
         }
-
-        
     }
 
 

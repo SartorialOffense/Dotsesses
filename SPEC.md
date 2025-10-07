@@ -115,12 +115,11 @@ all sharing the same x-axis for perfect alignment:
 
 1. **Statistics Display** (top, fixed height ~30px)
    - Shows statistical labels (mean, standard deviations)
-   - Dashed lines rendered in Dot Display area below
+   - Thin rectangle border for visual separation
    - Fixed height, does not resize with splitter
 
 2. **Dot Display** (middle, variable height ~145px initial)
    - Student score histogram with alternating grade region bands
-   - Statistical dashed lines overlay the dots
    - Height controlled by horizontal splitter below
    - No minimum/maximum height constraints currently
 
@@ -147,23 +146,21 @@ All three areas maintain pixel-perfect x-axis alignment during window resize.
 ### Statistics Display
 
 The Statistics Display is the top rendering area of the three-part plot, showing statistical
-labels for the dataset. The dashed lines are rendered in the Dot Display area below.
+labels for the dataset.
 
-#### Labels and Lines
+#### Labels
 
 **Mean (μ):**
 - Label: "μ" vertically centered in Statistics Display area
-- Vertical dashed line drawn in Dot Display area at the mean aggregate score
-- Line thickness: 1px
-- Color: Light gray with alpha 0x80 (semi-transparent)
+- Font size: 16px
+- Color: Light gray RGB(180, 180, 180)
 
 **Standard Deviations (±σ):**
 - Labels: "+1σ", "-1σ", "+2σ", "-2σ", etc. vertically centered in Statistics Display area
-- Vertical dashed lines drawn in Dot Display area at ±1σ, ±2σ, ±3σ, etc. from the mean
 - Show as many standard deviations as exist within the score range
-- Do not draw lines that exceed the min/max score range
-- Line thickness: 1px
-- Color: Light gray with alpha 0x80 (semi-transparent)
+- Do not draw labels that exceed the min/max score range
+- Font size: 14px
+- Color: Light gray RGB(180, 180, 180)
 
 #### Behavior
 
@@ -171,12 +168,12 @@ labels for the dataset. The dashed lines are rendered in the Dot Display area be
 - **Statistics do not change when grade cursors are enabled/disabled**
 - Fixed height rendering area (~30px)
 - Shares x-axis range with Dot Display and Grade Cursors
-- Dashed lines rendered in Dot Display are behind dots (BelowSeries layer)
 
 #### Borders
 
-- Full outline (top, left, right, bottom)
-- Thin gray line, faint styling
+- Thin rectangle border (top, left, right, bottom)
+- Color: RGB(60, 60, 60)
+- Thickness: 1px
 
 ### Drill Down
 
@@ -228,9 +225,14 @@ The Grade Cursors rendering area (bottom of the three-part plot) displays dragga
   - Labels centered between each cursor and its right neighbor
   - For the highest grade, label centered between cursor and right boundary
   - The lowest grade has no cursor; its label centered between left boundary and second-lowest grade's cursor
-- Labels use regular text style (not semi-transparent), larger font than other text, must be visible against dark background
-- Fixed height rendering area (~50px)
-- Full outline (top, left, right, bottom) with thin gray line, faint styling
+- Label styling:
+  - Font size: 16px
+  - Font weight: Bold
+  - Color: White RGB(255, 255, 255)
+- Fixed height rendering area (~30px)
+- Thin rectangle border (top, left, right, bottom)
+  - Color: RGB(60, 60, 60)
+  - Thickness: 1px
 
 **Interaction:**
 - Cursors are draggable but cannot overlap
