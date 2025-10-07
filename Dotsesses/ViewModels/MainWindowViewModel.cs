@@ -364,59 +364,62 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         // ===== Grade Labels Below Cursors =====
-        for (int i = 0; i < enabledCursors.Count; i++)
+        // Get all enabled grades sorted by order (best to worst)
+        var enabledGrades = Cursors
+            .Where(c => c.IsEnabled)
+            .Select(c => c.Grade)
+            .OrderBy(g => g.Order)
+            .ToList();
+
+        if (enabledGrades.Any())
         {
-            var cursor = enabledCursors[i];
-            double labelX;
-
-            if (i == 0)
+            // Label for each grade
+            for (int i = 0; i < enabledGrades.Count; i++)
             {
-                // Lowest grade: centered between left boundary and first cursor
-                labelX = (minScore + cursor.Score) / 2;
+                var grade = enabledGrades[i];
+                double labelX;
+
+                if (i == 0)
+                {
+                    // Highest grade (best, e.g., A): between last cursor and right boundary
+                    labelX = (enabledCursors.Last().Score + maxScore) / 2;
+                }
+                else if (i == enabledGrades.Count - 1)
+                {
+                    // Lowest grade (worst): between left boundary and first cursor
+                    labelX = (minScore + enabledCursors.First().Score) / 2;
+                }
+                else
+                {
+                    // Middle grades: between cursor for this grade and the next higher grade's cursor
+                    // Find cursor for this grade (it's the lower bound)
+                    var cursorForThisGrade = enabledCursors.FirstOrDefault(c => c.Grade.Order == grade.Order);
+                    var cursorForNextGrade = enabledCursors.FirstOrDefault(c => c.Grade.Order == enabledGrades[i - 1].Order);
+                    
+                    if (cursorForThisGrade != null && cursorForNextGrade != null)
+                    {
+                        labelX = (cursorForThisGrade.Score + cursorForNextGrade.Score) / 2;
+                    }
+                    else
+                    {
+                        continue; // Skip if we can't find the cursors
+                    }
+                }
+
+                var label = new TextAnnotation
+                {
+                    Text = grade.DisplayName,
+                    TextPosition = new DataPoint(labelX, 0.5),
+                    TextColor = OxyColors.White,
+                    FontSize = 20,
+                    FontWeight = FontWeights.Bold,
+                    TextHorizontalAlignment = HorizontalAlignment.Center,
+                    TextVerticalAlignment = VerticalAlignment.Middle,
+                    XAxisKey = "SharedX",
+                    YAxisKey = "CursorY"
+                };
+                DotplotModel.Annotations.Add(label);
             }
-            else
-            {
-                // Other grades: centered between this cursor and previous cursor
-                labelX = (enabledCursors[i - 1].Score + cursor.Score) / 2;
-            }
-
-            var label = new TextAnnotation
-            {
-                Text = cursor.Grade.DisplayName,
-                TextPosition = new DataPoint(labelX, 0.5),
-                TextColor = OxyColors.White, // Regular text, not semi-transparent
-                FontSize = 20,
-                FontWeight = FontWeights.Bold,
-                TextHorizontalAlignment = HorizontalAlignment.Center,
-                TextVerticalAlignment = VerticalAlignment.Middle,
-                XAxisKey = "SharedX",
-                YAxisKey = "CursorY"
-            };
-            DotplotModel.Annotations.Add(label);
-        }
-
-        // Add label for highest grade (between last cursor and right boundary)
-        if (enabledCursors.Any())
-        {
-            var lastCursor = enabledCursors.Last();
-            var labelX = (lastCursor.Score + maxScore) / 2;
-
-            // Find the highest grade (lowest order number) to display
-            var highestGrade = enabledCursors.OrderBy(c => c.Grade.Order).First().Grade;
-
-            var label = new TextAnnotation
-            {
-                Text = highestGrade.DisplayName,
-                TextPosition = new DataPoint(labelX, 0.5),
-                TextColor = OxyColors.White,
-                FontSize = 20,
-                FontWeight = FontWeights.Bold,
-                TextHorizontalAlignment = HorizontalAlignment.Center,
-                TextVerticalAlignment = VerticalAlignment.Middle,
-                XAxisKey = "SharedX",
-                YAxisKey = "CursorY"
-            };
-            DotplotModel.Annotations.Add(label);
         }
 
         DotplotModel.InvalidatePlot(true);
