@@ -26,24 +26,9 @@
 
             <!-- Main Content: Dotplot -->
             <SplitView.Content>
-                <Grid RowDefinitions="Auto,*">
-                    <!-- Toolbar with clear button -->
-                    <Border Grid.Row="0" Background="#181818" Padding="5">
-                        <Button Command="{Binding ClearSelectionsCommand}"
-                                HorizontalAlignment="Left"
-                                Background="Transparent"
-                                BorderThickness="0"
-                                Padding="5"
-                                ToolTip.Tip="Clear all selections">
-                            <TextBlock Text="⌫" FontSize="16" Foreground="White"/>
-                        </Button>
-                    </Border>
-
-                    <!-- Dotplot -->
-                    <Border Grid.Row="1" Background="#181818" Padding="10">
-                        <oxy:PlotView Model="{Binding DotplotModel}" />
-                    </Border>
-                </Grid>
+                <Border Background="#181818" Padding="10">
+                    <oxy:PlotView Model="{Binding DotplotModel}" />
+                </Border>
             </SplitView.Content>
 
             <!-- Pane: Compliance Grid -->
@@ -148,9 +133,21 @@
 
         <!-- Bottom Row: Selected Student Cards -->
         <Border Grid.Row="2" Background="#181818" BorderBrush="#3F3F46" BorderThickness="0,1,0,0">
-            <Grid RowDefinitions="Auto,*">
+            <Grid RowDefinitions="Auto,Auto,*">
+                <!-- Clear Selections Button -->
+                <Border Grid.Row="0" Background="#181818" Padding="10,5">
+                    <Button Command="{Binding ClearSelectionsCommand}"
+                            HorizontalAlignment="Left"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Padding="5"
+                            ToolTip.Tip="Clear all selections">
+                        <TextBlock Text="⌫" FontSize="16" Foreground="White"/>
+                    </Button>
+                </Border>
+
                 <!-- Header -->
-                <Border Grid.Row="0" Background="#181818" Padding="10">
+                <Border Grid.Row="1" Background="#181818" Padding="10,5,10,10">
                     <TextBlock Text="Selected Students"
                              FontSize="16"
                              FontWeight="SemiBold"
@@ -158,7 +155,7 @@
                 </Border>
 
                 <!-- Student Cards -->
-                <ScrollViewer Grid.Row="1" Padding="10">
+                <ScrollViewer Grid.Row="2" Padding="10">
                     <ItemsControl ItemsSource="{Binding SelectedStudents}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>

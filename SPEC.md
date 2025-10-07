@@ -45,6 +45,35 @@ Click a point to toggle selection. **Selection persists when cursors move.**
 
 **Visual Indicator:** Selected students display a crosshair (dimension = 2× dot diameter) drawn behind the dot as a non-interactive series.
 
+#### Click Detection
+
+All click detection uses screen space (pixel) coordinates to ensure consistent behavior regardless of data scale or zoom level.
+
+**Student Selection:**
+- Uses Euclidean distance in screen space (pixels)
+- Selection occurs only if click is within 10 pixels of a student dot
+- Distance formula: `sqrt((screenX - dotScreenX)² + (screenY - dotScreenY)²)`
+- Click must be within Dot Display Y-axis bounds (between DotY minimum and maximum)
+- Algorithm:
+  1. Transform click position from screen coordinates to data coordinates using Dot Display axes
+  2. For each student, transform their data position to screen coordinates
+  3. Calculate pixel distance between click and each dot
+  4. Select nearest student if distance ≤ 10 pixels
+
+**Cursor Dragging:**
+- Horizontal proximity check: cursor must be within 3 data units of click X position
+- Vertical bounds check: click Y position must be within Grade Cursors area bounds
+- Uses cursor Y-axis transformation to validate click is in cursor region
+- Only then initiates cursor drag operation
+- This prevents accidental cursor dragging when clicking on grade region band edges in Dot Display
+
+**Coordinate Transformations:**
+- Screen space: pixel coordinates from mouse events (ScreenPoint)
+- Data space: coordinate values on plot axes (DataPoint)
+- Use `axis.Transform(x, y)` to convert data → screen
+- Use `axis.InverseTransform(screenPoint)` to convert screen → data
+- Different Y-axes (DotY, CursorY, StatsY) have separate coordinate spaces
+
 #### Dot Appearance
 
 - **Size:** Marker radius is 4 to reduce overlap
@@ -56,8 +85,8 @@ Click a point to toggle selection. **Selection persists when cursors move.**
 Alternating subtle background rectangles indicate grade regions between cursors.
 
 **Visual Style:**
-- Alternating pattern: transparent (clear) and very light gray
-- Gray color: RGB(36, 36, 36)
+- Alternating pattern: transparent (clear) and semi-transparent white
+- White color: RGB(255, 255, 255) with alpha 0x20
 - Rectangles span full height of Dot Display area
 
 **Behavior:**
@@ -84,17 +113,18 @@ The main window uses a multi-row layout with resizable splitters:
 A single OxyPlot instance with three separate rendering areas (subplot regions),
 all sharing the same x-axis for perfect alignment:
 
-1. **Statistics Display** (top, fixed height ~41px)
-   - Shows mean and standard deviation markers
-   - Median label displayed below in tick area
+1. **Statistics Display** (top, fixed height ~30px)
+   - Shows statistical labels (mean, standard deviations)
+   - Dashed lines rendered in Dot Display area below
    - Fixed height, does not resize with splitter
 
 2. **Dot Display** (middle, variable height ~145px initial)
    - Student score histogram with alternating grade region bands
+   - Statistical dashed lines overlay the dots
    - Height controlled by horizontal splitter below
    - No minimum/maximum height constraints currently
 
-3. **Grade Cursors** (bottom of plot area, fixed height ~41px)
+3. **Grade Cursors** (bottom of plot area, fixed height ~30px)
    - Draggable vertical cursors for grade cutoffs
    - Grade labels displayed below cursors
    - Fixed height, does not resize with splitter
@@ -117,36 +147,31 @@ All three areas maintain pixel-perfect x-axis alignment during window resize.
 ### Statistics Display
 
 The Statistics Display is the top rendering area of the three-part plot, showing statistical
-markers for the dataset.
+labels for the dataset. The dashed lines are rendered in the Dot Display area below.
 
-#### Markers
+#### Labels and Lines
 
 **Mean (μ):**
-- Vertical dashed line at the mean aggregate score
+- Label: "μ" vertically centered in Statistics Display area
+- Vertical dashed line drawn in Dot Display area at the mean aggregate score
 - Line thickness: 1px
-- Color: Light gray
-- Label: "μ" displayed above the marker
+- Color: Light gray with alpha 0x80 (semi-transparent)
 
 **Standard Deviations (±σ):**
-- Vertical dashed lines at ±1σ, ±2σ, ±3σ, etc. from the mean
+- Labels: "+1σ", "-1σ", "+2σ", "-2σ", etc. vertically centered in Statistics Display area
+- Vertical dashed lines drawn in Dot Display area at ±1σ, ±2σ, ±3σ, etc. from the mean
 - Show as many standard deviations as exist within the score range
-- Do not draw markers that exceed the min/max score range
+- Do not draw lines that exceed the min/max score range
 - Line thickness: 1px
-- Color: Light gray
-- Labels: "+1σ", "-1σ", "+2σ", "-2σ", etc. displayed above markers
-
-**Median:**
-- Displayed in the tick area below the Statistics Display (where x-axis ticks would appear)
-- Format: Single uppercase "M"
-- Regular ticks are not shown
-- Positioned at the median aggregate score on the x-axis
+- Color: Light gray with alpha 0x80 (semi-transparent)
 
 #### Behavior
 
 - Statistics are calculated from the current dataset
 - **Statistics do not change when grade cursors are enabled/disabled**
-- Fixed height rendering area (~41px)
+- Fixed height rendering area (~30px)
 - Shares x-axis range with Dot Display and Grade Cursors
+- Dashed lines rendered in Dot Display are behind dots (BelowSeries layer)
 
 #### Borders
 
