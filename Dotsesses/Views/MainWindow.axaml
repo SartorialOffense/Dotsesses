@@ -48,8 +48,8 @@
                             <ItemsControl ItemsSource="{Binding ComplianceRows}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Padding="2,1" Margin="0,1">
-                                            <Grid ColumnDefinitions="Auto,60,50,50,50">
+                                        <Border Padding="2,0" Margin="0,0.5">
+                                            <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto">
                                                 <!-- Checkbox -->
                                                 <CheckBox Grid.Column="0"
                                                          IsChecked="{Binding IsEnabled}"
@@ -122,13 +122,13 @@
         <Button Grid.Row="0"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Top"
-                Margin="10"
-                Padding="10"
+                Margin="5"
+                Padding="5"
                 Command="{Binding ToggleCompliancePaneCommand}"
                 Background="#2D2D30"
                 Foreground="White"
                 ToolTip.Tip="Toggle Compliance Panel">
-            <TextBlock Text="☰" FontSize="16" />
+            <TextBlock Text="☰" FontSize="14" />
         </Button>
 
         <!-- Bottom Row: Selected Student Cards -->

@@ -236,7 +236,6 @@ public partial class MainWindowViewModel : ViewModelBase
             MarkerFill = OxyColor.FromRgb(70, 130, 180), // Medium blue
             MarkerStroke = OxyColor.FromRgb(70, 130, 180),
             MarkerStrokeThickness = 2,
-            TrackerFormatString = "{Tag}",
             XAxisKey = "SharedX",
             YAxisKey = "DotY"
         };
@@ -249,7 +248,6 @@ public partial class MainWindowViewModel : ViewModelBase
             MarkerFill = OxyColors.White,
             MarkerStroke = OxyColors.White,
             MarkerStrokeThickness = 0.5,
-            TrackerFormatString = "{Tag}",
             XAxisKey = "SharedX",
             YAxisKey = "DotY"
         };
@@ -441,7 +439,9 @@ public partial class MainWindowViewModel : ViewModelBase
                     TextHorizontalAlignment = HorizontalAlignment.Center,
                     TextVerticalAlignment = VerticalAlignment.Middle,
                     XAxisKey = "SharedX",
-                    YAxisKey = "CursorY"
+                    YAxisKey = "CursorY",
+                    Stroke = OxyColors.Transparent,
+                    StrokeThickness = 0
                 };
                 DotplotModel.Annotations.Add(label);
             }
@@ -821,8 +821,9 @@ public partial class MainWindowViewModel : ViewModelBase
         var pos = series.InverseTransform(e.Position);
         var newScore = (int)Math.Round(pos.X);
 
-        // Validate cursor movement
+        // Validate cursor movement (only include enabled cursors)
         var allCutoffs = Cursors
+            .Where(c => c.IsEnabled)
             .Select(c => new GradeCutoff(c.Grade, c == _draggingCursor ? newScore : c.Score))
             .ToList();
 
@@ -837,8 +838,9 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         if (_isDraggingCursor && _draggingCursor != null)
         {
-            // Finalize cursor drag - update cutoffs and recalculate compliance
+            // Finalize cursor drag - update cutoffs and recalculate compliance (only enabled cursors)
             var updatedCutoffs = Cursors
+                .Where(c => c.IsEnabled)
                 .Select(c => new GradeCutoff(c.Grade, c.Score))
                 .ToList();
 

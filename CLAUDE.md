@@ -65,3 +65,7 @@ Check after edits to files.
 
 - When I ask you to make a questionnaire for me, do this in the .conversations/ folder. this folder
 is in .gitignore so any record will need be in a summary file in design_history/ later on.
+
+- If I ask you to do something that is more than a simple fix or refinement, and you have
+multiple questions or feel you need clarification, please pose this as a questionnaire file
+for me to answer in.
