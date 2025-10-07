@@ -369,7 +369,9 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         // ===== Vertical Cursors in Grade Cursors Area =====
-        foreach (var cursor in enabledCursors)
+        // Skip the lowest grade (highest Order) - it has no cursor, just a label
+        var lowestGrade = enabledCursors.OrderByDescending(c => c.Grade.Order).FirstOrDefault();
+        foreach (var cursor in enabledCursors.Where(c => c != lowestGrade))
         {
             var line = new LineAnnotation
             {
@@ -869,7 +871,9 @@ public partial class MainWindowViewModel : ViewModelBase
         CursorViewModel? nearest = null;
         double minDistance = double.MaxValue;
 
-        foreach (var cursor in Cursors.Where(c => c.IsEnabled))
+        // Exclude the lowest grade (highest Order) - it has no draggable cursor
+        var lowestGrade = Cursors.Where(c => c.IsEnabled).OrderByDescending(c => c.Grade.Order).FirstOrDefault();
+        foreach (var cursor in Cursors.Where(c => c.IsEnabled && c != lowestGrade))
         {
             double distance = Math.Abs(cursor.Score - xPos);
             if (distance < minDistance)
