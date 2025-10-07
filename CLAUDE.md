@@ -59,5 +59,9 @@ dotnet build -c Release
 ## Rules of the road
 
 - **NEVER** commit code unless I explicitly tell you to do this.
+
 - Use clean markdown, follow best practices for formatting, spacing, and line lengths.
 Check after edits to files.
+
+- When I ask you to make a questionnaire for me, do this in the .conversations/ folder. this folder
+is in .gitignore so any record will need be in a summary file in design_history/ later on.
