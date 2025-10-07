@@ -55,3 +55,9 @@ dotnet build -c Release
 - `Views/` - Avalonia UserControls and Windows (XAML + code-behind)
 - `Models/` - Data models (currently empty)
 - `Assets/` - Application resources (icons, images, etc.)
+
+## Rules of the road
+
+- **NEVER** commit code unless I explicitly tell you to do this.
+- Use clean markdown, follow best practices for formatting, spacing, and line lengths.
+Check after edits to files.
