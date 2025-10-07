@@ -11,10 +11,11 @@ reminiscent of early grade school.
 
 ## User Experience
 
+**Note:** All visualizations are data-driven. The number of grade regions varies based on which grades are enabled. Statistical markers (mean, standard deviations, median) are calculated from the current dataset and do not change when grades are enabled/disabled.
+
 ### Dotplot Visualization
 
-Scores are distributed horizontally on a dotplot histogram that stretches across the top
-of the main window.
+The Dot Display is the middle rendering area of the three-part plot. Scores are distributed horizontally on a dotplot histogram with alternating grade region bands in the background.
 
 #### X-Axis Positioning
 
@@ -32,7 +33,7 @@ Students with identical aggregate scores stack vertically, ordered by student ID
 
 #### Scaling
 
-Dotplot stretches horizontally and autoscales vertically to fit the maximum number of students in a bin.
+Dot Display stretches horizontally to fill available width and autoscales vertically within its allocated height (controlled by splitter) to fit the maximum number of students in a bin.
 
 #### Hover
 
@@ -42,49 +43,126 @@ Hovering over a point displays a formatted summary table of the student's scores
 
 Click a point to toggle selection. **Selection persists when cursors move.**
 
-**Visual Indicator:** Selected students display a medium blue vertical bar (height = 2× dot diameter) drawn behind the dot as a non-interactive annotation. Each selected student gets its own vertical bar, which may overlap with other bars or extend over nearby dots.
+**Visual Indicator:** Selected students display a crosshair (dimension = 2× dot diameter) drawn behind the dot as a non-interactive series.
 
 #### Dot Appearance
 
-- **Size:** Marker radius is 3× smaller than default to reduce overlap
+- **Size:** Marker radius is 4 to reduce overlap
 - **Color:** Solid white
 - **Background:** RGB(24, 24, 24) matching all other controls
 
+#### Grade Region Bands
+
+Alternating subtle background rectangles indicate grade regions between cursors.
+
+**Visual Style:**
+- Alternating pattern: transparent (clear) and very light gray
+- Gray color: RGB(36, 36, 36)
+- Rectangles span full height of Dot Display area
+
+**Behavior:**
+- Dynamically resize based on cursor positions as they are dragged
+- Only drawn for enabled grades (when cursor checkbox is checked)
+- When a grade cursor is disabled, its region band disappears
+- Number of bands varies with dataset (depends on how many grades are enabled)
+
+**Example:** If grades A, A-, B+, B are enabled, there would be 5 regions with
+alternating transparency (include ends).
+
 #### Axis Display
 
-- **X-Axis:** Bottom axis line only (no tick marks, no labels)
+- **X-Axis:** Hidden (no line, no ticks, no labels)
 - **Y-Axis:** Hidden (no line, no ticks, no labels)
-- **Borders:** Bottom border only (top, left, and right borders removed)
+- **Borders:** Full outline (top, left, right, bottom) with thin gray line, faint styling
 - **Title:** None
-
-#### Toolbar
-
-Above the dotplot, left-aligned:
-- **Clear Selections Button:** Displays eraser symbol (⌫) with tooltip "Clear all selections"
 
 ### Layout
 
-The main window uses a two-row layout with a resizable splitter:
+The main window uses a multi-row layout with resizable splitters:
 
-**Top Row:**
-- Left: Dotplot (stretches to fill available width)
-  - Minimum height: 20% of initial height
-  - Maximum height: Initial height
-- Right: Curve Compliance grid in a collapsible SplitView pane
-  - When collapsed, dotplot uses full width
+**Top Section - Three-Part Plot:**
+A single OxyPlot instance with three separate rendering areas (subplot regions),
+all sharing the same x-axis for perfect alignment:
+
+1. **Statistics Display** (top, fixed height ~41px)
+   - Shows mean and standard deviation markers
+   - Median label displayed below in tick area
+   - Fixed height, does not resize with splitter
+
+2. **Dot Display** (middle, variable height ~145px initial)
+   - Student score histogram with alternating grade region bands
+   - Height controlled by horizontal splitter below
+   - No minimum/maximum height constraints currently
+
+3. **Grade Cursors** (bottom of plot area, fixed height ~41px)
+   - Draggable vertical cursors for grade cutoffs
+   - Grade labels displayed below cursors
+   - Fixed height, does not resize with splitter
+
+All three areas maintain pixel-perfect x-axis alignment during window resize.
+
+**Right Panel:**
+- Curve Compliance grid in a collapsible SplitView pane
+  - When collapsed, plot uses full width
   - Standard Avalonia SplitView with hamburger menu toggle
 
-**Splitter:**
-- Subtle horizontal splitter between top row and bottom row
-- Dragging adjusts heights: dotplot stretches, compliance grid gets scrollbar when too short
+**Horizontal Splitter:**
+- Subtle horizontal splitter between Dot Display and Drill Down section
+- Dragging adjusts only Dot Display height (Statistics and Grade Cursors remain fixed)
+- Compliance grid gets scrollbar when too short
 
-**Bottom Row:**
-- Selected student cards span full width below both dotplot and compliance grid
+**Bottom Section:**
+- Selected student cards span full width below both plot and compliance grid
+
+### Statistics Display
+
+The Statistics Display is the top rendering area of the three-part plot, showing statistical
+markers for the dataset.
+
+#### Markers
+
+**Mean (μ):**
+- Vertical dashed line at the mean aggregate score
+- Line thickness: 1px
+- Color: Light gray
+- Label: "μ" displayed above the marker
+
+**Standard Deviations (±σ):**
+- Vertical dashed lines at ±1σ, ±2σ, ±3σ, etc. from the mean
+- Show as many standard deviations as exist within the score range
+- Do not draw markers that exceed the min/max score range
+- Line thickness: 1px
+- Color: Light gray
+- Labels: "+1σ", "-1σ", "+2σ", "-2σ", etc. displayed above markers
+
+**Median:**
+- Displayed in the tick area below the Statistics Display (where x-axis ticks would appear)
+- Format: Single uppercase "M"
+- Regular ticks are not shown
+- Positioned at the median aggregate score on the x-axis
+
+#### Behavior
+
+- Statistics are calculated from the current dataset
+- **Statistics do not change when grade cursors are enabled/disabled**
+- Fixed height rendering area (~41px)
+- Shares x-axis range with Dot Display and Grade Cursors
+
+#### Borders
+
+- Full outline (top, left, right, bottom)
+- Thin gray line, faint styling
 
 ### Drill Down
 
 Selected students appear as rectangular cards with embedded tables.
 Cards flow left to right, then wrap to next row. A vertical scrollbar appears when cards don't fit.
+
+**Clear Selections Button:**
+- Positioned above the drill-down section, left-aligned
+- Displays eraser symbol (⌫) with tooltip "Clear all selections"
+- Disabled when no students are selected
+- Enabled when one or more students are selected
 
 **Card Content:**
 1. Header: MuppetName and assigned grade
@@ -117,14 +195,25 @@ The collapsible SplitView pane shows:
 
 ### Cursors
 
-- Dashed vertical cursors show grade cutoffs (only when enabled via checkboxes).
-- Letter grade labels appear centered between each cursor and its right neighbor. For the highest grade, the label is centered between the cursor and right boundary.
-- The lowest grade has no cursor. Its label is centered between the left boundary and the second-lowest grade's cursor.
-- Labels are **semi-transparent (fixed level)**, use a larger font than other text, and must be visible (not black on dark background).
-- Cursors are draggable but cannot overlap.
-  - Example: cursor for A cannot move left of or onto A-.
-  - **Cursors must be at least 1 point apart** on the score scale.
-- **Enabling/disabling cursors triggers recalculation** of grade assignments.
+The Grade Cursors rendering area (bottom of the three-part plot) displays draggable vertical lines for grade cutoffs.
+
+**Visual Style:**
+- Dashed vertical cursors show grade cutoffs (only when enabled via checkboxes)
+- Letter grade labels appear **below the cursors** in the Grade Cursors area
+  - Labels centered between each cursor and its right neighbor
+  - For the highest grade, label centered between cursor and right boundary
+  - The lowest grade has no cursor; its label centered between left boundary and second-lowest grade's cursor
+- Labels use regular text style (not semi-transparent), larger font than other text, must be visible against dark background
+- Fixed height rendering area (~50px)
+- Full outline (top, left, right, bottom) with thin gray line, faint styling
+
+**Interaction:**
+- Cursors are draggable but cannot overlap
+  - Example: cursor for A cannot move left of or onto A-
+  - **Cursors must be at least 1 point apart** on the score scale
+- **No crosshairs appear when dragging**
+- Visual feedback during drag: grade region bands in Dot Display dynamically resize
+- **Enabling/disabling cursors triggers recalculation** of grade assignments and updates region bands
 
 #### Initial Placement of Cursors
 
@@ -437,7 +526,9 @@ Standard curve: A, A-, B+, B, B-, C+, and C. Grades below C are not required.
 
 ### View Testing
 
-The window must save PNG snapshots to a temp folder and return the file path. This allows Claude Code to verify UI design. The window must be callable from a test executable that accepts command line arguments to set initial state.
+The window must save PNG snapshots to a temp folder and return the file path.
+This allows Claude Code to verify UI design. The window must be callable from a test executable that accepts
+command line arguments to set initial state.
 
 ## Design History
 
