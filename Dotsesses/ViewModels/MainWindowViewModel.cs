@@ -20,7 +20,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly InitialCutoffCalculator _initialCutoffCalculator;
     private readonly CursorValidation _cursorValidation;
     private readonly CursorPlacementCalculator _cursorPlacementCalculator;
-    private readonly GradeAssigner _gradeAssigner;
+    private GradeAssigner _gradeAssigner = null!;
     private CursorViewModel? _draggingCursor;
     private bool _isDraggingCursor;
 
@@ -51,7 +51,6 @@ public partial class MainWindowViewModel : ViewModelBase
         _initialCutoffCalculator = new InitialCutoffCalculator();
         _cursorValidation = new CursorValidation();
         _cursorPlacementCalculator = new CursorPlacementCalculator();
-        _gradeAssigner = new GradeAssigner();
 
         _cursors = new ObservableCollection<CursorViewModel>();
         _selectedStudents = new ObservableCollection<StudentCardViewModel>();
@@ -89,6 +88,8 @@ public partial class MainWindowViewModel : ViewModelBase
             current,
             muppetNameMap
         );
+
+        _gradeAssigner = new GradeAssigner(initialCutoffs);
     }
 
     private void InitializeDotplot()
@@ -710,6 +711,7 @@ public partial class MainWindowViewModel : ViewModelBase
             .ToList();
 
         ClassAssessment.CurrentCutoffs = enabledCutoffs;
+        _gradeAssigner = new GradeAssigner(enabledCutoffs);
         var newCurrent = _cutoffCountCalculator.Calculate(ClassAssessment.Assessments, enabledCutoffs);
         ClassAssessment.Current = newCurrent;
 
@@ -755,7 +757,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private string GetGradeForStudent(StudentAssessment student)
     {
-        var grade = _gradeAssigner.AssignGrade(student.AggregateGrade, ClassAssessment.CurrentCutoffs);
+        var grade = _gradeAssigner.AssignGrade(student.AggregateGrade);
         return grade.LetterGrade.ToString();
     }
 
@@ -850,6 +852,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 .ToList();
 
             ClassAssessment.CurrentCutoffs = updatedCutoffs;
+            _gradeAssigner = new GradeAssigner(updatedCutoffs);
             var newCurrent = _cutoffCountCalculator.Calculate(ClassAssessment.Assessments, updatedCutoffs);
             ClassAssessment.Current = newCurrent;
 

@@ -7,8 +7,6 @@ using Dotsesses.Models;
 /// </summary>
 public class CutoffCountCalculator
 {
-    private readonly GradeAssigner _gradeAssigner = new();
-
     /// <summary>
     /// Calculates student counts for each grade based on current cutoffs.
     /// </summary>
@@ -22,6 +20,7 @@ public class CutoffCountCalculator
         ArgumentNullException.ThrowIfNull(assessments);
         ArgumentNullException.ThrowIfNull(cutoffs);
 
+        var gradeAssigner = new GradeAssigner(cutoffs);
         var counts = new Dictionary<Grade, int>();
 
         // Initialize counts
@@ -33,7 +32,7 @@ public class CutoffCountCalculator
         // Bin each student into appropriate grade using GradeAssigner
         foreach (var assessment in assessments)
         {
-            var grade = _gradeAssigner.AssignGrade(assessment.AggregateGrade, cutoffs);
+            var grade = gradeAssigner.AssignGrade(assessment.AggregateGrade);
             counts[grade]++;
         }
 

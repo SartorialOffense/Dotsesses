@@ -7,15 +7,16 @@ using Dotsesses.Models;
 /// </summary>
 public class GradeAssigner
 {
+    private readonly List<GradeCutoff> _sortedCutoffs;
+    private readonly Grade _lowestGrade;
+
     /// <summary>
-    /// Assigns a grade to a student based on current cutoffs.
-    /// Validates that cutoffs are properly ordered before assignment.
+    /// Creates a new GradeAssigner with validated and pre-sorted cutoffs.
+    /// Create a new instance whenever grade cutoffs change.
     /// </summary>
-    /// <param name="score">Student's aggregate score</param>
-    /// <param name="cutoffs">Current grade cutoffs</param>
-    /// <returns>The grade the student qualifies for</returns>
-    /// <exception cref="InvalidOperationException">Thrown if cutoffs are out of order (validation bug)</exception>
-    public Grade AssignGrade(int score, IReadOnlyCollection<GradeCutoff> cutoffs)
+    /// <param name="cutoffs">Grade cutoffs to use for assignment</param>
+    /// <exception cref="InvalidOperationException">Thrown if cutoffs are invalid or out of order</exception>
+    public GradeAssigner(IReadOnlyCollection<GradeCutoff> cutoffs)
     {
         ArgumentNullException.ThrowIfNull(cutoffs);
 
@@ -24,20 +25,31 @@ public class GradeAssigner
             throw new InvalidOperationException("No grades available in cutoffs");
         }
 
-        // VALIDATE: Cutoffs must be properly ordered (better grades >= worse grades)
-        ValidateCutoffOrdering(cutoffs);
-
-        // Find the lowest grade (catch-all grade with highest Order)
-        var lowestGrade = cutoffs.OrderByDescending(c => c.Grade.Order).First();
+        // Sort by grade hierarchy (Order) once for both validation and finding lowest grade
+        var sortedByGrade = cutoffs.OrderBy(c => c.Grade.Order).ToList();
         
-        // Find grade by descending score order, excluding lowest grade
+        // The lowest grade is the last element (highest Order)
+        _lowestGrade = sortedByGrade[^1].Grade;
+
+        // VALIDATE: Cutoffs must be properly ordered (better grades >= worse grades)
+        ValidateCutoffOrdering(sortedByGrade, _lowestGrade);
+        
+        // Pre-sort cutoffs by descending score order, excluding lowest grade
         // The lowest grade is the fallback if score is below all other cutoffs
-        var sortedCutoffs = cutoffs
-            .Where(c => !c.Grade.Equals(lowestGrade.Grade))
+        _sortedCutoffs = cutoffs
+            .Where(c => !c.Grade.Equals(_lowestGrade))
             .OrderByDescending(c => c.Score)
             .ToList();
+    }
 
-        foreach (var cutoff in sortedCutoffs)
+    /// <summary>
+    /// Assigns a grade to a student based on the cutoffs provided at construction.
+    /// </summary>
+    /// <param name="score">Student's aggregate score</param>
+    /// <returns>The grade the student qualifies for</returns>
+    public Grade AssignGrade(int score)
+    {
+        foreach (var cutoff in _sortedCutoffs)
         {
             if (score >= cutoff.Score)
             {
@@ -46,17 +58,11 @@ public class GradeAssigner
         }
 
         // If below all cutoffs, return lowest grade (catch-all)
-        return lowestGrade.Grade;
+        return _lowestGrade;
     }
 
-    private void ValidateCutoffOrdering(IReadOnlyCollection<GradeCutoff> cutoffs)
+    private void ValidateCutoffOrdering(List<GradeCutoff> sortedByGrade, Grade lowestGrade)
     {
-        // Sort by grade hierarchy (Order)
-        var sortedByGrade = cutoffs.OrderBy(c => c.Grade.Order).ToList();
-        
-        // Find the lowest grade (catch-all grade with highest Order)
-        var lowestGrade = sortedByGrade.OrderByDescending(c => c.Grade.Order).First();
-
         // Verify: Better grades (lower Order) must have >= cutoff scores than worse grades
         // EXCEPT the lowest grade, which is a catch-all and has a static score
         for (int i = 0; i < sortedByGrade.Count - 1; i++)
@@ -65,7 +71,7 @@ public class GradeAssigner
             var worseGrade = sortedByGrade[i + 1];
 
             // Skip validation if worse grade is the catch-all lowest grade
-            if (worseGrade.Grade.Equals(lowestGrade.Grade))
+            if (worseGrade.Grade.Equals(lowestGrade))
                 continue;
 
             if (betterGrade.Score < worseGrade.Score)

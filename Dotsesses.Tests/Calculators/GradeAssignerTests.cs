@@ -5,7 +5,6 @@ using Dotsesses.Models;
 
 public class GradeAssignerTests
 {
-    private readonly GradeAssigner _assigner = new();
 
     [Fact]
     public void AssignGrade_WithProperlyOrderedCutoffs_ReturnsCorrectGrade()
@@ -17,15 +16,16 @@ public class GradeAssignerTests
             new(new Grade(LetterGrade.B, 1), 250),
             new(new Grade(LetterGrade.C, 2), 200)
         };
+        var assigner = new GradeAssigner(cutoffs);
 
         // Act & Assert
-        Assert.Equal(LetterGrade.A, _assigner.AssignGrade(300, cutoffs).LetterGrade);
-        Assert.Equal(LetterGrade.A, _assigner.AssignGrade(280, cutoffs).LetterGrade);
-        Assert.Equal(LetterGrade.B, _assigner.AssignGrade(260, cutoffs).LetterGrade);
-        Assert.Equal(LetterGrade.B, _assigner.AssignGrade(250, cutoffs).LetterGrade);
-        Assert.Equal(LetterGrade.C, _assigner.AssignGrade(220, cutoffs).LetterGrade);
-        Assert.Equal(LetterGrade.C, _assigner.AssignGrade(200, cutoffs).LetterGrade);
-        Assert.Equal(LetterGrade.C, _assigner.AssignGrade(150, cutoffs).LetterGrade); // Below all -> lowest grade
+        Assert.Equal(LetterGrade.A, assigner.AssignGrade(300).LetterGrade);
+        Assert.Equal(LetterGrade.A, assigner.AssignGrade(280).LetterGrade);
+        Assert.Equal(LetterGrade.B, assigner.AssignGrade(260).LetterGrade);
+        Assert.Equal(LetterGrade.B, assigner.AssignGrade(250).LetterGrade);
+        Assert.Equal(LetterGrade.C, assigner.AssignGrade(220).LetterGrade);
+        Assert.Equal(LetterGrade.C, assigner.AssignGrade(200).LetterGrade);
+        Assert.Equal(LetterGrade.C, assigner.AssignGrade(150).LetterGrade); // Below all -> lowest grade
     }
 
     [Fact]
@@ -42,7 +42,7 @@ public class GradeAssignerTests
         };
 
         // Act & Assert
-        var ex = Assert.Throws<InvalidOperationException>(() => _assigner.AssignGrade(190, cutoffs));
+        var ex = Assert.Throws<InvalidOperationException>(() => new GradeAssigner(cutoffs));
         Assert.Contains("out of order", ex.Message);
         Assert.Contains("B+", ex.Message);
         Assert.Contains("B", ex.Message);
@@ -56,11 +56,12 @@ public class GradeAssignerTests
         {
             new(new Grade(LetterGrade.C, 2), 200)
         };
+        var assigner = new GradeAssigner(cutoffs);
 
         // Act & Assert
-        Assert.Equal(LetterGrade.C, _assigner.AssignGrade(250, cutoffs).LetterGrade);
-        Assert.Equal(LetterGrade.C, _assigner.AssignGrade(200, cutoffs).LetterGrade);
-        Assert.Equal(LetterGrade.C, _assigner.AssignGrade(150, cutoffs).LetterGrade);
+        Assert.Equal(LetterGrade.C, assigner.AssignGrade(250).LetterGrade);
+        Assert.Equal(LetterGrade.C, assigner.AssignGrade(200).LetterGrade);
+        Assert.Equal(LetterGrade.C, assigner.AssignGrade(150).LetterGrade);
     }
 
     [Fact]
@@ -70,7 +71,7 @@ public class GradeAssignerTests
         var cutoffs = new List<GradeCutoff>();
 
         // Act & Assert
-        var ex = Assert.Throws<InvalidOperationException>(() => _assigner.AssignGrade(200, cutoffs));
+        var ex = Assert.Throws<InvalidOperationException>(() => new GradeAssigner(cutoffs));
         Assert.Contains("No grades available", ex.Message);
     }
 
@@ -84,9 +85,10 @@ public class GradeAssignerTests
             new(new Grade(LetterGrade.B, 1), 250),  // Same score as A (tied cutoff)
             new(new Grade(LetterGrade.C, 2), 200)
         };
+        var assigner = new GradeAssigner(cutoffs);
 
         // Act & Assert - Should give better grade when tied
-        Assert.Equal(LetterGrade.A, _assigner.AssignGrade(250, cutoffs).LetterGrade);
+        Assert.Equal(LetterGrade.A, assigner.AssignGrade(250).LetterGrade);
     }
 
     [Fact]
@@ -99,9 +101,10 @@ public class GradeAssignerTests
             new(new Grade(LetterGrade.B, 1), 250),
             new(new Grade(LetterGrade.F, 9), 100)  // F is lowest grade (highest Order)
         };
+        var assigner = new GradeAssigner(cutoffs);
 
         // Act
-        var grade = _assigner.AssignGrade(50, cutoffs); // Below all cutoffs
+        var grade = assigner.AssignGrade(50); // Below all cutoffs
 
         // Assert
         Assert.Equal(LetterGrade.F, grade.LetterGrade);
@@ -119,12 +122,13 @@ public class GradeAssignerTests
             new(new Grade(LetterGrade.CPlus, 5), 150),  // Second-to-last cursor dragged low
             new(new Grade(LetterGrade.C, 6), 175)       // Lowest grade (catch-all) has higher score
         };
+        var assigner = new GradeAssigner(cutoffs);
 
         // Act & Assert - Should NOT throw even though C+ (150) < C (175)
         // because C is the catch-all lowest grade and exempt from validation
-        var grade1 = _assigner.AssignGrade(250, cutoffs); // Should get BPlus
-        var grade2 = _assigner.AssignGrade(160, cutoffs); // Should get CPlus
-        var grade3 = _assigner.AssignGrade(140, cutoffs); // Should get C (below all cursors)
+        var grade1 = assigner.AssignGrade(250); // Should get BPlus
+        var grade2 = assigner.AssignGrade(160); // Should get CPlus
+        var grade3 = assigner.AssignGrade(140); // Should get C (below all cursors)
 
         Assert.Equal(LetterGrade.BPlus, grade1.LetterGrade);
         Assert.Equal(LetterGrade.CPlus, grade2.LetterGrade);
