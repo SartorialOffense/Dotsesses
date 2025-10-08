@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Getting Started
+
+**IMPORTANT**: Before starting work on this project, read `SPEC.md` to understand the full requirements, architecture, and testing procedures.
+
 ## Project Overview
 
 Dotsesses is an Avalonia UI desktop application built on .NET 9.0. It uses the MVVM pattern with CommunityToolkit.Mvvm for observable properties and commands, and integrates OxyPlot for data visualization.

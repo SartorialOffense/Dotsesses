@@ -553,9 +553,44 @@ Standard curve: A, A-, B+, B, B-, C+, and C. Grades below C are not required.
 
 ### View Testing
 
-The window must save PNG snapshots to a temp folder and return the file path.
-This allows Claude Code to verify UI design. The window must be callable from a test executable that accepts
-command line arguments to set initial state.
+The application supports automated snapshot capture for UI verification by Claude Code.
+
+#### Snapshot Command Line Arguments
+
+The application accepts the following command line arguments for snapshot mode:
+
+- `--snapshot` or `--capture-snapshot`: Triggers snapshot mode. The app will launch, render the window, capture a PNG snapshot, print the file path to stdout, and exit.
+- `--output <path>` or `-o <path>`: Optional. Specifies the output path for the snapshot. If not provided, saves to temp folder with timestamp.
+
+#### Snapshot Implementation
+
+The `SaveSnapshotAsync` method in `MainWindow.axaml.cs` handles snapshot capture:
+- Determines output path (uses temp folder with timestamp if not specified)
+- Waits 200ms for rendering to complete
+- Forces layout update
+- Renders window to bitmap at 96 DPI
+- Saves as PNG with maximum quality (100)
+- Returns full file path
+
+#### Claude Code Workflow
+
+When Claude Code needs to verify UI changes:
+
+1. **Run snapshot command**:
+   ```bash
+   dotnet run --project Dotsesses/Dotsesses.csproj -- --snapshot
+   ```
+
+2. **Capture output**: The app prints the snapshot path to stdout:
+   ```
+   Snapshot saved to: /var/folders/.../dotsesses_snapshot_20251008_001717.png
+   ```
+
+3. **Read snapshot**: Use the Read tool with the returned file path to view the UI
+
+4. **Iterate**: Make code changes and repeat to verify visual alignment
+
+This workflow enables Claude Code to visually verify UI tweaks like cursor alignment, spacing, colors, and layout without manual inspection.
 
 ## Design History
 
