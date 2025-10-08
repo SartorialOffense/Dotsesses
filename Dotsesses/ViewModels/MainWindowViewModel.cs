@@ -828,13 +828,17 @@ public partial class MainWindowViewModel : ViewModelBase
         var pos = series.InverseTransform(e.Position);
         var newScore = (int)Math.Round(pos.X);
 
+        // Limit cursor movement to within 1 of actual student scores
+        var minBound = ClassAssessment.Assessments.Min(a => a.AggregateGrade) - 1;
+        var maxBound = ClassAssessment.Assessments.Max(a => a.AggregateGrade) + 1;
+
         // Validate cursor movement (include ALL enabled cursors for proper ordering constraints)
         var allCutoffs = Cursors
             .Where(c => c.IsEnabled)
             .Select(c => new GradeCutoff(c.Grade, c == _draggingCursor ? newScore : c.Score))
             .ToList();
 
-        var validatedScore = _cursorValidation.ValidateMovement(_draggingCursor.Grade, newScore, allCutoffs);
+        var validatedScore = _cursorValidation.ValidateMovement(_draggingCursor.Grade, newScore, allCutoffs, (int)minBound, (int)maxBound);
 
         _draggingCursor.Score = validatedScore;
         UpdateCursors();

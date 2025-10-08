@@ -19,10 +19,16 @@ public class CursorValidation
     public int ValidateMovement(
         Grade gradeToMove,
         int proposedScore,
-        IReadOnlyCollection<GradeCutoff> allCutoffs)
+        IReadOnlyCollection<GradeCutoff> allCutoffs,
+        int minBound,
+        int maxBound)
     {
         ArgumentNullException.ThrowIfNull(gradeToMove);
         ArgumentNullException.ThrowIfNull(allCutoffs);
+
+        // Enforce plot boundaries first
+        proposedScore = Math.Max(proposedScore, minBound);
+        proposedScore = Math.Min(proposedScore, maxBound);
 
         var others = allCutoffs.Where(c => c.Grade.Order != gradeToMove.Order).ToList();
 
