@@ -16,8 +16,8 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-    <Grid RowDefinitions="2*,5,*">
-        <!-- Top Row: Color Panel, Dotplot, and Compliance Panel -->
+    <Grid RowDefinitions="175,5,*">
+        <!-- Top Row: Color Panel, Dotplot, and Compliance Panel (fixed 175px height) -->
         <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto">
 
             <!-- Color Selection Panel -->
