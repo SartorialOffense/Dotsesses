@@ -664,13 +664,18 @@ public partial class MainWindowViewModel : ViewModelBase
             // Recalculate all cutoff positions
             var newCutoffs = _initialCutoffCalculator.Calculate(ClassAssessment.Assessments, enabledCurve);
 
-            // Update all enabled cursor positions
+            // Get valid drag bounds to ensure cursors are placed within draggable range
+            var minBound = ClassAssessment.Assessments.Min(a => a.AggregateGrade) - 1;
+            var maxBound = ClassAssessment.Assessments.Max(a => a.AggregateGrade) + 1;
+
+            // Update all enabled cursor positions, clamped to valid range
             foreach (var cutoff in newCutoffs)
             {
                 var cursor = Cursors.FirstOrDefault(c => c.Grade.Equals(cutoff.Grade));
                 if (cursor != null)
                 {
-                    cursor.Score = cutoff.Score;
+                    // Clamp score to valid dragging bounds
+                    cursor.Score = Math.Clamp(cutoff.Score, minBound, maxBound);
                 }
             }
         }
