@@ -306,6 +306,18 @@ public partial class MainWindowViewModel : ViewModelBase
             DotplotModel.Annotations.Add(ann);
         }
 
+        // Clear cursor handle series (they're in the series collection)
+        var seriesToKeep = DotplotModel.Series
+            .Where(s => s is ScatterSeries ss && ss.YAxisKey == "DotY")
+            .ToList();
+        
+        DotplotModel.Series.Clear();
+        
+        foreach (var series in seriesToKeep)
+        {
+            DotplotModel.Series.Add(series);
+        }
+
         var enabledCursors = Cursors.Where(c => c.IsEnabled).OrderBy(c => c.Score).ToList();
         var minScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade) - 10;
         var maxScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade) + 10;
@@ -384,7 +396,22 @@ public partial class MainWindowViewModel : ViewModelBase
         var lowestGrade = enabledCursors.OrderByDescending(c => c.Grade.Order).FirstOrDefault();
         foreach (var cursor in enabledCursors.Where(c => c != lowestGrade))
         {
-            // White vertical line (handle stick)
+            // White square handle at bottom (inverse lollipop - handle to grab)
+            var handleSeries = new OxyPlot.Series.ScatterSeries
+            {
+                MarkerType = MarkerType.Square,
+                MarkerSize = 10,
+                MarkerFill = OxyColors.Transparent,  // No fill
+                MarkerStroke = OxyColors.White,
+                MarkerStrokeThickness = 2,
+                XAxisKey = "SharedX",
+                YAxisKey = "CursorY",
+                TrackerFormatString = ""
+            };
+            handleSeries.Points.Add(new OxyPlot.Series.ScatterPoint(cursor.Score, 0.15));
+            DotplotModel.Series.Add(handleSeries);
+
+            // White vertical line extending upward from handle
             var line = new LineAnnotation
             {
                 Type = LineAnnotationType.Vertical,
@@ -394,25 +421,10 @@ public partial class MainWindowViewModel : ViewModelBase
                 StrokeThickness = 2,
                 XAxisKey = "SharedX",
                 YAxisKey = "CursorY",
-                MinimumY = 0,
-                MaximumY = 0.7  // Stop before top to leave room for handle
+                MinimumY = 0.15,  // Start from handle
+                MaximumY = 1
             };
             DotplotModel.Annotations.Add(line);
-
-            // White circular handle at top (inverse lollipop)
-            var handleSeries = new OxyPlot.Series.ScatterSeries
-            {
-                MarkerType = MarkerType.Circle,
-                MarkerSize = 8,
-                MarkerFill = OxyColors.White,
-                MarkerStroke = OxyColors.White,
-                MarkerStrokeThickness = 1,
-                XAxisKey = "SharedX",
-                YAxisKey = "CursorY",
-                TrackerFormatString = ""
-            };
-            handleSeries.Points.Add(new OxyPlot.Series.ScatterPoint(cursor.Score, 0.85));
-            DotplotModel.Series.Add(handleSeries);
         }
 
         // ===== Grade Labels Below Cursors =====
