@@ -20,6 +20,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly InitialCutoffCalculator _initialCutoffCalculator;
     private readonly CursorValidation _cursorValidation;
     private readonly CursorPlacementCalculator _cursorPlacementCalculator;
+    private readonly GradeAssigner _gradeAssigner;
     private CursorViewModel? _draggingCursor;
     private bool _isDraggingCursor;
 
@@ -50,6 +51,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _initialCutoffCalculator = new InitialCutoffCalculator();
         _cursorValidation = new CursorValidation();
         _cursorPlacementCalculator = new CursorPlacementCalculator();
+        _gradeAssigner = new GradeAssigner();
 
         _cursors = new ObservableCollection<CursorViewModel>();
         _selectedStudents = new ObservableCollection<StudentCardViewModel>();
@@ -237,7 +239,8 @@ public partial class MainWindowViewModel : ViewModelBase
             MarkerStroke = OxyColor.FromRgb(70, 130, 180),
             MarkerStrokeThickness = 2,
             XAxisKey = "SharedX",
-            YAxisKey = "DotY"
+            YAxisKey = "DotY",
+            TrackerFormatString = "" // Disable tracker
         };
 
         // Create series for all dots (white fill, on top)
@@ -249,7 +252,8 @@ public partial class MainWindowViewModel : ViewModelBase
             MarkerStroke = OxyColors.White,
             MarkerStrokeThickness = 0.5,
             XAxisKey = "SharedX",
-            YAxisKey = "DotY"
+            YAxisKey = "DotY",
+            TrackerFormatString = "" // Disable tracker
         };
 
         foreach (var group in scoreGroups)
@@ -326,8 +330,12 @@ public partial class MainWindowViewModel : ViewModelBase
         DotplotModel.Annotations.Add(cursorRect);
 
         // ===== Grade Region Bands in Dot Display =====
-        // Alternating pattern: transparent and light gray RGB(36, 36, 36)
-        if (enabledCursors.Any())
+        // Alternating pattern: transparent and light gray
+        // Only use cursors that have visible lines (exclude lowest grade)
+        var lowestGradeForRegions = enabledCursors.OrderByDescending(c => c.Grade.Order).FirstOrDefault();
+        var cursorsWithLines = enabledCursors.Where(c => c != lowestGradeForRegions).OrderBy(c => c.Score).ToList();
+        
+        if (cursorsWithLines.Any())
         {
             var grayColor = OxyColor.FromArgb(0x20, 255, 255, 255); // White with alpha 0x20
             var clearColor = OxyColors.Transparent;
@@ -335,19 +343,19 @@ public partial class MainWindowViewModel : ViewModelBase
             // Create regions from left boundary to first cursor, between cursors, and last cursor to right
             var regions = new List<(double left, double right, bool isGray)>();
 
-            // First region: left boundary to first cursor
-            regions.Add((minScore, enabledCursors[0].Score, false)); // Start with clear
+            // First region: left boundary to first visible cursor
+            regions.Add((minScore, cursorsWithLines[0].Score, false)); // Start with clear
 
             // Between cursors
-            for (int i = 0; i < enabledCursors.Count - 1; i++)
+            for (int i = 0; i < cursorsWithLines.Count - 1; i++)
             {
                 bool isGray = (i + 1) % 2 == 1; // Alternate starting with gray for second region
-                regions.Add((enabledCursors[i].Score, enabledCursors[i + 1].Score, isGray));
+                regions.Add((cursorsWithLines[i].Score, cursorsWithLines[i + 1].Score, isGray));
             }
 
             // Last region: last cursor to right boundary
-            bool lastIsGray = enabledCursors.Count % 2 == 1;
-            regions.Add((enabledCursors.Last().Score, maxScore, lastIsGray));
+            bool lastIsGray = cursorsWithLines.Count % 2 == 1;
+            regions.Add((cursorsWithLines.Last().Score, maxScore, lastIsGray));
 
             // Draw region bands
             foreach (var (left, right, isGray) in regions)
@@ -747,19 +755,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private string GetGradeForStudent(StudentAssessment student)
     {
-        var sortedCutoffs = ClassAssessment.CurrentCutoffs
-            .OrderByDescending(c => c.Score)
-            .ToList();
-
-        foreach (var cutoff in sortedCutoffs)
-        {
-            if (student.AggregateGrade >= cutoff.Score)
-            {
-                return cutoff.Grade.LetterGrade.ToString();
-            }
-        }
-
-        return "F";
+        var grade = _gradeAssigner.AssignGrade(student.AggregateGrade, ClassAssessment.CurrentCutoffs);
+        return grade.LetterGrade.ToString();
     }
 
     private void OnDotplotMouseDown(object? sender, OxyMouseDownEventArgs e)
@@ -806,15 +803,21 @@ public partial class MainWindowViewModel : ViewModelBase
             if (nearestPoint != null)
             {
                 ToggleStudent(nearestPoint);
-                e.Handled = true;
             }
         }
+        
+        // Always mark event as handled to prevent default OxyPlot tracker behavior
+        e.Handled = true;
     }
 
     private void OnDotplotMouseMove(object? sender, OxyMouseEventArgs e)
     {
         if (!_isDraggingCursor || _draggingCursor == null)
+        {
+            // Always handle to prevent default tracker behavior
+            e.Handled = true;
             return;
+        }
 
         var series = DotplotModel.Series.FirstOrDefault() as ScatterSeries;
         if (series == null)
@@ -823,7 +826,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var pos = series.InverseTransform(e.Position);
         var newScore = (int)Math.Round(pos.X);
 
-        // Validate cursor movement (only include enabled cursors)
+        // Validate cursor movement (include ALL enabled cursors for proper ordering constraints)
         var allCutoffs = Cursors
             .Where(c => c.IsEnabled)
             .Select(c => new GradeCutoff(c.Grade, c == _draggingCursor ? newScore : c.Score))
@@ -840,7 +843,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         if (_isDraggingCursor && _draggingCursor != null)
         {
-            // Finalize cursor drag - update cutoffs and recalculate compliance (only enabled cursors)
+            // Finalize cursor drag - include all enabled cursors for count calculation
             var updatedCutoffs = Cursors
                 .Where(c => c.IsEnabled)
                 .Select(c => new GradeCutoff(c.Grade, c.Score))

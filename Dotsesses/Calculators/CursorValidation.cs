@@ -26,10 +26,15 @@ public class CursorValidation
 
         var others = allCutoffs.Where(c => c.Grade.Order != gradeToMove.Order).ToList();
 
+        // Find the lowest grade (highest Order) - this is the catch-all grade
+        var lowestGrade = allCutoffs.OrderByDescending(c => c.Grade.Order).FirstOrDefault()?.Grade;
+
         // Find adjacent cursors by score (not grade order)
         // Lower score cursor (grade with higher order number, like C vs B)
+        // BUT exclude the lowest grade - it's a catch-all with no draggable cursor
         var lowerScoreCursor = others
             .Where(c => c.Grade.Order > gradeToMove.Order)
+            .Where(c => !c.Grade.Equals(lowestGrade))  // Exclude catch-all grade
             .OrderBy(c => c.Grade.Order)
             .FirstOrDefault();
 

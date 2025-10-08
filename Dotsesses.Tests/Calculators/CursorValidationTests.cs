@@ -29,19 +29,20 @@ public class CursorValidationTests
     [Fact]
     public void ValidateMovement_TooCloseToLowerCursor_SnapsToMinimumSpacing()
     {
-        // Arrange
+        // Arrange - B is moving, C+ is below (not lowest grade), D is lowest (catch-all)
         var gradeToMove = new Grade(LetterGrade.B, 1);
         var cutoffs = new List<GradeCutoff>
         {
             new(new Grade(LetterGrade.A, 0), 280),
             new(gradeToMove, 250),
-            new(new Grade(LetterGrade.C, 2), 200)
+            new(new Grade(LetterGrade.CPlus, 3), 200),  // Not lowest grade
+            new(new Grade(LetterGrade.D, 6), 150)        // Lowest grade (catch-all)
         };
 
-        // Act - try to move B to 201 (only 1 point above C)
+        // Act - try to move B to 200 (overlapping with C+)
         var result = _validation.ValidateMovement(gradeToMove, 200, cutoffs);
 
-        // Assert - should snap to 201 (minimum 1 point spacing)
+        // Assert - should snap to 201 (minimum 1 point spacing above C+)
         Assert.Equal(201, result);
     }
 
@@ -135,5 +136,84 @@ public class CursorValidationTests
 
         // Assert
         Assert.True(result);
+    }
+
+    [Fact]
+    public void ValidateMovement_SecondToLastCursor_CanMoveToMinimumScore()
+    {
+        // Arrange - B+ is second-to-last (C is last/catch-all)
+        // B+ should be able to move all the way down to min score
+        var gradeToMove = new Grade(LetterGrade.BPlus, 2);
+        var cutoffs = new List<GradeCutoff>
+        {
+            new(new Grade(LetterGrade.A, 0), 280),
+            new(gradeToMove, 200),
+            new(new Grade(LetterGrade.C, 4), 150)  // Lowest grade (catch-all)
+        };
+
+        // Act - try to move B+ down to 100 (below C's cursor)
+        var result = _validation.ValidateMovement(gradeToMove, 100, cutoffs);
+
+        // Assert - should allow movement to 100, not be blocked by C
+        Assert.Equal(100, result);
+    }
+
+    [Fact]
+    public void ValidateMovement_MiddleCursor_ConstrainedByBothNeighbors()
+    {
+        // Arrange - B is a middle cursor, not second-to-last
+        var gradeToMove = new Grade(LetterGrade.B, 1);
+        var cutoffs = new List<GradeCutoff>
+        {
+            new(new Grade(LetterGrade.A, 0), 280),
+            new(gradeToMove, 250),
+            new(new Grade(LetterGrade.BPlus, 2), 200),
+            new(new Grade(LetterGrade.C, 4), 150)  // Lowest grade
+        };
+
+        // Act - try to move B down to 199 (too close to B+)
+        var result = _validation.ValidateMovement(gradeToMove, 199, cutoffs);
+
+        // Assert - should snap to 201 (minimum spacing above B+)
+        Assert.Equal(201, result);
+    }
+
+    [Fact]
+    public void ValidateMovement_TopCursor_OnlyConstrainedBelow()
+    {
+        // Arrange - A is the top cursor
+        var gradeToMove = new Grade(LetterGrade.A, 0);
+        var cutoffs = new List<GradeCutoff>
+        {
+            new(gradeToMove, 280),
+            new(new Grade(LetterGrade.B, 1), 250),
+            new(new Grade(LetterGrade.C, 2), 200)
+        };
+
+        // Act - try to move A to 1000
+        var result = _validation.ValidateMovement(gradeToMove, 1000, cutoffs);
+
+        // Assert - should allow (no upper constraint)
+        Assert.Equal(1000, result);
+    }
+
+    [Fact]
+    public void ValidateMovement_SecondToLastCursor_StillConstrainedAbove()
+    {
+        // Arrange - B+ is second-to-last
+        var gradeToMove = new Grade(LetterGrade.BPlus, 2);
+        var cutoffs = new List<GradeCutoff>
+        {
+            new(new Grade(LetterGrade.A, 0), 280),
+            new(new Grade(LetterGrade.B, 1), 250),
+            new(gradeToMove, 200),
+            new(new Grade(LetterGrade.C, 4), 150)
+        };
+
+        // Act - try to move B+ up to 250 (overlapping with B)
+        var result = _validation.ValidateMovement(gradeToMove, 250, cutoffs);
+
+        // Assert - should snap to 249 (minimum spacing below B)
+        Assert.Equal(249, result);
     }
 }
