@@ -19,7 +19,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly CutoffCountCalculator _cutoffCountCalculator;
     private readonly InitialCutoffCalculator _initialCutoffCalculator;
     private readonly CursorValidation _cursorValidation;
-    private readonly CursorPlacementCalculator _cursorPlacementCalculator;
+
     private GradeAssigner _gradeAssigner = null!;
     private CursorViewModel? _draggingCursor;
     private bool _isDraggingCursor;
@@ -50,7 +50,6 @@ public partial class MainWindowViewModel : ViewModelBase
         _cutoffCountCalculator = new CutoffCountCalculator();
         _initialCutoffCalculator = new InitialCutoffCalculator();
         _cursorValidation = new CursorValidation();
-        _cursorPlacementCalculator = new CursorPlacementCalculator();
 
         _cursors = new ObservableCollection<CursorViewModel>();
         _selectedStudents = new ObservableCollection<StudentCardViewModel>();
@@ -641,60 +640,37 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void UpdateCursorsFromComplianceGrid()
     {
-        // Track newly enabled grades that need cursor placement
-        var newlyEnabled = new List<Grade>();
+        // Track if any cursors were enabled/disabled
+        bool cursorsChanged = false;
 
         foreach (var row in ComplianceRows)
         {
             var cursor = Cursors.FirstOrDefault(c => c.Grade.Equals(row.Grade));
-            if (cursor != null)
+            if (cursor != null && cursor.IsEnabled != row.IsEnabled)
             {
-                bool wasEnabled = cursor.IsEnabled;
                 cursor.IsEnabled = row.IsEnabled;
-
-                // If newly enabled and has no valid score, track it
-                if (!wasEnabled && row.IsEnabled && cursor.Score == 0)
-                {
-                    newlyEnabled.Add(cursor.Grade);
-                }
+                cursorsChanged = true;
             }
         }
 
-        // Calculate positions for newly enabled cursors
-        if (newlyEnabled.Any())
+        // If cursors changed, recalculate ALL cursor positions from scratch
+        if (cursorsChanged)
         {
-            var minScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade);
-            var maxScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade);
+            // Build curve from enabled grades using their default counts
+            var enabledCurve = ClassAssessment.DefaultCurve
+                .Where(cc => Cursors.Any(c => c.Grade.Equals(cc.Grade) && c.IsEnabled))
+                .ToList();
 
-            foreach (var grade in newlyEnabled)
+            // Recalculate all cutoff positions
+            var newCutoffs = _initialCutoffCalculator.Calculate(ClassAssessment.Assessments, enabledCurve);
+
+            // Update all enabled cursor positions
+            foreach (var cutoff in newCutoffs)
             {
-                var existingCutoffs = Cursors
-                    .Where(c => c.IsEnabled && !newlyEnabled.Contains(c.Grade))
-                    .Select(c => new GradeCutoff(c.Grade, c.Score))
-                    .ToList();
-
-                var newCutoffs = _cursorPlacementCalculator.PlaceNewCursor(
-                    grade,
-                    existingCutoffs,
-                    minScore,
-                    maxScore);
-
-                // Update cursor with new score
-                var cursor = Cursors.FirstOrDefault(c => c.Grade.Equals(grade));
-                var newCutoff = newCutoffs.FirstOrDefault(c => c.Grade.Equals(grade));
-                if (cursor != null && newCutoff != null)
+                var cursor = Cursors.FirstOrDefault(c => c.Grade.Equals(cutoff.Grade));
+                if (cursor != null)
                 {
-                    cursor.Score = newCutoff.Score;
-                }
-
-                // If placement reset all cursors, update them too
-                foreach (var cutoff in newCutoffs)
-                {
-                    var c = Cursors.FirstOrDefault(cur => cur.Grade.Equals(cutoff.Grade));
-                    if (c != null)
-                    {
-                        c.Score = cutoff.Score;
-                    }
+                    cursor.Score = cutoff.Score;
                 }
             }
         }
