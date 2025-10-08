@@ -1,6 +1,7 @@
 namespace Dotsesses.Tests.ViewModels;
 
 using Dotsesses.ViewModels;
+using Dotsesses.Models;
 using OxyPlot;
 
 public class MainWindowViewModelTests
@@ -110,5 +111,35 @@ public class MainWindowViewModelTests
         // Assert
         Assert.NotNull(viewModel.SelectedStudents);
         Assert.Empty(viewModel.SelectedStudents);
+    }
+
+
+    [Fact]
+    public void AddingCursor_ClampsPositionToValidDraggingBounds()
+    {
+        // Arrange
+        var viewModel = new MainWindowViewModel();
+        var minScore = viewModel.ClassAssessment.Assessments.Min(a => a.AggregateGrade);
+        var maxScore = viewModel.ClassAssessment.Assessments.Max(a => a.AggregateGrade);
+        var minBound = minScore - 1;
+        var maxBound = maxScore + 1;
+
+        // Find a grade that's not initially enabled (like F)
+        var fGrade = viewModel.ComplianceRows.FirstOrDefault(r => r.Grade.LetterGrade == LetterGrade.F);
+        Assert.NotNull(fGrade);
+        Assert.False(fGrade.IsEnabled); // F should not be enabled initially
+        
+        var fCursorBefore = viewModel.Cursors.FirstOrDefault(c => c.Grade.LetterGrade == LetterGrade.F);
+        var scoreBefore = fCursorBefore?.Score ?? -1;
+
+        // Act - Enable F grade (this triggers the callback via OnIsEnabledChanged)
+        fGrade.IsEnabled = true;
+
+        // Assert - F cursor should be clamped to at least minBound
+        var fCursor = viewModel.Cursors.FirstOrDefault(c => c.Grade.LetterGrade == LetterGrade.F);
+        Assert.NotNull(fCursor);
+        Assert.True(fCursor.IsEnabled, "F cursor should be enabled");
+        Assert.True(fCursor.Score >= minBound, $"F cursor score {fCursor.Score} should be >= minBound {minBound} (was {scoreBefore})");
+        Assert.True(fCursor.Score <= maxBound, $"F cursor score {fCursor.Score} should be <= maxBound {maxBound}");
     }
 }

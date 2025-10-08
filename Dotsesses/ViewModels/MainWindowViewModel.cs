@@ -656,10 +656,18 @@ public partial class MainWindowViewModel : ViewModelBase
         // If cursors changed, recalculate ALL cursor positions from scratch
         if (cursorsChanged)
         {
-            // Build curve from enabled grades using their default counts
-            var enabledCurve = ClassAssessment.DefaultCurve
-                .Where(cc => Cursors.Any(c => c.Grade.Equals(cc.Grade) && c.IsEnabled))
-                .ToList();
+            var enabledGrades = Cursors.Where(c => c.IsEnabled).Select(c => c.Grade).ToList();
+            var totalStudents = ClassAssessment.Assessments.Count;
+            var studentsPerGrade = totalStudents / Math.Max(1, enabledGrades.Count);
+            
+            // Build curve: use DefaultCurve counts where available, otherwise distribute evenly
+            var enabledCurve = new List<CutoffCount>();
+            foreach (var grade in enabledGrades.OrderBy(g => g.Order))
+            {
+                var defaultEntry = ClassAssessment.DefaultCurve.FirstOrDefault(cc => cc.Grade.Equals(grade));
+                var count = defaultEntry?.Count ?? studentsPerGrade;
+                enabledCurve.Add(new CutoffCount(grade, count));
+            }
 
             // Recalculate all cutoff positions
             var newCutoffs = _initialCutoffCalculator.Calculate(ClassAssessment.Assessments, enabledCurve);
