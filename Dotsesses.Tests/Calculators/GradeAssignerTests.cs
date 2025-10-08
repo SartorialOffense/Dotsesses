@@ -31,19 +31,21 @@ public class GradeAssignerTests
     [Fact]
     public void AssignGrade_WithOutOfOrderCutoffs_ThrowsException()
     {
-        // Arrange - BPlus (better grade, Order 2) has LOWER score than C (worse grade, Order 4) - BUG!
+        // Arrange - BPlus (better grade, Order 2) has LOWER score than B (worse grade, Order 3) - BUG!
+        // Note: C is the lowest grade, so it's exempt from validation (can have any score)
         var cutoffs = new List<GradeCutoff>
         {
             new(new Grade(LetterGrade.A, 0), 280),
             new(new Grade(LetterGrade.BPlus, 2), 175),  // Better grade (lower Order), lower score - BUG!
-            new(new Grade(LetterGrade.C, 4), 200)       // Worse grade (higher Order), higher score - BUG!
+            new(new Grade(LetterGrade.B, 3), 200),      // Worse grade (higher Order), higher score - BUG!
+            new(new Grade(LetterGrade.C, 4), 100)       // Lowest grade, exempt from validation
         };
 
         // Act & Assert
         var ex = Assert.Throws<InvalidOperationException>(() => _assigner.AssignGrade(190, cutoffs));
         Assert.Contains("out of order", ex.Message);
         Assert.Contains("B+", ex.Message);
-        Assert.Contains("C", ex.Message);
+        Assert.Contains("B", ex.Message);
     }
 
     [Fact]
@@ -103,5 +105,29 @@ public class GradeAssignerTests
 
         // Assert
         Assert.Equal(LetterGrade.F, grade.LetterGrade);
+    }
+
+    [Fact]
+    public void AssignGrade_SecondToLastCursorBelowLowestScore_DoesNotThrow()
+    {
+        // Arrange - Simulates the boundary exception scenario where C+ (second-to-last) 
+        // is dragged below C (lowest grade) score without validation error
+        var cutoffs = new List<GradeCutoff>
+        {
+            new(new Grade(LetterGrade.A, 0), 280),
+            new(new Grade(LetterGrade.BPlus, 2), 240),
+            new(new Grade(LetterGrade.CPlus, 5), 150),  // Second-to-last cursor dragged low
+            new(new Grade(LetterGrade.C, 6), 175)       // Lowest grade (catch-all) has higher score
+        };
+
+        // Act & Assert - Should NOT throw even though C+ (150) < C (175)
+        // because C is the catch-all lowest grade and exempt from validation
+        var grade1 = _assigner.AssignGrade(250, cutoffs); // Should get BPlus
+        var grade2 = _assigner.AssignGrade(160, cutoffs); // Should get CPlus
+        var grade3 = _assigner.AssignGrade(140, cutoffs); // Should get C (below all cursors)
+
+        Assert.Equal(LetterGrade.BPlus, grade1.LetterGrade);
+        Assert.Equal(LetterGrade.CPlus, grade2.LetterGrade);
+        Assert.Equal(LetterGrade.C, grade3.LetterGrade);
     }
 }
