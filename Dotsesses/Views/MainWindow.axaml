@@ -27,7 +27,16 @@
             <!-- Main Content: Dotplot -->
             <SplitView.Content>
                 <Border Background="#181818">
-                    <oxy:PlotView Model="{Binding DotplotModel}" />
+                    <oxy:PlotView Model="{Binding DotplotModel}">
+                        <oxy:PlotView.Cursor>
+                            <MultiBinding>
+                                <MultiBinding.Converter>
+                                    <local:ResizeCursorConverter/>
+                                </MultiBinding.Converter>
+                                <Binding Path="IsResizeCursor"/>
+                            </MultiBinding>
+                        </oxy:PlotView.Cursor>
+                    </oxy:PlotView>
                 </Border>
             </SplitView.Content>
 

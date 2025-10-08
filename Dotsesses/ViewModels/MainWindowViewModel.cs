@@ -42,6 +42,9 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isCompliancePaneOpen = true;
 
+    [ObservableProperty]
+    private bool _isResizeCursor;
+
 
     public bool CanClearSelections => SelectedStudents.Any();
 
@@ -360,10 +363,14 @@ public partial class MainWindowViewModel : ViewModelBase
             // Draw region bands
             foreach (var (left, right, isGray) in regions)
             {
+                // Extend boundaries slightly to be flush with cursor lines (StrokeThickness=2)
+                var extendedLeft = left - 0.5;
+                var extendedRight = right + 0.5; // Extend edges to align with cursor
+                
                 var rect = new RectangleAnnotation
                 {
-                    MinimumX = left,
-                    MaximumX = right,
+                    MinimumX = extendedLeft,
+                    MaximumX = extendedRight,
                     MinimumY = dotYAxis.Minimum,
                     MaximumY = dotYAxis.Maximum,
                     Fill = isGray ? grayColor : clearColor,
@@ -385,7 +392,7 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 Type = LineAnnotationType.Vertical,
                 X = cursor.Score,
-                Color = OxyColor.FromRgb(255, 215, 0), // Gold
+                Color = OxyColor.FromRgb(255, 255, 255),
                 LineStyle = LineStyle.Dash,
                 StrokeThickness = 2,
                 XAxisKey = "SharedX",
@@ -803,18 +810,32 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void OnDotplotMouseMove(object? sender, OxyMouseEventArgs e)
     {
-        if (!_isDraggingCursor || _draggingCursor == null)
-        {
-            // Always handle to prevent default tracker behavior
-            e.Handled = true;
-            return;
-        }
-
         var series = DotplotModel.Series.FirstOrDefault() as ScatterSeries;
         if (series == null)
             return;
 
         var pos = series.InverseTransform(e.Position);
+
+        if (!_isDraggingCursor || _draggingCursor == null)
+        {
+            // Check if hovering over a cursor
+            var nearestCursor = FindNearestCursor(pos.X);
+            var cursorYAxis = DotplotModel.Axes.FirstOrDefault(a => a.Key == "CursorY");
+            
+            if (cursorYAxis != null && nearestCursor.cursor != null && nearestCursor.distance < 3)
+            {
+                var cursorY = cursorYAxis.InverseTransform(e.Position.Y);
+                IsResizeCursor = cursorY >= cursorYAxis.Minimum && cursorY <= cursorYAxis.Maximum;
+            }
+            else
+            {
+                IsResizeCursor = false;
+            }
+            
+            e.Handled = true;
+            return;
+        }
+
         var newScore = (int)Math.Round(pos.X);
 
         // Limit cursor movement to within 1 of actual student scores

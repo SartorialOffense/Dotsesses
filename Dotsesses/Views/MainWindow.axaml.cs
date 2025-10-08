@@ -87,3 +87,25 @@ public class DeviationColorConverter : IMultiValueConverter
         throw new NotImplementedException();
     }
 }
+
+
+/// <summary>
+/// Converts boolean to resize cursor type.
+/// </summary>
+public class ResizeCursorConverter : IMultiValueConverter
+{
+    public object? Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (values.Count > 0 && values[0] is bool isResize && isResize)
+        {
+            return new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.SizeWestEast);
+        }
+
+        return new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Arrow);
+    }
+
+    public object?[] ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
