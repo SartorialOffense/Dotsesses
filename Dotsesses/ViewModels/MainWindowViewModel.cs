@@ -49,10 +49,16 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool _isColorSelectionPaneOpen = false;
 
     [ObservableProperty]
+    private bool _isSizePaneOpen = false;
+
+    [ObservableProperty]
     private string? _selectedColorAttribute;
 
     [ObservableProperty]
     private ObservableCollection<ColorLegendItem> _colorLegend = new();
+
+    [ObservableProperty]
+    private double _dotSize = 2.0;
 
 
     public bool CanClearSelections => SelectedStudents.Any();
@@ -252,8 +258,8 @@ public partial class MainWindowViewModel : ViewModelBase
             .GroupBy(a => a.AggregateGrade)
             .OrderBy(g => g.Key);
 
-        // Marker size per spec: radius = 2 (50% of original)
-        var markerSize = 2.0;
+        // Use dynamic dot size from slider
+        var markerSize = DotSize;
         var crosshairSize = markerSize * 2;
 
         // Create series for selected students (crosshairs behind)
@@ -834,6 +840,12 @@ public partial class MainWindowViewModel : ViewModelBase
         IsColorSelectionPaneOpen = !IsColorSelectionPaneOpen;
     }
 
+    [RelayCommand]
+    private void ToggleSizePane()
+    {
+        IsSizePaneOpen = !IsSizePaneOpen;
+    }
+
     [RelayCommand(CanExecute = nameof(CanClearSelections))]
     private void ClearSelections()
     {
@@ -1048,6 +1060,15 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         UpdateColorLegend();
         
+        // Only update dotplot if it's been initialized
+        if (DotplotModel != null)
+        {
+            UpdateDotplotPoints();
+        }
+    }
+
+    partial void OnDotSizeChanged(double value)
+    {
         // Only update dotplot if it's been initialized
         if (DotplotModel != null)
         {

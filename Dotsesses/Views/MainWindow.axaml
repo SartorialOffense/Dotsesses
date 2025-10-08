@@ -17,8 +17,8 @@
     </Design.DataContext>
 
     <Grid RowDefinitions="175,5,*">
-        <!-- Top Row: Color Panel, Dotplot, and Compliance Panel (fixed 175px height) -->
-        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto">
+        <!-- Top Row: Color Panel, Size Panel, Dotplot, and Compliance Panel (fixed 175px height) -->
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*,Auto">
 
             <!-- Color Selection Panel -->
             <Border Grid.Column="0"
@@ -113,8 +113,89 @@
                 </Grid>
             </Border>
 
+            <!-- Size Panel -->
+            <Border Grid.Column="1"
+                   Background="#181818"
+                   BorderBrush="#3F3F46"
+                   BorderThickness="0,0,1,0"
+                   Padding="0">
+                <Grid>
+                    <!-- Collapsed State: Hamburger icon with rotated text -->
+                    <StackPanel IsVisible="{Binding !IsSizePaneOpen}"
+                               Orientation="Vertical"
+                               Spacing="0">
+                        <Button Command="{Binding ToggleSizePaneCommand}"
+                               Width="18"
+                               Height="18"
+                               BorderThickness="0"
+                               Padding="0"
+                               Margin="3,6,3,3"
+                               HorizontalAlignment="Center"
+                               Cursor="Hand"
+                               ToolTip.Tip="Size">
+                            <TextBlock Text="☰"
+                                     Foreground="White"
+                                     FontSize="14"
+                                     Margin="0"
+                                     HorizontalAlignment="Center"/>
+                        </Button>
+                        <LayoutTransformControl Margin="2,8,2,0">
+                            <LayoutTransformControl.LayoutTransform>
+                                <RotateTransform Angle="-90"/>
+                            </LayoutTransformControl.LayoutTransform>
+                            <TextBlock Text="Size"
+                                   Foreground="White"
+                                   FontSize="14"
+                                   HorizontalAlignment="Center"/>
+                        </LayoutTransformControl>
+                    </StackPanel>
+
+                    <!-- Expanded State: Full Panel -->
+                    <Border IsVisible="{Binding IsSizePaneOpen}"
+                           Padding="3,6,10,10">
+                        <StackPanel Spacing="8" MinWidth="150">
+                            <Grid ColumnDefinitions="Auto,*">
+                                <Button Grid.Column="0"
+                                       Command="{Binding ToggleSizePaneCommand}"
+                                       Height="18"
+                                       Width="18"
+                                       BorderThickness="0"
+                                       Padding="0"
+                                       Margin="0"
+                                       Cursor="Hand"
+                                       ToolTip.Tip="Collapse">
+                                    <TextBlock Text="☰"
+                                             Foreground="White"
+                                             FontSize="14"
+                                             Margin="0"
+                                             HorizontalAlignment="Center"/>
+                                </Button>
+                                <TextBlock Grid.Column="1"
+                                         Text="Size"
+                                         Foreground="White"
+                                         FontSize="14"
+                                         Margin="8,0,0,0"
+                                         VerticalAlignment="Center"/>
+                            </Grid>
+
+                            <Slider Value="{Binding DotSize}"
+                                   Minimum="2"
+                                   Maximum="10"
+                                   TickFrequency="1"
+                                   IsSnapToTickEnabled="True"
+                                   Foreground="White"/>
+
+                            <TextBlock Text="{Binding DotSize, StringFormat='Dot Size: {0}'}"
+                                     Foreground="White"
+                                     FontSize="12"
+                                     HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
             <!-- Dotplot -->
-            <Border Grid.Column="1" Background="#181818">
+            <Border Grid.Column="2" Background="#181818">
                 <oxy:PlotView Model="{Binding DotplotModel}">
                     <oxy:PlotView.Cursor>
                         <MultiBinding>
@@ -128,7 +209,7 @@
             </Border>
 
             <!-- Compliance Panel -->
-            <Border Grid.Column="2"
+            <Border Grid.Column="3"
                    Background="#181818"
                    BorderBrush="#3F3F46"
                    BorderThickness="1,0,0,0"
