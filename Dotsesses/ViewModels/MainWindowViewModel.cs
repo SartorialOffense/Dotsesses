@@ -252,8 +252,8 @@ public partial class MainWindowViewModel : ViewModelBase
             .GroupBy(a => a.AggregateGrade)
             .OrderBy(g => g.Key);
 
-        // Marker size per spec: radius = 4
-        var markerSize = 4.0;
+        // Marker size per spec: radius = 2 (50% of original)
+        var markerSize = 2.0;
         var crosshairSize = markerSize * 2;
 
         // Create series for selected students (crosshairs behind)
