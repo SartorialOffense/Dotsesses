@@ -17,140 +17,185 @@
     </Design.DataContext>
 
     <Grid RowDefinitions="2*,5,*">
-        <!-- Top Row: Dotplot and Compliance Grid -->
-        <SplitView Grid.Row="0"
-                   IsPaneOpen="{Binding IsCompliancePaneOpen}"
-                   DisplayMode="Inline"
-                   OpenPaneLength="300"
-                   PanePlacement="Right">
+        <!-- Top Row: Color Panel, Dotplot, and Compliance Panel -->
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto">
 
-            <!-- Main Content: Dotplot with Color Selection -->
-            <SplitView.Content>
-                <Grid ColumnDefinitions="*,Auto">
-                    <!-- Dotplot -->
-                    <Border Grid.Column="0" Background="#181818">
-                        <oxy:PlotView Model="{Binding DotplotModel}">
-                            <oxy:PlotView.Cursor>
-                                <MultiBinding>
-                                    <MultiBinding.Converter>
-                                        <local:ResizeCursorConverter/>
-                                    </MultiBinding.Converter>
-                                    <Binding Path="IsResizeCursor"/>
-                                </MultiBinding>
-                            </oxy:PlotView.Cursor>
-                        </oxy:PlotView>
-                    </Border>
-                    
-                    <!-- Color Selection Panel -->
-                    <Border Grid.Column="1" 
-                           Background="#181818" 
-                           BorderBrush="#3F3F46" 
-                           BorderThickness="1,0,0,0"
-                           Padding="0">
-                        <Grid>
-                            <!-- Collapsed State: Hamburger icon with rotated text -->
-                            <StackPanel IsVisible="{Binding !IsColorSelectionPaneOpen}"
-                                       Orientation="Vertical"
-                                       Spacing="0">
-                                <Button Command="{Binding ToggleColorSelectionPaneCommand}"
-                                       Width="18"
+            <!-- Color Selection Panel -->
+            <Border Grid.Column="0"
+                   Background="#181818"
+                   BorderBrush="#3F3F46"
+                   BorderThickness="0,0,1,0"
+                   Padding="0">
+                <Grid>
+                    <!-- Collapsed State: Hamburger icon with rotated text -->
+                    <StackPanel IsVisible="{Binding !IsColorSelectionPaneOpen}"
+                               Orientation="Vertical"
+                               Spacing="0">
+                        <Button Command="{Binding ToggleColorSelectionPaneCommand}"
+                               Width="18"
+                               Height="18"
+                               BorderThickness="0"
+                               Padding="0"
+                               Margin="3,6,3,3"
+                               HorizontalAlignment="Center"
+                               Cursor="Hand"
+                               ToolTip.Tip="Color by">
+                            <TextBlock Text="☰"
+                                     Foreground="White"
+                                     FontSize="14"
+                                     Margin="0"
+                                     HorizontalAlignment="Center"/>
+                        </Button>
+                        <LayoutTransformControl Margin="2,8,2,0">
+                            <LayoutTransformControl.LayoutTransform>
+                                <RotateTransform Angle="-90"/>
+                            </LayoutTransformControl.LayoutTransform>
+                            <TextBlock Text="Color by"
+                                   Foreground="White"
+                                   FontSize="14"
+                                   HorizontalAlignment="Center"/>
+                        </LayoutTransformControl>
+                    </StackPanel>
+
+                    <!-- Expanded State: Full Panel -->
+                    <Border IsVisible="{Binding IsColorSelectionPaneOpen}"
+                           Padding="3,6,10,10">
+                        <StackPanel Spacing="8" MinWidth="150">
+                            <Grid ColumnDefinitions="Auto,*">
+                                <Button Grid.Column="0"
+                                       Command="{Binding ToggleColorSelectionPaneCommand}"
                                        Height="18"
+                                       Width="18"
                                        BorderThickness="0"
                                        Padding="0"
-                                       Margin="3,6,3,3"
-                                       HorizontalAlignment="Center"
+                                       Margin="0"
                                        Cursor="Hand"
-                                       ToolTip.Tip="Color by">
-                                    <TextBlock Text="☰" 
-                                             Foreground="White" 
+                                       ToolTip.Tip="Collapse">
+                                    <TextBlock Text="☰"
+                                             Foreground="White"
                                              FontSize="14"
                                              Margin="0"
                                              HorizontalAlignment="Center"/>
                                 </Button>
-                                <LayoutTransformControl Margin="2,8,2,0">
-                                    <LayoutTransformControl.LayoutTransform>
-                                        <RotateTransform Angle="-90"/>
-                                    </LayoutTransformControl.LayoutTransform>
-                                    <TextBlock Text="Color by"
-                                           Foreground="White"
-                                           FontSize="14"
-                                           HorizontalAlignment="Center"
-                                           />
-                                </LayoutTransformControl>
-                            </StackPanel>
-                            
-                            <!-- Expanded State: Full Panel -->
-                            <Border IsVisible="{Binding IsColorSelectionPaneOpen}"
-                                   Padding="3,6,10,10">
-                                <StackPanel Spacing="8" MinWidth="150">
-                                    <Grid ColumnDefinitions="Auto,*">
-                                        <Button Grid.Column="0"
-                                               Command="{Binding ToggleColorSelectionPaneCommand}"
-                                               Height="18"
-                                               Width="18"
-                                               BorderThickness="0"
-                                               Padding="0"
-                                               Margin="0"
-                                               Cursor="Hand"
-                                               ToolTip.Tip="Collapse">
-                                            <TextBlock Text="☰"
+                                <TextBlock Grid.Column="1"
+                                         Text="Color by"
+                                         Foreground="White"
+                                         FontSize="14"
+                                         Margin="8,0,0,0"
+                                         VerticalAlignment="Center"/>
+                            </Grid>
+
+                            <ComboBox ItemsSource="{Binding AvailableColorAttributes}"
+                                     SelectedItem="{Binding SelectedColorAttribute}"
+                                     HorizontalAlignment="Stretch"
+                                     Background="#1E1E1E"
+                                     Foreground="White"/>
+
+                            <!-- Color Legend -->
+                            <ItemsControl ItemsSource="{Binding ColorLegend}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4">
+                                            <Border Width="16"
+                                                   Height="16"
+                                                   Background="{Binding Color}"
+                                                   CornerRadius="2"/>
+                                            <TextBlock Text="{Binding Value}"
                                                      Foreground="White"
-                                                     FontSize="14"
-                                                     Margin="0"
-                                                     HorizontalAlignment="Center"/>
-                                        </Button>
-                                        <TextBlock Grid.Column="1"
-                                                 Text="Color by"
-                                                 Foreground="White"
-                                                 FontSize="14"
-                                                 Margin="8,0,0,0"
-                                                 VerticalAlignment="Center"/>
-                                    </Grid>
-                                    
-                                    <ComboBox ItemsSource="{Binding AvailableColorAttributes}"
-                                             SelectedItem="{Binding SelectedColorAttribute}"
-                                             HorizontalAlignment="Stretch"
-                                             Background="#1E1E1E"
-                                             Foreground="White"/>
-                                    
-                                    <!-- Color Legend -->
-                                    <ItemsControl ItemsSource="{Binding ColorLegend}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4">
-                                                    <Border Width="16" 
-                                                           Height="16" 
-                                                           Background="{Binding Color}"
-                                                           CornerRadius="2"/>
-                                                    <TextBlock Text="{Binding Value}"
-                                                             Foreground="White"
-                                                             FontSize="12"
-                                                             VerticalAlignment="Center"/>
-                                                </StackPanel>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
+                                                     FontSize="12"
+                                                     VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
                     </Border>
                 </Grid>
-            </SplitView.Content>
+            </Border>
 
-            <!-- Pane: Compliance Grid -->
-            <SplitView.Pane>
-                <Border Background="#181818" BorderBrush="#3F3F46" BorderThickness="1,0,0,0">
-                    <Grid RowDefinitions="Auto,*">
-                        <!-- Pane Header -->
-                        <Border Grid.Row="0" Background="#181818" Padding="10">
+            <!-- Dotplot -->
+            <Border Grid.Column="1" Background="#181818">
+                <oxy:PlotView Model="{Binding DotplotModel}">
+                    <oxy:PlotView.Cursor>
+                        <MultiBinding>
+                            <MultiBinding.Converter>
+                                <local:ResizeCursorConverter/>
+                            </MultiBinding.Converter>
+                            <Binding Path="IsResizeCursor"/>
+                        </MultiBinding>
+                    </oxy:PlotView.Cursor>
+                </oxy:PlotView>
+            </Border>
+
+            <!-- Compliance Panel -->
+            <Border Grid.Column="2"
+                   Background="#181818"
+                   BorderBrush="#3F3F46"
+                   BorderThickness="1,0,0,0"
+                   Padding="0">
+                <Grid>
+                    <!-- Collapsed State: Hamburger icon with rotated text -->
+                    <StackPanel IsVisible="{Binding !IsCompliancePaneOpen}"
+                               Orientation="Vertical"
+                               Spacing="0">
+                        <Button Command="{Binding ToggleCompliancePaneCommand}"
+                               Width="18"
+                               Height="18"
+                               BorderThickness="0"
+                               Padding="0"
+                               Margin="3,6,3,3"
+                               HorizontalAlignment="Center"
+                               Cursor="Hand"
+                               ToolTip.Tip="Curve Compliance">
+                            <TextBlock Text="☰"
+                                     Foreground="White"
+                                     FontSize="14"
+                                     Margin="0"
+                                     HorizontalAlignment="Center"/>
+                        </Button>
+                        <LayoutTransformControl Margin="2,8,2,0">
+                            <LayoutTransformControl.LayoutTransform>
+                                <RotateTransform Angle="-90"/>
+                            </LayoutTransformControl.LayoutTransform>
                             <TextBlock Text="Curve Compliance"
-                                     FontSize="16"
-                                     FontWeight="SemiBold"
-                                     Foreground="White"/>
-                        </Border>
+                                   Foreground="White"
+                                   FontSize="14"
+                                   HorizontalAlignment="Center"/>
+                        </LayoutTransformControl>
+                    </StackPanel>
 
-                        <!-- Compliance Grid -->
-                        <ScrollViewer Grid.Row="1" Padding="10">
+                    <!-- Expanded State: Full Panel -->
+                    <Border IsVisible="{Binding IsCompliancePaneOpen}"
+                           Padding="3,6,10,10"
+                           MinWidth="250">
+                        <Grid RowDefinitions="Auto,*">
+                            <!-- Header with hamburger -->
+                            <Grid Grid.Row="0" ColumnDefinitions="Auto,*" Margin="0,0,0,8">
+                                <Button Grid.Column="0"
+                                       Command="{Binding ToggleCompliancePaneCommand}"
+                                       Height="18"
+                                       Width="18"
+                                       BorderThickness="0"
+                                       Padding="0"
+                                       Margin="0"
+                                       Cursor="Hand"
+                                       ToolTip.Tip="Collapse">
+                                    <TextBlock Text="☰"
+                                             Foreground="White"
+                                             FontSize="14"
+                                             Margin="0"
+                                             HorizontalAlignment="Center"/>
+                                </Button>
+                                <TextBlock Grid.Column="1"
+                                         Text="Curve Compliance"
+                                         Foreground="White"
+                                         FontSize="14"
+                                         Margin="8,0,0,0"
+                                         VerticalAlignment="Center"/>
+                            </Grid>
+
+                            <!-- Compliance Grid -->
+                            <ScrollViewer Grid.Row="1" Padding="0">
                             <ItemsControl ItemsSource="{Binding ComplianceRows}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -213,29 +258,17 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
                         </ScrollViewer>
-                    </Grid>
-                </Border>
-            </SplitView.Pane>
-        </SplitView>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Border>
+        </Grid>
 
         <!-- Splitter -->
         <GridSplitter Grid.Row="1"
                       Background="#3F3F46"
                       ResizeDirection="Rows"
                       HorizontalAlignment="Stretch"/>
-
-        <!-- Toggle Button for Compliance Pane -->
-        <Button Grid.Row="0"
-                HorizontalAlignment="Right"
-                VerticalAlignment="Top"
-                Margin="5"
-                Padding="5"
-                Command="{Binding ToggleCompliancePaneCommand}"
-                Background="#2D2D30"
-                Foreground="White"
-                ToolTip.Tip="Toggle Compliance Panel">
-            <TextBlock Text="☰" FontSize="14" />
-        </Button>
 
         <!-- Bottom Row: Selected Student Cards -->
         <Border Grid.Row="2" Background="#181818" BorderBrush="#3F3F46" BorderThickness="0,1,0,0">
