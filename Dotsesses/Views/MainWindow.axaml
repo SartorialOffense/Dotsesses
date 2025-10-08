@@ -27,8 +27,7 @@
             <!-- Main Content: Dotplot -->
             <SplitView.Content>
                 <Border Background="#181818">
-                    <oxy:PlotView Model="{Binding DotplotModel}" 
-                                  Cursor="{Binding PlotCursor}" />
+                    <oxy:PlotView Model="{Binding DotplotModel}" />
                 </Border>
             </SplitView.Content>
 

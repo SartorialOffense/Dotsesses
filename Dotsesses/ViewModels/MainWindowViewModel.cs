@@ -42,9 +42,6 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isCompliancePaneOpen = true;
 
-    [ObservableProperty]
-    private Avalonia.Input.Cursor? _plotCursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Arrow);
-
 
     public bool CanClearSelections => SelectedStudents.Any();
 
@@ -384,35 +381,19 @@ public partial class MainWindowViewModel : ViewModelBase
         var lowestGrade = enabledCursors.OrderByDescending(c => c.Grade.Order).FirstOrDefault();
         foreach (var cursor in enabledCursors.Where(c => c != lowestGrade))
         {
-            // White vertical line (handle stick)
             var line = new LineAnnotation
             {
                 Type = LineAnnotationType.Vertical,
                 X = cursor.Score,
-                Color = OxyColors.White,
-                LineStyle = LineStyle.Solid,
+                Color = OxyColor.FromRgb(255, 215, 0), // Gold
+                LineStyle = LineStyle.Dash,
                 StrokeThickness = 2,
                 XAxisKey = "SharedX",
                 YAxisKey = "CursorY",
                 MinimumY = 0,
-                MaximumY = 0.7  // Stop before top to leave room for handle
+                MaximumY = 1
             };
             DotplotModel.Annotations.Add(line);
-
-            // White circular handle at top (inverse lollipop)
-            var handleSeries = new OxyPlot.Series.ScatterSeries
-            {
-                MarkerType = MarkerType.Circle,
-                MarkerSize = 8,
-                MarkerFill = OxyColors.White,
-                MarkerStroke = OxyColors.White,
-                MarkerStrokeThickness = 1,
-                XAxisKey = "SharedX",
-                YAxisKey = "CursorY",
-                TrackerFormatString = ""
-            };
-            handleSeries.Points.Add(new OxyPlot.Series.ScatterPoint(cursor.Score, 0.85));
-            DotplotModel.Series.Add(handleSeries);
         }
 
         // ===== Grade Labels Below Cursors =====
@@ -822,37 +803,12 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void OnDotplotMouseMove(object? sender, OxyMouseEventArgs e)
     {
-        if (!_isDraggingCursor)
+        if (!_isDraggingCursor || _draggingCursor == null)
         {
-            // Check if hovering over a cursor to show drag hint
-            var hoverSeries = DotplotModel.Series.FirstOrDefault() as ScatterSeries;
-            if (hoverSeries != null)
-            {
-                var hoverPos = hoverSeries.InverseTransform(e.Position);
-                var nearestCursor = FindNearestCursor(hoverPos.X);
-                var cursorYAxis = DotplotModel.Axes.FirstOrDefault(a => a.Key == "CursorY");
-
-                if (cursorYAxis != null && nearestCursor.cursor != null && nearestCursor.distance < 3)
-                {
-                    var cursorY = cursorYAxis.InverseTransform(e.Position.Y);
-                    if (cursorY >= cursorYAxis.Minimum && cursorY <= cursorYAxis.Maximum)
-                    {
-                        // Over a cursor - show hand cursor for dragging
-                        PlotCursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand);
-                        e.Handled = true;
-                        return;
-                    }
-                }
-            }
-
-            // Not over a cursor - default arrow cursor
-            PlotCursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Arrow);
+            // Always handle to prevent default tracker behavior
             e.Handled = true;
             return;
         }
-
-        if (_draggingCursor == null)
-            return;
 
         var series = DotplotModel.Series.FirstOrDefault() as ScatterSeries;
         if (series == null)
