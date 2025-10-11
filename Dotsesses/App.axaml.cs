@@ -5,7 +5,9 @@ using Avalonia.Data.Core.Plugins;
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using CSnakes.Runtime;
 using CommunityToolkit.Mvvm.Messaging;
 using Dotsesses.Services;
@@ -32,21 +34,21 @@ public partial class App : Application
             // More info: https://docs.avaloniaui.net/docs/guides/development-guides/data-validation#manage-validationplugins
             DisableAvaloniaDataAnnotationValidation();
 
-            // Set up Python environment and services
-            var services = new ServiceCollection();
-            ConfigureServices(services);
-            Services = services.BuildServiceProvider();
-
-            var mainWindow = new MainWindow
-            {
-                DataContext = Services.GetRequiredService<MainWindowViewModel>(),
-            };
-
-            desktop.MainWindow = mainWindow;
-
-            // Handle snapshot mode
+            // Handle snapshot mode - skip splash screen
             if (StartupConfig.SnapshotMode)
             {
+                // Set up Python environment and services synchronously for snapshot mode
+                var services = new ServiceCollection();
+                ConfigureServices(services);
+                Services = services.BuildServiceProvider();
+
+                var mainWindow = new MainWindow
+                {
+                    DataContext = Services.GetRequiredService<MainWindowViewModel>(),
+                };
+
+                desktop.MainWindow = mainWindow;
+
                 mainWindow.Opened += async (s, e) =>
                 {
                     try
@@ -61,6 +63,56 @@ public partial class App : Application
                         desktop.Shutdown(1);
                     }
                 };
+            }
+            else
+            {
+                // Show splash screen
+                var splashWindow = new SplashWindow();
+                desktop.MainWindow = splashWindow;
+                splashWindow.Show();
+
+                // Initialize Python environment asynchronously
+                Task.Run(async () =>
+                {
+                    try
+                    {
+                        // Update status
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                            splashWindow.UpdateStatus("Configuring Python environment..."));
+
+                        // Set up Python environment and services
+                        var services = new ServiceCollection();
+                        ConfigureServices(services);
+                        Services = services.BuildServiceProvider();
+
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                            splashWindow.UpdateStatus("Loading main window..."));
+
+                        // Small delay to show the status
+                        await Task.Delay(500);
+
+                        // Switch to main window on UI thread
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            var mainWindow = new MainWindow
+                            {
+                                DataContext = Services.GetRequiredService<MainWindowViewModel>(),
+                            };
+
+                            desktop.MainWindow = mainWindow;
+                            mainWindow.Show();
+                            splashWindow.Close();
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                            splashWindow.UpdateStatus($"Error: {ex.Message}"));
+                        await Task.Delay(3000);
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                            desktop.Shutdown());
+                    }
+                });
             }
         }
 

@@ -1,0 +1,61 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Dotsesses.Views.SplashWindow"
+        Title="Dotsesses"
+        Width="600" Height="400"
+        WindowStartupLocation="CenterScreen"
+        CanResize="False"
+        SystemDecorations="None"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent">
+    <Border Background="#1E1E2E" CornerRadius="12" BorderBrush="#9B59B6" BorderThickness="2">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="60" />
+            </Grid.RowDefinitions>
+
+            <!-- Logo/Icon -->
+            <Viewbox Grid.Row="0" Width="200" Height="200" Margin="0,40,0,0">
+                <Canvas Width="200" Height="200">
+                    <!-- Colorful dots in a pattern -->
+                    <Ellipse Width="60" Height="60" Fill="#3498DB" Canvas.Left="20" Canvas.Top="20" />
+                    <Ellipse Width="60" Height="60" Fill="#E74C3C" Canvas.Left="120" Canvas.Top="20" />
+                    <Ellipse Width="60" Height="60" Fill="#2ECC71" Canvas.Left="70" Canvas.Top="80" />
+                    <Ellipse Width="60" Height="60" Fill="#F39C12" Canvas.Left="20" Canvas.Top="120" />
+                    <Ellipse Width="60" Height="60" Fill="#9B59B6" Canvas.Left="120" Canvas.Top="120" />
+                </Canvas>
+            </Viewbox>
+
+            <!-- Title and Version -->
+            <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="0,0,0,20">
+                <TextBlock Text="Dotsesses"
+                          FontSize="32"
+                          FontWeight="Bold"
+                          Foreground="White"
+                          HorizontalAlignment="Center"
+                          Margin="0,0,0,8" />
+                <TextBlock Text="Student Assessment Visualization"
+                          FontSize="14"
+                          Foreground="#B4B4C8"
+                          HorizontalAlignment="Center" />
+            </StackPanel>
+
+            <!-- Loading indicator -->
+            <StackPanel Grid.Row="2" VerticalAlignment="Center" Margin="0,0,0,20">
+                <TextBlock x:Name="LoadingText"
+                          Text="Initializing Python environment..."
+                          FontSize="12"
+                          Foreground="#8B8B9E"
+                          HorizontalAlignment="Center"
+                          Margin="0,0,0,10" />
+                <ProgressBar IsIndeterminate="True"
+                            Height="4"
+                            Width="300"
+                            Foreground="#9B59B6"
+                            Background="#2E2E3E" />
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>
