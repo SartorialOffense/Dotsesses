@@ -41,10 +41,14 @@ public partial class ViolinPlotControl : UserControl
 
     private void OnSizeChanged(object? sender, SizeChangedEventArgs e)
     {
-        // Immediately re-render points to match new size
+        // Immediately reposition dots to match SVG scaling during resize
         if (DataContext is ViolinPlotViewModel vm && !string.IsNullOrEmpty(vm.SvgContent))
         {
-            RenderPointsAsShapes();
+            var controlBounds = Bounds;
+            if (controlBounds.Width > 0 && controlBounds.Height > 0)
+            {
+                UpdateDotPositions(controlBounds.Width, controlBounds.Height);
+            }
         }
 
         // Cancel previous resize operation
@@ -129,6 +133,8 @@ public partial class ViolinPlotControl : UserControl
 
         try
         {
+            Console.WriteLine("[ViolinPlot] UpdateSvgDisplay called");
+
             // Write SVG to temp file for display
             var tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "dotsesses_violin.svg");
             File.WriteAllText(tempPath, svgContent);
@@ -138,8 +144,12 @@ public partial class ViolinPlotControl : UserControl
             var svgImage = new Avalonia.Svg.Skia.SvgImage { Source = svgSource };
             SvgView.Source = svgImage;
 
-            // Render points as Avalonia shapes
-            RenderPointsAsShapes();
+            // Delay rendering points slightly to let SVG settle
+            Dispatcher.UIThread.Post(() =>
+            {
+                RenderPointsAsShapes();
+                Console.WriteLine("[ViolinPlot] Points re-rendered after SVG update");
+            }, Avalonia.Threading.DispatcherPriority.Background);
         }
         catch (Exception ex)
         {
@@ -164,6 +174,8 @@ public partial class ViolinPlotControl : UserControl
         var displayWidth = controlBounds.Width > 0 ? controlBounds.Width : 800;
         var displayHeight = controlBounds.Height > 0 ? controlBounds.Height : 400;
 
+        Console.WriteLine($"[ViolinPlot] RenderPointsAsShapes: Control bounds = {controlBounds.Width}x{controlBounds.Height}, Using {displayWidth}x{displayHeight}, Points count = {allPoints.Count}");
+
         foreach (var point in allPoints)
         {
             // Calculate position using actual display size
@@ -182,6 +194,29 @@ public partial class ViolinPlotControl : UserControl
             Canvas.SetTop(ellipse, displayY - 2.5);
 
             PointsOverlay.Children.Add(ellipse);
+        }
+    }
+
+    private void UpdateDotPositions(double displayWidth, double displayHeight)
+    {
+        if (DataContext is not ViolinPlotViewModel vm)
+            return;
+
+        var allPoints = vm.GetAllPoints();
+        if (!allPoints.Any())
+            return;
+
+        // Update position of each existing ellipse
+        var ellipses = PointsOverlay.Children.OfType<Ellipse>().ToList();
+        for (int i = 0; i < Math.Min(allPoints.Count, ellipses.Count); i++)
+        {
+            var point = allPoints[i];
+            var ellipse = ellipses[i];
+
+            var (displayX, displayY) = vm.SvgToDisplayWithSize(point.X, point.Y, displayWidth, displayHeight);
+
+            Canvas.SetLeft(ellipse, displayX - 2.5);
+            Canvas.SetTop(ellipse, displayY - 2.5);
         }
     }
 
