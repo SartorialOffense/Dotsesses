@@ -351,119 +351,269 @@
                       ResizeDirection="Rows"
                       HorizontalAlignment="Stretch"/>
 
-        <!-- Bottom Row: Selected Student Cards -->
+        <!-- Bottom Row: Drill-Down and Violin Plot with Horizontal Expanders -->
         <Border Grid.Row="2" Background="#181818" BorderBrush="#3F3F46" BorderThickness="0,1,0,0">
-            <Grid RowDefinitions="Auto,Auto,*">
-                <!-- Clear Selections Button -->
-                <Border Grid.Row="0" Background="#181818" Padding="10,5">
-                    <Button Command="{Binding ClearSelectionsCommand}"
-                            HorizontalAlignment="Left"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Padding="5"
-                            ToolTip.Tip="Clear all selections">
-                        <TextBlock Text="⌫" FontSize="16" Foreground="White"/>
-                    </Button>
-                </Border>
+            <Grid ColumnDefinitions="Auto,5,*">
 
-                <!-- Header -->
-                <Border Grid.Row="1" Background="#181818" Padding="10,5,10,10">
-                    <TextBlock Text="Selected Students"
-                             FontSize="16"
-                             FontWeight="SemiBold"
-                             Foreground="White"/>
-                </Border>
+                <!-- Left: Drill-Down Panel -->
+                <Border Grid.Column="0"
+                       Background="#181818"
+                       BorderBrush="#3F3F46"
+                       BorderThickness="0,0,1,0"
+                       Padding="0">
+                    <Grid>
+                        <!-- Collapsed State: Hamburger icon with rotated text -->
+                        <StackPanel IsVisible="{Binding !IsDrillDownPaneOpen}"
+                                   Orientation="Vertical"
+                                   Spacing="0">
+                            <Button Command="{Binding ToggleDrillDownPaneCommand}"
+                                   Width="18"
+                                   Height="18"
+                                   BorderThickness="0"
+                                   Padding="0"
+                                   Margin="3,6,3,3"
+                                   HorizontalAlignment="Center"
+                                   Cursor="Hand"
+                                   ToolTip.Tip="Drill-Down">
+                                <TextBlock Text="☰"
+                                         Foreground="White"
+                                         FontSize="14"
+                                         Margin="0"
+                                         HorizontalAlignment="Center"/>
+                            </Button>
+                            <LayoutTransformControl Margin="2,8,2,0">
+                                <LayoutTransformControl.LayoutTransform>
+                                    <RotateTransform Angle="-90"/>
+                                </LayoutTransformControl.LayoutTransform>
+                                <TextBlock Text="Drill-Down"
+                                       Foreground="White"
+                                       FontSize="14"
+                                       HorizontalAlignment="Center"/>
+                            </LayoutTransformControl>
+                        </StackPanel>
 
-                <!-- Student Cards -->
-                <ScrollViewer Grid.Row="2" Padding="10">
-                    <ItemsControl ItemsSource="{Binding SelectedStudents}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <WrapPanel Orientation="Horizontal" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
+                        <!-- Expanded State: Full Panel -->
+                        <Border IsVisible="{Binding IsDrillDownPaneOpen}"
+                               Padding="3,6,10,10"
+                               MinWidth="350">
+                            <Grid RowDefinitions="Auto,Auto,Auto,*">
+                                <!-- Header with hamburger -->
+                                <Grid Grid.Row="0" ColumnDefinitions="Auto,*" Margin="0,0,0,8">
+                                    <Button Grid.Column="0"
+                                           Command="{Binding ToggleDrillDownPaneCommand}"
+                                           Height="18"
+                                           Width="18"
+                                           BorderThickness="0"
+                                           Padding="0"
+                                           Margin="0"
+                                           Cursor="Hand"
+                                           ToolTip.Tip="Collapse">
+                                        <TextBlock Text="☰"
+                                                 Foreground="White"
+                                                 FontSize="14"
+                                                 Margin="0"
+                                                 HorizontalAlignment="Center"/>
+                                    </Button>
+                                    <TextBlock Grid.Column="1"
+                                             Text="Drill-Down"
+                                             Foreground="White"
+                                             FontSize="14"
+                                             Margin="8,0,0,0"
+                                             VerticalAlignment="Center"/>
+                                </Grid>
 
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Background="#181818"
-                                       BorderBrush="#3F3F46"
-                                       BorderThickness="1"
-                                       CornerRadius="4"
-                                       Padding="15"
-                                       Margin="5"
-                                       Width="300">
-                                    <Grid RowDefinitions="Auto,Auto">
-                                        <!-- Header: Name and Grade -->
-                                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
-                                            <TextBlock Grid.Column="0"
-                                                     Text="{Binding Assessment.MuppetName}"
-                                                     Foreground="White"
-                                                     FontWeight="SemiBold"
-                                                     FontSize="14"
-                                                     TextWrapping="Wrap"/>
-                                            <Border Grid.Column="1"
-                                                   Background="#007ACC"
-                                                   CornerRadius="3"
-                                                   Padding="8,4"
-                                                   Margin="10,0,0,0">
-                                                <TextBlock Text="{Binding AssignedGrade}"
-                                                         Foreground="White"
-                                                         FontWeight="Bold"
-                                                         FontSize="14"/>
-                                            </Border>
-                                        </Grid>
-
-                                        <!-- Single merged table: Scores first, then Attributes -->
-                                        <StackPanel Grid.Row="1">
-                                            <!-- Scores -->
-                                            <ItemsControl ItemsSource="{Binding Assessment.Scores}">
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <Grid ColumnDefinitions="*,Auto" Margin="0,2">
-                                                            <TextBlock Grid.Column="0"
-                                                                     Text="{Binding Name}"
-                                                                     Foreground="#AAAAAA"
-                                                                     FontSize="11"/>
-                                                            <TextBlock Grid.Column="1"
-                                                                     Text="{Binding Value}"
-                                                                     Foreground="White"
-                                                                     FontSize="11"
-                                                                     FontWeight="Medium"/>
-                                                        </Grid>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-
-                                            <!-- Separator line -->
-                                            <Border Height="1"
-                                                   Background="#666666"
-                                                   Margin="0,8"
-                                                   HorizontalAlignment="Stretch"/>
-
-                                            <!-- Attributes -->
-                                            <ItemsControl ItemsSource="{Binding Assessment.Attributes}">
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <Grid ColumnDefinitions="*,Auto" Margin="0,2" TextElement.Foreground="White">
-                                                            <TextBlock Grid.Column="0"
-                                                                     Text="{Binding Name}"
-                                                                     Foreground="#AAAAAA"
-                                                                     FontSize="11"/>
-                                                            <TextBlock Grid.Column="1"
-                                                                     Text="{Binding Value}"
-                                                                     FontSize="11"
-                                                                     FontWeight="Medium"/>
-                                                        </Grid>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                        </StackPanel>
-                                    </Grid>
+                                <!-- Clear Selections Button -->
+                                <Border Grid.Row="1" Background="#181818" Padding="0,0,0,5">
+                                    <Button Command="{Binding ClearSelectionsCommand}"
+                                            HorizontalAlignment="Left"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            Padding="5"
+                                            ToolTip.Tip="Clear all selections">
+                                        <TextBlock Text="⌫" FontSize="16" Foreground="White"/>
+                                    </Button>
                                 </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
+
+                                <!-- Selected Students Header -->
+                                <Border Grid.Row="2" Background="#181818" Padding="0,0,0,5">
+                                    <TextBlock Text="Selected Students"
+                                             FontSize="14"
+                                             FontWeight="SemiBold"
+                                             Foreground="White"/>
+                                </Border>
+
+                                <!-- Student Cards -->
+                                <ScrollViewer Grid.Row="3" Padding="0">
+                                    <ItemsControl ItemsSource="{Binding SelectedStudents}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Vertical" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="#181818"
+                                                       BorderBrush="#3F3F46"
+                                                       BorderThickness="1"
+                                                       CornerRadius="4"
+                                                       Padding="15"
+                                                       Margin="0,5">
+                                                    <Grid RowDefinitions="Auto,Auto">
+                                                        <!-- Header: Name and Grade -->
+                                                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+                                                            <TextBlock Grid.Column="0"
+                                                                     Text="{Binding Assessment.MuppetName}"
+                                                                     Foreground="White"
+                                                                     FontWeight="SemiBold"
+                                                                     FontSize="14"
+                                                                     TextWrapping="Wrap"/>
+                                                            <Border Grid.Column="1"
+                                                                   Background="#007ACC"
+                                                                   CornerRadius="3"
+                                                                   Padding="8,4"
+                                                                   Margin="10,0,0,0">
+                                                                <TextBlock Text="{Binding AssignedGrade}"
+                                                                         Foreground="White"
+                                                                         FontWeight="Bold"
+                                                                         FontSize="14"/>
+                                                            </Border>
+                                                        </Grid>
+
+                                                        <!-- Single merged table: Scores first, then Attributes -->
+                                                        <StackPanel Grid.Row="1">
+                                                            <!-- Scores -->
+                                                            <ItemsControl ItemsSource="{Binding Assessment.Scores}">
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate>
+                                                                        <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                                                                            <TextBlock Grid.Column="0"
+                                                                                     Text="{Binding Name}"
+                                                                                     Foreground="#AAAAAA"
+                                                                                     FontSize="11"/>
+                                                                            <TextBlock Grid.Column="1"
+                                                                                     Text="{Binding Value}"
+                                                                                     Foreground="White"
+                                                                                     FontSize="11"
+                                                                                     FontWeight="Medium"/>
+                                                                        </Grid>
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
+
+                                                            <!-- Separator line -->
+                                                            <Border Height="1"
+                                                                   Background="#666666"
+                                                                   Margin="0,8"
+                                                                   HorizontalAlignment="Stretch"/>
+
+                                                            <!-- Attributes -->
+                                                            <ItemsControl ItemsSource="{Binding Assessment.Attributes}">
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate>
+                                                                        <Grid ColumnDefinitions="*,Auto" Margin="0,2" TextElement.Foreground="White">
+                                                                            <TextBlock Grid.Column="0"
+                                                                                     Text="{Binding Name}"
+                                                                                     Foreground="#AAAAAA"
+                                                                                     FontSize="11"/>
+                                                                            <TextBlock Grid.Column="1"
+                                                                                     Text="{Binding Value}"
+                                                                                     FontSize="11"
+                                                                                     FontWeight="Medium"/>
+                                                                        </Grid>
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- Vertical Splitter -->
+                <GridSplitter Grid.Column="1"
+                              Background="#3F3F46"
+                              ResizeDirection="Columns"
+                              VerticalAlignment="Stretch"/>
+
+                <!-- Right: Violin Plot Panel -->
+                <Border Grid.Column="2"
+                       Background="#181818"
+                       BorderBrush="#3F3F46"
+                       BorderThickness="1,0,0,0"
+                       Padding="0">
+                    <Grid>
+                        <!-- Collapsed State: Hamburger icon with rotated text -->
+                        <StackPanel IsVisible="{Binding !IsViolinPaneOpen}"
+                                   Orientation="Vertical"
+                                   Spacing="0">
+                            <Button Command="{Binding ToggleViolinPaneCommand}"
+                                   Width="18"
+                                   Height="18"
+                                   BorderThickness="0"
+                                   Padding="0"
+                                   Margin="3,6,3,3"
+                                   HorizontalAlignment="Center"
+                                   Cursor="Hand"
+                                   ToolTip.Tip="Violin Plot">
+                                <TextBlock Text="☰"
+                                         Foreground="White"
+                                         FontSize="14"
+                                         Margin="0"
+                                         HorizontalAlignment="Center"/>
+                            </Button>
+                            <LayoutTransformControl Margin="2,8,2,0">
+                                <LayoutTransformControl.LayoutTransform>
+                                    <RotateTransform Angle="-90"/>
+                                </LayoutTransformControl.LayoutTransform>
+                                <TextBlock Text="Violin Plot"
+                                       Foreground="White"
+                                       FontSize="14"
+                                       HorizontalAlignment="Center"/>
+                            </LayoutTransformControl>
+                        </StackPanel>
+
+                        <!-- Expanded State: Full Panel -->
+                        <Border IsVisible="{Binding IsViolinPaneOpen}"
+                               Padding="3,6,10,10">
+                            <Grid RowDefinitions="Auto,*">
+                                <!-- Header with hamburger -->
+                                <Grid Grid.Row="0" ColumnDefinitions="Auto,*" Margin="0,0,0,8">
+                                    <Button Grid.Column="0"
+                                           Command="{Binding ToggleViolinPaneCommand}"
+                                           Height="18"
+                                           Width="18"
+                                           BorderThickness="0"
+                                           Padding="0"
+                                           Margin="0"
+                                           Cursor="Hand"
+                                           ToolTip.Tip="Collapse">
+                                        <TextBlock Text="☰"
+                                                 Foreground="White"
+                                                 FontSize="14"
+                                                 Margin="0"
+                                                 HorizontalAlignment="Center"/>
+                                    </Button>
+                                    <TextBlock Grid.Column="1"
+                                             Text="Violin Plot"
+                                             Foreground="White"
+                                             FontSize="14"
+                                             Margin="8,0,0,0"
+                                             VerticalAlignment="Center"/>
+                                </Grid>
+
+                                <!-- Violin Plot Control -->
+                                <local:ViolinPlotControl Grid.Row="1" DataContext="{Binding ViolinPlotViewModel}" />
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Border>
             </Grid>
         </Border>
     </Grid>

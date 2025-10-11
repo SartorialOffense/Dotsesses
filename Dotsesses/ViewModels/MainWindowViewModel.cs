@@ -3,7 +3,9 @@ namespace Dotsesses.ViewModels;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 using Dotsesses.Calculators;
+using Dotsesses.Messages;
 using Dotsesses.Models;
 using Dotsesses.Services;
 using OxyPlot;
@@ -19,10 +21,12 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly CutoffCountCalculator _cutoffCountCalculator;
     private readonly InitialCutoffCalculator _initialCutoffCalculator;
     private readonly CursorValidation _cursorValidation;
+    private readonly IMessenger _messenger;
 
     private GradeAssigner _gradeAssigner = null!;
     private CursorViewModel? _draggingCursor;
     private bool _isDraggingCursor;
+    private int? _hoveredStudentId;
 
     [ObservableProperty]
     private ClassAssessment _classAssessment = null!;
@@ -52,7 +56,16 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool _isSizePaneOpen = false;
 
     [ObservableProperty]
+    private bool _isDrillDownPaneOpen = true;
+
+    [ObservableProperty]
+    private bool _isViolinPaneOpen = true;
+
+    [ObservableProperty]
     private string? _selectedColorAttribute;
+
+    [ObservableProperty]
+    private ViolinPlotViewModel? _violinPlotViewModel;
 
     [ObservableProperty]
     private ObservableCollection<ColorLegendItem> _colorLegend = new();
@@ -65,8 +78,10 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public List<string> AvailableColorAttributes { get; private set; } = new();
 
-    public MainWindowViewModel()
+    public MainWindowViewModel(IMessenger messenger, ViolinPlotViewModel violinPlotViewModel)
     {
+        _messenger = messenger;
+        _violinPlotViewModel = violinPlotViewModel;
         _cutoffCountCalculator = new CutoffCountCalculator();
         _initialCutoffCalculator = new InitialCutoffCalculator();
         _cursorValidation = new CursorValidation();
@@ -78,10 +93,21 @@ public partial class MainWindowViewModel : ViewModelBase
         // Hook up collection changed to update command state
         _selectedStudents.CollectionChanged += (s, e) => ClearSelectionsCommand.NotifyCanExecuteChanged();
 
+        // Register for hover messages from violin plot
+        _messenger.Register<StudentHoverMessage>(this, (r, m) =>
+        {
+            if (m.Source != "dotplot") // Only respond to violin messages
+            {
+                _hoveredStudentId = m.StudentId;
+                UpdateDotplotHover();
+            }
+        });
+
         InitializeWithSyntheticData();
         InitializeCursors();
         InitializeComplianceGrid();
         InitializeDotplot();
+        InitializeViolinPlot();
     }
 
     private void InitializeWithSyntheticData()
@@ -246,6 +272,27 @@ public partial class MainWindowViewModel : ViewModelBase
         UpdateDotplotPoints();
         UpdateStatistics();
         UpdateCursors();
+    }
+
+
+    private void InitializeViolinPlot()
+    {
+        if (ViolinPlotViewModel == null) return;
+
+        // Transform student assessment data into violin plot series format
+        var seriesData = new List<(string SeriesName, Dictionary<string, double> Scores)>();
+
+        // Create a series for all students with their aggregate scores
+        var allStudentsScores = new Dictionary<string, double>();
+        foreach (var assessment in ClassAssessment.Assessments)
+        {
+            // Normalize aggregate grade to 0-1 range for violin plot
+            allStudentsScores[$"S{assessment.Id:D3}"] = assessment.AggregateGrade / 100.0;
+        }
+        seriesData.Add(("All Students", allStudentsScores));
+
+        // Generate the violin plot with default figure size
+        ViolinPlotViewModel.GeneratePlot((800, 400), seriesData, 3.0);
     }
 
     private void UpdateDotplotPoints()
@@ -846,6 +893,19 @@ public partial class MainWindowViewModel : ViewModelBase
         IsSizePaneOpen = !IsSizePaneOpen;
     }
 
+
+    [RelayCommand]
+    private void ToggleDrillDownPane()
+    {
+        IsDrillDownPaneOpen = !IsDrillDownPaneOpen;
+    }
+
+    [RelayCommand]
+    private void ToggleViolinPane()
+    {
+        IsViolinPaneOpen = !IsViolinPaneOpen;
+    }
+
     [RelayCommand(CanExecute = nameof(CanClearSelections))]
     private void ClearSelections()
     {
@@ -923,7 +983,7 @@ public partial class MainWindowViewModel : ViewModelBase
             // Check if hovering over a cursor
             var nearestCursor = FindNearestCursor(pos.X);
             var cursorYAxis = DotplotModel.Axes.FirstOrDefault(a => a.Key == "CursorY");
-            
+
             if (cursorYAxis != null && nearestCursor.cursor != null && nearestCursor.distance < 3)
             {
                 var cursorY = cursorYAxis.InverseTransform(e.Position.Y);
@@ -933,7 +993,24 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 IsResizeCursor = false;
             }
-            
+
+            // Check for student hover
+            var student = FindNearestStudent(e.Position);
+            int? newHoveredId = student?.Id;
+
+            if (newHoveredId != _hoveredStudentId)
+            {
+                _hoveredStudentId = newHoveredId;
+
+                // Broadcast hover message to violin plot
+                _messenger.Send(new StudentHoverMessage(
+                    _hoveredStudentId,
+                    "dotplot",
+                    null));
+
+                UpdateDotplotHover();
+            }
+
             e.Handled = true;
             return;
         }
@@ -1124,5 +1201,72 @@ public partial class MainWindowViewModel : ViewModelBase
         var g = Convert.ToByte(hex.Substring(2, 2), 16);
         var b = Convert.ToByte(hex.Substring(4, 2), 16);
         return OxyColor.FromRgb(r, g, b);
+    }
+
+    private void UpdateDotplotHover()
+    {
+        // Remove previous hover annotations
+        var hoverAnnotations = DotplotModel.Annotations
+            .Where(a => a.Tag is "hover")
+            .ToList();
+
+        foreach (var ann in hoverAnnotations)
+        {
+            DotplotModel.Annotations.Remove(ann);
+        }
+
+        if (_hoveredStudentId.HasValue)
+        {
+            var student = ClassAssessment.Assessments
+                .FirstOrDefault(s => s.Id == _hoveredStudentId.Value);
+
+            if (student != null)
+            {
+                // Find Y position (same logic as UpdateDotplotPoints)
+                var studentsAtScore = ClassAssessment.Assessments
+                    .Where(a => a.AggregateGrade == student.AggregateGrade)
+                    .OrderBy(s => s.Id)
+                    .ToList();
+
+                int index = studentsAtScore.IndexOf(student);
+                double binOffset = student.AggregateGrade % 2 == 1 ? 0.1 : 0.0;
+                double yPos = index * 2 + binOffset;
+
+                // Add larger marker annotation (3x size)
+                var hoverMarker = new EllipseAnnotation
+                {
+                    X = student.AggregateGrade,
+                    Y = yPos,
+                    Width = DotSize * 6, // 3x diameter
+                    Height = DotSize * 6,
+                    Fill = OxyColor.FromArgb(128, 70, 130, 180), // Semi-transparent blue
+                    XAxisKey = "SharedX",
+                    YAxisKey = "DotY",
+                    Tag = "hover"
+                };
+                DotplotModel.Annotations.Add(hoverMarker);
+
+                // Add tooltip annotation
+                var muppetName = ClassAssessment.MuppetNameMap
+                    .TryGetValue(student.Id, out var info) ? info.Name : "Unknown";
+
+                var tooltip = new TextAnnotation
+                {
+                    Text = $"{muppetName}\nScore: {student.AggregateGrade}",
+                    TextPosition = new DataPoint(student.AggregateGrade, yPos + 1.5),
+                    Background = OxyColors.Black,
+                    TextColor = OxyColors.White,
+                    Stroke = OxyColors.White,
+                    StrokeThickness = 1,
+                    Padding = new OxyThickness(4, 2, 4, 2), // left, top, right, bottom
+                    XAxisKey = "SharedX",
+                    YAxisKey = "DotY",
+                    Tag = "hover"
+                };
+                DotplotModel.Annotations.Add(tooltip);
+            }
+        }
+
+        DotplotModel.InvalidatePlot(true);
     }
 }
