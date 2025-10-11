@@ -17,12 +17,30 @@ namespace Dotsesses.Views;
 
 public partial class ViolinPlotControl : UserControl
 {
-    private Ellipse? _currentlyHoveredEllipse;
-
     public ViolinPlotControl()
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+        Loaded += OnLoaded;
+        SizeChanged += OnSizeChanged;
+    }
+
+    private void OnLoaded(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        // Re-render points after layout is complete with correct bounds
+        if (DataContext is ViolinPlotViewModel vm && !string.IsNullOrEmpty(vm.SvgContent))
+        {
+            RenderPointsAsShapes();
+        }
+    }
+
+    private void OnSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        // Re-render points when control is resized
+        if (DataContext is ViolinPlotViewModel vm && !string.IsNullOrEmpty(vm.SvgContent))
+        {
+            RenderPointsAsShapes();
+        }
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
@@ -30,6 +48,12 @@ public partial class ViolinPlotControl : UserControl
         if (DataContext is ViolinPlotViewModel vm)
         {
             vm.PropertyChanged += OnViewModelPropertyChanged;
+
+            // Check if SVG content already exists (set before this control was created)
+            if (!string.IsNullOrEmpty(vm.SvgContent))
+            {
+                UpdateSvgDisplay(vm.SvgContent);
+            }
         }
     }
 
@@ -52,7 +76,10 @@ public partial class ViolinPlotControl : UserControl
         if (DataContext is ViolinPlotViewModel vm)
         {
             var position = e.GetPosition(this);
-            vm.OnPointerMoved(position);
+            var controlBounds = Bounds;
+            var displayWidth = controlBounds.Width > 0 ? controlBounds.Width : 800;
+            var displayHeight = controlBounds.Height > 0 ? controlBounds.Height : 400;
+            vm.OnPointerMoved(position, displayWidth, displayHeight);
         }
     }
 
@@ -90,9 +117,18 @@ public partial class ViolinPlotControl : UserControl
         PointsOverlay.Children.Clear();
 
         var allPoints = vm.GetAllPoints();
+        if (!allPoints.Any())
+            return;
+
+        // Get actual rendered bounds - use control bounds as the display area
+        var controlBounds = Bounds;
+        var displayWidth = controlBounds.Width > 0 ? controlBounds.Width : 800;
+        var displayHeight = controlBounds.Height > 0 ? controlBounds.Height : 400;
+
         foreach (var point in allPoints)
         {
-            var (displayX, displayY) = vm.SvgToDisplay(point.X, point.Y);
+            // Calculate position using actual display size
+            var (displayX, displayY) = vm.SvgToDisplayWithSize(point.X, point.Y, displayWidth, displayHeight);
 
             var ellipse = new Ellipse
             {
@@ -136,10 +172,15 @@ public partial class ViolinPlotControl : UserControl
             // Get all points for this student
             var studentPoints = vm.GetPointsForStudent(vm.HoveredStudentId.Value);
 
+            // Use actual display size
+            var controlBounds = Bounds;
+            var displayWidth = controlBounds.Width > 0 ? controlBounds.Width : 800;
+            var displayHeight = controlBounds.Height > 0 ? controlBounds.Height : 400;
+
             foreach (var point in studentPoints)
             {
-                // Find the ellipse for this student
-                var (displayX, displayY) = vm.SvgToDisplay(point.X, point.Y);
+                // Find the ellipse for this student using actual display coordinates
+                var (displayX, displayY) = vm.SvgToDisplayWithSize(point.X, point.Y, displayWidth, displayHeight);
 
                 var ellipse = PointsOverlay.Children.OfType<Ellipse>()
                     .FirstOrDefault(e => (int?)e.Tag == point.StudentId &&

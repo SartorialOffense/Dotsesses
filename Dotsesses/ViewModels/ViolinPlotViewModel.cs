@@ -69,23 +69,21 @@ public partial class ViolinPlotViewModel : ViewModelBase
         SvgContent = svgContent;
         _dataPoints = dataPoints;
 
-        // Extract SVG dimensions from viewBox (simplified - would need XML parsing for real implementation)
-        // For now, assume standard matplotlib dimensions
-        _svgWidth = widthInches * 72; // Points
-        _svgHeight = heightInches * 72;
+        // Extract actual SVG dimensions from viewBox
+        ExtractSvgDimensions(svgContent);
     }
 
     /// <summary>
     /// Handles pointer moved event for hover detection.
     /// </summary>
-    public void OnPointerMoved(Point position)
+    public void OnPointerMoved(Point position, double displayWidth, double displayHeight)
     {
-        if (_dataPoints.Count == 0 || _displayWidth == 0 || _displayHeight == 0)
+        if (_dataPoints.Count == 0 || displayWidth == 0 || displayHeight == 0)
             return;
 
         // Calculate scale factors for SVG to display conversion
-        double scaleX = _displayWidth / _svgWidth;
-        double scaleY = _displayHeight / _svgHeight;
+        double scaleX = displayWidth / _svgWidth;
+        double scaleY = displayHeight / _svgHeight;
 
         // Find closest student within 15px tolerance
         var hit = _dataPoints
@@ -131,16 +129,48 @@ public partial class ViolinPlotViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Converts SVG coordinates to display coordinates.
+    /// Converts SVG coordinates to display coordinates using stored display size.
     /// </summary>
     public (double X, double Y) SvgToDisplay(double svgX, double svgY)
+    {
+        return SvgToDisplayWithSize(svgX, svgY, _displayWidth, _displayHeight);
+    }
+
+    /// <summary>
+    /// Converts SVG coordinates to display coordinates using specified display size.
+    /// </summary>
+    public (double X, double Y) SvgToDisplayWithSize(double svgX, double svgY, double displayWidth, double displayHeight)
     {
         if (_svgWidth == 0 || _svgHeight == 0)
             return (0, 0);
 
-        double scaleX = _displayWidth / _svgWidth;
-        double scaleY = _displayHeight / _svgHeight;
+        double scaleX = displayWidth / _svgWidth;
+        double scaleY = displayHeight / _svgHeight;
 
         return (svgX * scaleX, svgY * scaleY);
+    }
+
+    /// <summary>
+    /// Extracts actual SVG dimensions from viewBox attribute.
+    /// </summary>
+    private void ExtractSvgDimensions(string svgContent)
+    {
+        // Parse viewBox="0 0 width height" from SVG
+        var viewBoxMatch = System.Text.RegularExpressions.Regex.Match(
+            svgContent,
+            @"viewBox=""[\d\.\-\s]+\s+([\d\.]+)\s+([\d\.]+)""");
+
+        if (viewBoxMatch.Success)
+        {
+            _svgWidth = double.Parse(viewBoxMatch.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+            _svgHeight = double.Parse(viewBoxMatch.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
+        }
+        else
+        {
+            // Fallback to approximate dimensions if parsing fails
+            const double DPI = 100.0;
+            _svgWidth = _displayWidth / DPI * 72;
+            _svgHeight = _displayHeight / DPI * 72;
+        }
     }
 }

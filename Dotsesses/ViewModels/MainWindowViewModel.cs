@@ -282,14 +282,31 @@ public partial class MainWindowViewModel : ViewModelBase
         // Transform student assessment data into violin plot series format
         var seriesData = new List<(string SeriesName, Dictionary<string, double> Scores)>();
 
-        // Create a series for all students with their aggregate scores
-        var allStudentsScores = new Dictionary<string, double>();
-        foreach (var assessment in ClassAssessment.Assessments)
+        // Get all unique score types from the first student (all students have the same score types)
+        var firstStudent = ClassAssessment.Assessments.First();
+        var scoreTypes = firstStudent.Scores.Select(s =>
+            s.Index.HasValue ? $"{s.Name} {s.Index}" : s.Name).ToList();
+
+        // Create a series for each score type
+        foreach (var score in firstStudent.Scores)
         {
-            // Normalize aggregate grade to 0-1 range for violin plot
-            allStudentsScores[$"S{assessment.Id:D3}"] = assessment.AggregateGrade / 100.0;
+            var seriesName = score.Index.HasValue ? $"{score.Name} {score.Index}" : score.Name;
+            var seriesScores = new Dictionary<string, double>();
+
+            foreach (var assessment in ClassAssessment.Assessments)
+            {
+                // Find the matching score for this student
+                var studentScore = assessment.Scores.FirstOrDefault(s =>
+                    s.Name == score.Name && s.Index == score.Index);
+
+                if (studentScore != null)
+                {
+                    seriesScores[$"S{assessment.Id:D3}"] = studentScore.Value;
+                }
+            }
+
+            seriesData.Add((seriesName, seriesScores));
         }
-        seriesData.Add(("All Students", allStudentsScores));
 
         // Generate the violin plot with default figure size
         ViolinPlotViewModel.GeneratePlot((800, 400), seriesData, 3.0);

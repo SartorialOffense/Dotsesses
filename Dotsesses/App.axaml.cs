@@ -71,12 +71,13 @@ public partial class App : Application
     {
         // Set up Python environment
         var pythonHome = Path.Combine(AppContext.BaseDirectory, "Python", "Violin");
+        var venvPath = Path.Combine(pythonHome, ".venv");
+        var pyprojectPath = Path.Combine(pythonHome, "pyproject.toml");
 
         services.WithPython()
             .WithHome(pythonHome)
             .FromRedistributable()
-            .WithVirtualEnvironment(".venv")
-            .WithUvInstaller(Path.Combine(pythonHome, "pyproject.toml"));
+            .WithVirtualEnvironment(venvPath);
 
         // Register messenger
         services.AddSingleton<IMessenger>(WeakReferenceMessenger.Default);
