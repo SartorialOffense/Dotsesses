@@ -39,7 +39,7 @@ public class ViolinPlotService
             pySeriesList,
             null, // colors (use default)
             "", // title
-            "Series",
+            "", // xlabel (empty - just show series names)
             "Normalized Score (0-1)",
             dotSize
         );
