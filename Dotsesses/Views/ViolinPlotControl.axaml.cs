@@ -151,24 +151,18 @@ public partial class ViolinPlotControl : UserControl
         // Clear tooltips
         TooltipsOverlay.Children.Clear();
 
-        // Reset all ellipses to normal size and opacity
-        foreach (var ellipse in PointsOverlay.Children.OfType<Ellipse>())
-        {
-            ellipse.Opacity = 0.6;  // Dim all
-            ellipse.Width = 5;
-            ellipse.Height = 5;
-            var studentId = (int?)ellipse.Tag;
-            if (studentId.HasValue)
-            {
-                var left = Canvas.GetLeft(ellipse);
-                var top = Canvas.GetTop(ellipse);
-                Canvas.SetLeft(ellipse, left + 2.5 - 2.5);
-                Canvas.SetTop(ellipse, top + 2.5 - 2.5);
-            }
-        }
+        // Re-render all points in their correct positions
+        RenderPointsAsShapes();
 
+        // If hovering, dim non-hovered points and highlight hovered ones
         if (vm.HoveredStudentId.HasValue)
         {
+            // Dim all points first
+            foreach (var ellipse in PointsOverlay.Children.OfType<Ellipse>())
+            {
+                ellipse.Opacity = 0.6;
+            }
+
             // Get all points for this student
             var studentPoints = vm.GetPointsForStudent(vm.HoveredStudentId.Value);
 
