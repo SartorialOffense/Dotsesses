@@ -2,6 +2,8 @@ using System;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Animation;
 using Avalonia.Animation.Easings;
@@ -10,6 +12,7 @@ using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 using Dotsesses.Models;
 using Dotsesses.ViewModels;
 
@@ -17,6 +20,8 @@ namespace Dotsesses.Views;
 
 public partial class ViolinPlotControl : UserControl
 {
+    private CancellationTokenSource? _resizeCts;
+
     public ViolinPlotControl()
     {
         InitializeComponent();
@@ -36,11 +41,36 @@ public partial class ViolinPlotControl : UserControl
 
     private void OnSizeChanged(object? sender, SizeChangedEventArgs e)
     {
-        // Re-render points when control is resized
+        // Immediately re-render points to match new size
         if (DataContext is ViolinPlotViewModel vm && !string.IsNullOrEmpty(vm.SvgContent))
         {
             RenderPointsAsShapes();
         }
+
+        // Cancel previous resize operation
+        _resizeCts?.Cancel();
+        _resizeCts = new CancellationTokenSource();
+        var token = _resizeCts.Token;
+
+        // Debounce: wait 300ms after resize finishes before regenerating full plot
+        Task.Delay(300, token).ContinueWith(t =>
+        {
+            if (!t.IsCanceled && DataContext is ViolinPlotViewModel viewModel)
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (!token.IsCancellationRequested)
+                    {
+                        var controlBounds = Bounds;
+                        var displayWidth = controlBounds.Width > 0 ? controlBounds.Width : 800;
+                        var displayHeight = controlBounds.Height > 0 ? controlBounds.Height : 400;
+
+                        // Trigger full plot regeneration in ViewModel
+                        viewModel.RegeneratePlot(displayWidth, displayHeight);
+                    }
+                });
+            }
+        }, token);
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)

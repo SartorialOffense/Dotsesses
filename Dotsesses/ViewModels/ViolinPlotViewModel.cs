@@ -22,6 +22,8 @@ public partial class ViolinPlotViewModel : ViewModelBase
     private double _svgHeight;
     private double _displayWidth;
     private double _displayHeight;
+    private List<(string SeriesName, Dictionary<string, double> Scores)> _seriesData = new();
+    private double _dotSize = 3.0;
 
     [ObservableProperty]
     private string? _svgContent;
@@ -52,6 +54,9 @@ public partial class ViolinPlotViewModel : ViewModelBase
         List<(string SeriesName, Dictionary<string, double> Scores)> seriesData,
         double dotSize = 5.0)
     {
+        // Store data for later regeneration
+        _seriesData = seriesData;
+        _dotSize = dotSize;
         _displayWidth = displaySize.Width;
         _displayHeight = displaySize.Height;
 
@@ -71,6 +76,16 @@ public partial class ViolinPlotViewModel : ViewModelBase
 
         // Extract actual SVG dimensions from viewBox
         ExtractSvgDimensions(svgContent);
+    }
+
+    /// <summary>
+    /// Regenerates the plot with new display dimensions using stored data.
+    /// </summary>
+    public void RegeneratePlot(double displayWidth, double displayHeight)
+    {
+        if (_seriesData.Count == 0) return;
+
+        GeneratePlot((displayWidth, displayHeight), _seriesData, _dotSize);
     }
 
     /// <summary>
