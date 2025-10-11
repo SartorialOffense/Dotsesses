@@ -151,7 +151,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void InitializeDotplot()
     {
-        var backgroundColor = OxyColor.FromRgb(24, 24, 24);
+        var backgroundColor = OxyColor.FromRgb(0, 0, 0);
 
         DotplotModel = new PlotModel
         {

@@ -22,7 +22,7 @@
 
             <!-- Color Selection Panel -->
             <Border Grid.Column="0"
-                   Background="#181818"
+                   Background="#000000"
                    BorderBrush="#3F3F46"
                    BorderThickness="0,0,1,0"
                    Padding="0">
@@ -115,7 +115,7 @@
 
             <!-- Size Panel -->
             <Border Grid.Column="1"
-                   Background="#181818"
+                   Background="#000000"
                    BorderBrush="#3F3F46"
                    BorderThickness="0,0,1,0"
                    Padding="0">
@@ -195,7 +195,7 @@
             </Border>
 
             <!-- Dotplot -->
-            <Border Grid.Column="2" Background="#181818">
+            <Border Grid.Column="2" Background="#000000">
                 <oxy:PlotView Model="{Binding DotplotModel}">
                     <oxy:PlotView.Cursor>
                         <MultiBinding>
@@ -210,7 +210,7 @@
 
             <!-- Compliance Panel -->
             <Border Grid.Column="3"
-                   Background="#181818"
+                   Background="#000000"
                    BorderBrush="#3F3F46"
                    BorderThickness="1,0,0,0"
                    Padding="0">
@@ -352,12 +352,12 @@
                       HorizontalAlignment="Stretch"/>
 
         <!-- Bottom Row: Drill-Down and Violin Plot with Horizontal Expanders -->
-        <Border Grid.Row="2" Background="#181818" BorderBrush="#3F3F46" BorderThickness="0,1,0,0">
+        <Border Grid.Row="2" Background="#000000" BorderBrush="#3F3F46" BorderThickness="0,1,0,0">
             <Grid ColumnDefinitions="Auto,5,*">
 
                 <!-- Left: Drill-Down Panel -->
                 <Border Grid.Column="0"
-                       Background="#181818"
+                       Background="#000000"
                        BorderBrush="#3F3F46"
                        BorderThickness="0,0,1,0"
                        Padding="0">
@@ -423,7 +423,7 @@
                                 </Grid>
 
                                 <!-- Clear Selections Button -->
-                                <Border Grid.Row="1" Background="#181818" Padding="0,0,0,5">
+                                <Border Grid.Row="1" Background="#000000" Padding="0,0,0,5">
                                     <Button Command="{Binding ClearSelectionsCommand}"
                                             HorizontalAlignment="Left"
                                             Background="Transparent"
@@ -435,7 +435,7 @@
                                 </Border>
 
                                 <!-- Selected Students Header -->
-                                <Border Grid.Row="2" Background="#181818" Padding="0,0,0,5">
+                                <Border Grid.Row="2" Background="#000000" Padding="0,0,0,5">
                                     <TextBlock Text="Selected Students"
                                              FontSize="14"
                                              FontWeight="SemiBold"
@@ -453,7 +453,7 @@
 
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
-                                                <Border Background="#181818"
+                                                <Border Background="#000000"
                                                        BorderBrush="#3F3F46"
                                                        BorderThickness="1"
                                                        CornerRadius="4"
@@ -544,7 +544,7 @@
 
                 <!-- Right: Violin Plot Panel -->
                 <Border Grid.Column="2"
-                       Background="#181818"
+                       Background="#000000"
                        BorderBrush="#3F3F46"
                        BorderThickness="1,0,0,0"
                        Padding="0">
