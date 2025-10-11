@@ -55,18 +55,27 @@ public partial class ViolinPlotControl : UserControl
         // Debounce: wait 300ms after resize finishes before regenerating full plot
         Task.Delay(300, token).ContinueWith(t =>
         {
-            if (!t.IsCanceled && DataContext is ViolinPlotViewModel viewModel)
+            if (!t.IsCanceled)
             {
                 Dispatcher.UIThread.Post(() =>
                 {
-                    if (!token.IsCancellationRequested)
+                    if (!token.IsCancellationRequested && DataContext is ViolinPlotViewModel viewModel)
                     {
                         var controlBounds = Bounds;
                         var displayWidth = controlBounds.Width > 0 ? controlBounds.Width : 800;
                         var displayHeight = controlBounds.Height > 0 ? controlBounds.Height : 400;
 
-                        // Trigger full plot regeneration in ViewModel
-                        viewModel.RegeneratePlot(displayWidth, displayHeight);
+                        Console.WriteLine($"[ViolinPlot] Regenerating plot: {displayWidth}x{displayHeight}");
+
+                        try
+                        {
+                            // Trigger full plot regeneration in ViewModel
+                            viewModel.RegeneratePlot(displayWidth, displayHeight);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[ViolinPlot] Error regenerating plot: {ex.Message}");
+                        }
                     }
                 });
             }

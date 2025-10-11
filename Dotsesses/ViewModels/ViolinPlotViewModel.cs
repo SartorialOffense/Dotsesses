@@ -83,7 +83,13 @@ public partial class ViolinPlotViewModel : ViewModelBase
     /// </summary>
     public void RegeneratePlot(double displayWidth, double displayHeight)
     {
-        if (_seriesData.Count == 0) return;
+        Console.WriteLine($"[ViolinPlotViewModel] RegeneratePlot called: {displayWidth}x{displayHeight}, SeriesData count: {_seriesData.Count}");
+
+        if (_seriesData.Count == 0)
+        {
+            Console.WriteLine("[ViolinPlotViewModel] No series data to regenerate");
+            return;
+        }
 
         GeneratePlot((displayWidth, displayHeight), _seriesData, _dotSize);
     }
