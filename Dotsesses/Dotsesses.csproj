@@ -32,13 +32,8 @@
 
     <ItemGroup>
         <AdditionalFiles Include="Python/Violin/violin_swarm.py">
-            <Link>violin_swarm.py</Link>
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-            <TargetPath>Python/Violin/violin_swarm.py</TargetPath>
         </AdditionalFiles>
-    </ItemGroup>
-
-    <ItemGroup>
         <None Include="Python/Violin/pyproject.toml">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>

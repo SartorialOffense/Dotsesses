@@ -89,29 +89,46 @@ public partial class ViolinPlotControl : UserControl
         // Clear existing points
         PointsOverlay.Children.Clear();
 
-        var allPoints = vm.GetPointsForStudent(0); // Get all points (studentId 0 won't exist, so this is a hack - need better API)
-        // TODO: Add method to ViolinPlotViewModel to get all points
+        var allPoints = vm.GetAllPoints();
+        foreach (var point in allPoints)
+        {
+            var (displayX, displayY) = vm.SvgToDisplay(point.X, point.Y);
 
-        // For now, we'll render points when we implement hover
-        // This will be completed in the hover visualization method
+            var ellipse = new Ellipse
+            {
+                Width = 5,
+                Height = 5,
+                Fill = new SolidColorBrush(Color.Parse(point.Color)),
+                Opacity = 0.8,
+                Tag = point.StudentId
+            };
+
+            Canvas.SetLeft(ellipse, displayX - 2.5);
+            Canvas.SetTop(ellipse, displayY - 2.5);
+
+            PointsOverlay.Children.Add(ellipse);
+        }
     }
 
     private void UpdateHoverVisualization(ViolinPlotViewModel vm)
     {
-        // Clear previous hover
-        if (_currentlyHoveredEllipse != null)
-        {
-            AnimateUnhover(_currentlyHoveredEllipse);
-            _currentlyHoveredEllipse = null;
-        }
-
         // Clear tooltips
         TooltipsOverlay.Children.Clear();
 
-        // Dim all ellipses
+        // Reset all ellipses to normal size and opacity
         foreach (var ellipse in PointsOverlay.Children.OfType<Ellipse>())
         {
-            ellipse.Opacity = 1.0;
+            ellipse.Opacity = 0.6;  // Dim all
+            ellipse.Width = 5;
+            ellipse.Height = 5;
+            var studentId = (int?)ellipse.Tag;
+            if (studentId.HasValue)
+            {
+                var left = Canvas.GetLeft(ellipse);
+                var top = Canvas.GetTop(ellipse);
+                Canvas.SetLeft(ellipse, left + 2.5 - 2.5);
+                Canvas.SetTop(ellipse, top + 2.5 - 2.5);
+            }
         }
 
         if (vm.HoveredStudentId.HasValue)
@@ -121,23 +138,22 @@ public partial class ViolinPlotControl : UserControl
 
             foreach (var point in studentPoints)
             {
-                // Find or create ellipse for this point
+                // Find the ellipse for this student
                 var (displayX, displayY) = vm.SvgToDisplay(point.X, point.Y);
 
-                // For now, create temporary hover visualization
-                // In full implementation, ellipses would be pre-rendered
-                var hoverMarker = new Ellipse
+                var ellipse = PointsOverlay.Children.OfType<Ellipse>()
+                    .FirstOrDefault(e => (int?)e.Tag == point.StudentId &&
+                                        Math.Abs(Canvas.GetLeft(e) - (displayX - 2.5)) < 1);
+
+                if (ellipse != null)
                 {
-                    Width = 15, // 3x normal size
-                    Height = 15,
-                    Fill = new SolidColorBrush(Color.Parse(point.Color)),
-                    Opacity = 1.0
-                };
-
-                Canvas.SetLeft(hoverMarker, displayX - 7.5);
-                Canvas.SetTop(hoverMarker, displayY - 7.5);
-
-                PointsOverlay.Children.Add(hoverMarker);
+                    // Highlight this ellipse
+                    ellipse.Opacity = 1.0;
+                    ellipse.Width = 15;  // 3x size
+                    ellipse.Height = 15;
+                    Canvas.SetLeft(ellipse, displayX - 7.5);
+                    Canvas.SetTop(ellipse, displayY - 7.5);
+                }
 
                 // Create tooltip
                 CreateTooltip(point, displayX, displayY);

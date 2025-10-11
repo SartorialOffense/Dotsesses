@@ -123,6 +123,14 @@ public partial class ViolinPlotViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Gets all data points.
+    /// </summary>
+    public List<ViolinDataPoint> GetAllPoints()
+    {
+        return _dataPoints;
+    }
+
+    /// <summary>
     /// Converts SVG coordinates to display coordinates.
     /// </summary>
     public (double X, double Y) SvgToDisplay(double svgX, double svgY)

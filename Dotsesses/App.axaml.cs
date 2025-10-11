@@ -70,7 +70,7 @@ public partial class App : Application
     private void ConfigureServices(ServiceCollection services)
     {
         // Set up Python environment
-        var pythonHome = Path.Combine(Directory.GetCurrentDirectory(), "Python", "Violin");
+        var pythonHome = Path.Combine(AppContext.BaseDirectory, "Python", "Violin");
 
         services.WithPython()
             .WithHome(pythonHome)
