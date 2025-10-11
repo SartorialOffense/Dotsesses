@@ -109,12 +109,57 @@ public class SyntheticStudentGenerator
                 break;
         }
 
+        // Break down Quiz Total into three quizzes
+        var (quiz1, quiz2, quiz3) = RandomSplit3(quizTotal);
+
+        // Break down Final into Short Answer and MC (60/40 split approximately)
+        var (finalShortAnswer, finalMC) = RandomSplit2(final, 0.6);
+
         return new List<Score>
         {
+            new Score("Quiz 1", null, quiz1),
+            new Score("Quiz 2", null, quiz2),
+            new Score("Quiz 3", null, quiz3),
             new Score("Quiz Total", null, quizTotal),
             new Score("Participation Total", null, participationTotal),
+            new Score("Final Short Answer", null, finalShortAnswer),
+            new Score("Final MC", null, finalMC),
             new Score("Final", null, final)
         };
+    }
+
+    /// <summary>
+    /// Randomly splits a value into 3 parts that sum to the original.
+    /// </summary>
+    private (double, double, double) RandomSplit3(double total)
+    {
+        // Generate two random split points
+        double r1 = _random.NextDouble();
+        double r2 = _random.NextDouble();
+
+        // Ensure r1 < r2
+        if (r1 > r2) (r1, r2) = (r2, r1);
+
+        double part1 = Math.Round(total * r1, 2);
+        double part2 = Math.Round(total * (r2 - r1), 2);
+        double part3 = Math.Round(total - part1 - part2, 2);
+
+        return (part1, part2, part3);
+    }
+
+    /// <summary>
+    /// Randomly splits a value into 2 parts around a target ratio.
+    /// </summary>
+    private (double, double) RandomSplit2(double total, double targetRatio = 0.5)
+    {
+        // Add some randomness around the target ratio (±10%)
+        double ratio = targetRatio + (_random.NextDouble() - 0.5) * 0.2;
+        ratio = Math.Clamp(ratio, 0.3, 0.7);
+
+        double part1 = Math.Round(total * ratio, 2);
+        double part2 = Math.Round(total - part1, 2);
+
+        return (part1, part2);
     }
 
     private IReadOnlyCollection<StudentAttribute> GenerateAttributes(PerformanceTier tier)
