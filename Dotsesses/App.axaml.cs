@@ -3,15 +3,22 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Data.Core;
 using Avalonia.Data.Core.Plugins;
 using System;
+using System.IO;
 using System.Linq;
 using Avalonia.Markup.Xaml;
+using CSnakes.Runtime;
+using CommunityToolkit.Mvvm.Messaging;
+using Dotsesses.Services;
 using Dotsesses.ViewModels;
 using Dotsesses.Views;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Dotsesses;
 
 public partial class App : Application
 {
+    public static IServiceProvider? Services { get; private set; }
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -25,9 +32,14 @@ public partial class App : Application
             // More info: https://docs.avaloniaui.net/docs/guides/development-guides/data-validation#manage-validationplugins
             DisableAvaloniaDataAnnotationValidation();
 
+            // Set up Python environment and services
+            var services = new ServiceCollection();
+            ConfigureServices(services);
+            Services = services.BuildServiceProvider();
+
             var mainWindow = new MainWindow
             {
-                DataContext = new MainWindowViewModel(),
+                DataContext = Services.GetRequiredService<MainWindowViewModel>(),
             };
 
             desktop.MainWindow = mainWindow;
@@ -53,6 +65,28 @@ public partial class App : Application
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private void ConfigureServices(ServiceCollection services)
+    {
+        // Set up Python environment
+        var pythonHome = Path.Combine(Directory.GetCurrentDirectory(), "Python", "Violin");
+
+        services.WithPython()
+            .WithHome(pythonHome)
+            .FromRedistributable()
+            .WithVirtualEnvironment(".venv")
+            .WithUvInstaller(Path.Combine(pythonHome, "pyproject.toml"));
+
+        // Register messenger
+        services.AddSingleton<IMessenger>(WeakReferenceMessenger.Default);
+
+        // Register services
+        services.AddSingleton<ViolinPlotService>();
+
+        // Register ViewModels
+        services.AddTransient<MainWindowViewModel>();
+        services.AddTransient<ViolinPlotViewModel>();
     }
 
     private void DisableAvaloniaDataAnnotationValidation()

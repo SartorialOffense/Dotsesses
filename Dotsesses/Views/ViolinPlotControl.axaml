@@ -1,0 +1,22 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Dotsesses.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="400"
+             x:Class="Dotsesses.Views.ViolinPlotControl"
+             x:DataType="vm:ViolinPlotViewModel"
+             Background="#181818">
+
+    <Grid PointerMoved="OnPointerMoved" Background="Transparent">
+        <!-- SVG Background -->
+        <Image x:Name="SvgView"
+               Stretch="Fill" />
+
+        <!-- Canvas for swarm point overlays -->
+        <Canvas x:Name="PointsOverlay" />
+
+        <!-- Canvas for tooltips -->
+        <Canvas x:Name="TooltipsOverlay" />
+    </Grid>
+</UserControl>
