@@ -115,16 +115,20 @@ public class SyntheticStudentGenerator
         // Break down Final into Short Answer and MC (60/40 split approximately)
         var (finalShortAnswer, finalMC) = RandomSplit2(final, 0.6);
 
+        // Calculate overall total
+        double total = participationTotal + quizTotal + final;
+
         return new List<Score>
         {
+            new Score("Participation Total", null, participationTotal),
             new Score("Quiz 1", null, quiz1),
             new Score("Quiz 2", null, quiz2),
             new Score("Quiz 3", null, quiz3),
             new Score("Quiz Total", null, quizTotal),
-            new Score("Participation Total", null, participationTotal),
-            new Score("Final Short Answer", null, finalShortAnswer),
             new Score("Final MC", null, finalMC),
-            new Score("Final", null, final)
+            new Score("Final Short Answer", null, finalShortAnswer),
+            new Score("Final", null, final),
+            new Score("Total", null, total)
         };
     }
 
