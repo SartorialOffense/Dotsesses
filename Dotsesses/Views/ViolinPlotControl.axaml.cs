@@ -228,13 +228,13 @@ public partial class ViolinPlotControl : UserControl
         // Re-render all points in their correct positions
         RenderPointsAsShapes();
 
-        // If hovering, dim non-hovered points and highlight hovered ones
+        // If hovering, dim non-hovered points and add ring overlays to hovered ones
         if (vm.HoveredStudentId.HasValue)
         {
             // Dim all points first
             foreach (var ellipse in PointsOverlay.Children.OfType<Ellipse>())
             {
-                ellipse.Opacity = 0.6;
+                ellipse.Opacity = 0.45;
             }
 
             // Get all points for this student
@@ -256,12 +256,24 @@ public partial class ViolinPlotControl : UserControl
 
                 if (ellipse != null)
                 {
-                    // Highlight this ellipse
+                    // Keep original ellipse at full opacity
                     ellipse.Opacity = 1.0;
-                    ellipse.Width = 15;  // 3x size
-                    ellipse.Height = 15;
-                    Canvas.SetLeft(ellipse, displayX - 7.5);
-                    Canvas.SetTop(ellipse, displayY - 7.5);
+
+                    double ringSize = 14;
+                    double ringThickness = 2;
+                    
+                    var hoverRing = new Ellipse
+                    {
+                        Width = ringSize,
+                        Height = ringSize,
+                        Stroke = new SolidColorBrush(Color.Parse(point.Color)),
+                        StrokeThickness = ringThickness
+                    };
+
+                    Canvas.SetLeft(hoverRing, displayX - ringSize / 2);
+                    Canvas.SetTop(hoverRing, displayY - ringSize / 2);
+
+                    PointsOverlay.Children.Add(hoverRing);
                 }
 
                 // Create tooltip
