@@ -31,6 +31,9 @@ public partial class MainWindowViewModel : ViewModelBase
     private int? _hoveredStudentId;
 
     [ObservableProperty]
+    private StudentCardViewModel? _hoveredStudent;
+
+    [ObservableProperty]
     private ClassAssessment _classAssessment = null!;
 
     [ObservableProperty]
@@ -935,6 +938,27 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         var grade = _gradeAssigner.AssignGrade(student.AggregateGrade);
         return grade.LetterGrade.ToString();
+    }
+
+    partial void OnHoveredStudentIdChanged(int? value)
+    {
+        if (value.HasValue)
+        {
+            var student = ClassAssessment.Assessments.FirstOrDefault(s => s.Id == value.Value);
+            if (student != null)
+            {
+                var grade = GetGradeForStudent(student);
+                HoveredStudent = new StudentCardViewModel(student, grade);
+            }
+            else
+            {
+                HoveredStudent = null;
+            }
+        }
+        else
+        {
+            HoveredStudent = null;
+        }
     }
 
     private void OnDotplotMouseDown(object? sender, OxyMouseDownEventArgs e)

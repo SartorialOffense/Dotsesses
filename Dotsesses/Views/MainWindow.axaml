@@ -400,7 +400,7 @@
                         <Border IsVisible="{Binding IsDrillDownPaneOpen}"
                                Padding="3,6,10,10"
                                MinWidth="350">
-                            <Grid RowDefinitions="Auto,Auto,Auto,*">
+                            <Grid RowDefinitions="Auto,*">
                                 <!-- Header with hamburger -->
                                 <Grid Grid.Row="0" ColumnDefinitions="Auto,*" Margin="0,0,0,8">
                                     <Button Grid.Column="0"
@@ -426,116 +426,93 @@
                                              VerticalAlignment="Center"/>
                                 </Grid>
 
-                                <!-- Clear Selections Button -->
-                                <Border Grid.Row="1" Background="#000000" Padding="0,0,0,5">
-                                    <Button Command="{Binding ClearSelectionsCommand}"
-                                            HorizontalAlignment="Left"
-                                            Background="Transparent"
-                                            BorderThickness="0"
-                                            Padding="5"
-                                            ToolTip.Tip="Clear all selections">
-                                        <TextBlock Text="⌫" FontSize="16" Foreground="White"/>
-                                    </Button>
-                                </Border>
-
-                                <!-- Selected Students Header -->
-                                <Border Grid.Row="2" Background="#000000" Padding="0,0,0,5">
-                                    <TextBlock Text="Selected Students"
-                                             FontSize="14"
-                                             FontWeight="SemiBold"
-                                             Foreground="White"/>
-                                </Border>
-
-                                <!-- Student Cards -->
-                                <ScrollViewer Grid.Row="3" Padding="0">
-                                    <ItemsControl ItemsSource="{Binding SelectedStudents}">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <StackPanel Orientation="Vertical" />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border Background="#000000"
-                                                       BorderBrush="#3F3F46"
-                                                       BorderThickness="1"
-                                                       CornerRadius="4"
-                                                       Padding="15"
-                                                       Margin="0,5">
-                                                    <Grid RowDefinitions="Auto,Auto">
-                                                        <!-- Header: Name and Grade -->
-                                                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
-                                                            <TextBlock Grid.Column="0"
-                                                                     Text="{Binding Assessment.MuppetName}"
-                                                                     Foreground="White"
-                                                                     FontWeight="SemiBold"
-                                                                     FontSize="14"
-                                                                     TextWrapping="Wrap"/>
-                                                            <Border Grid.Column="1"
-                                                                   Background="#007ACC"
-                                                                   CornerRadius="3"
-                                                                   Padding="8,4"
-                                                                   Margin="10,0,0,0">
-                                                                <TextBlock Text="{Binding AssignedGrade}"
+                                <!-- Hovered Student (temporary preview) -->
+<Border Grid.Row="1" Background="#000000" Padding="0,0,0,10" IsVisible="{Binding HoveredStudent, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                    <StackPanel>
+                                        <ContentControl Content="{Binding HoveredStudent}">
+                                            <ContentControl.ContentTemplate>
+                                                <DataTemplate x:DataType="vm:StudentCardViewModel">
+                                                    <Border Background="#1A1A1A"
+                                                           BorderBrush="#007ACC"
+                                                           BorderThickness="2"
+                                                           CornerRadius="4"
+                                                           Padding="15"
+                                                           Margin="0">
+                                                        <Grid RowDefinitions="Auto,Auto">
+                                                            <!-- Header: Name and Grade -->
+                                                            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+                                                                <TextBlock Grid.Column="0"
+                                                                         Text="{Binding Assessment.MuppetName}"
                                                                          Foreground="White"
-                                                                         FontWeight="Bold"
-                                                                         FontSize="14"/>
-                                                            </Border>
+                                                                         FontWeight="SemiBold"
+                                                                         FontSize="14"
+                                                                         TextWrapping="Wrap"/>
+                                                                <Border Grid.Column="1"
+                                                                       Background="#007ACC"
+                                                                       CornerRadius="3"
+                                                                       Padding="8,4"
+                                                                       Margin="10,0,0,0">
+                                                                    <TextBlock Text="{Binding AssignedGrade}"
+                                                                             Foreground="White"
+                                                                             FontWeight="Bold"
+                                                                             FontSize="14"/>
+                                                                </Border>
+                                                            </Grid>
+
+                                                            <!-- Single merged table: Scores first, then Attributes -->
+                                                            <StackPanel Grid.Row="1">
+                                                                <!-- Scores -->
+                                                                <ItemsControl ItemsSource="{Binding Assessment.Scores}">
+                                                                    <ItemsControl.ItemTemplate>
+                                                                        <DataTemplate>
+                                                                            <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                                                                                <TextBlock Grid.Column="0"
+                                                                                         Text="{Binding Name}"
+                                                                                         Foreground="#AAAAAA"
+                                                                                         FontSize="11"/>
+                                                                                <TextBlock Grid.Column="1"
+                                                                                         Text="{Binding Value}"
+                                                                                         Foreground="White"
+                                                                                         FontSize="11"
+                                                                                         FontWeight="Medium"/>
+                                                                            </Grid>
+                                                                        </DataTemplate>
+                                                                    </ItemsControl.ItemTemplate>
+                                                                </ItemsControl>
+
+                                                                <!-- Separator line -->
+                                                                <Border Height="1"
+                                                                       Background="#666666"
+                                                                       Margin="0,8"
+                                                                       HorizontalAlignment="Stretch"/>
+
+                                                                <!-- Attributes -->
+                                                                <ItemsControl ItemsSource="{Binding Assessment.Attributes}">
+                                                                    <ItemsControl.ItemTemplate>
+                                                                        <DataTemplate>
+                                                                            <Grid ColumnDefinitions="*,Auto" Margin="0,2" TextElement.Foreground="White">
+                                                                                <TextBlock Grid.Column="0"
+                                                                                         Text="{Binding Name}"
+                                                                                         Foreground="#AAAAAA"
+                                                                                         FontSize="11"/>
+                                                                                <TextBlock Grid.Column="1"
+                                                                                         Text="{Binding Value}"
+                                                                                         FontSize="11"
+                                                                                         FontWeight="Medium"/>
+                                                                            </Grid>
+                                                                        </DataTemplate>
+                                                                    </ItemsControl.ItemTemplate>
+                                                                </ItemsControl>
+                                                            </StackPanel>
                                                         </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ContentControl.ContentTemplate>
+                                        </ContentControl>
+                                    </StackPanel>
+                                </Border>
 
-                                                        <!-- Single merged table: Scores first, then Attributes -->
-                                                        <StackPanel Grid.Row="1">
-                                                            <!-- Scores -->
-                                                            <ItemsControl ItemsSource="{Binding Assessment.Scores}">
-                                                                <ItemsControl.ItemTemplate>
-                                                                    <DataTemplate>
-                                                                        <Grid ColumnDefinitions="*,Auto" Margin="0,2">
-                                                                            <TextBlock Grid.Column="0"
-                                                                                     Text="{Binding Name}"
-                                                                                     Foreground="#AAAAAA"
-                                                                                     FontSize="11"/>
-                                                                            <TextBlock Grid.Column="1"
-                                                                                     Text="{Binding Value}"
-                                                                                     Foreground="White"
-                                                                                     FontSize="11"
-                                                                                     FontWeight="Medium"/>
-                                                                        </Grid>
-                                                                    </DataTemplate>
-                                                                </ItemsControl.ItemTemplate>
-                                                            </ItemsControl>
-
-                                                            <!-- Separator line -->
-                                                            <Border Height="1"
-                                                                   Background="#666666"
-                                                                   Margin="0,8"
-                                                                   HorizontalAlignment="Stretch"/>
-
-                                                            <!-- Attributes -->
-                                                            <ItemsControl ItemsSource="{Binding Assessment.Attributes}">
-                                                                <ItemsControl.ItemTemplate>
-                                                                    <DataTemplate>
-                                                                        <Grid ColumnDefinitions="*,Auto" Margin="0,2" TextElement.Foreground="White">
-                                                                            <TextBlock Grid.Column="0"
-                                                                                     Text="{Binding Name}"
-                                                                                     Foreground="#AAAAAA"
-                                                                                     FontSize="11"/>
-                                                                            <TextBlock Grid.Column="1"
-                                                                                     Text="{Binding Value}"
-                                                                                     FontSize="11"
-                                                                                     FontWeight="Medium"/>
-                                                                        </Grid>
-                                                                    </DataTemplate>
-                                                                </ItemsControl.ItemTemplate>
-                                                            </ItemsControl>
-                                                        </StackPanel>
-                                                    </Grid>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </ScrollViewer>
-                            </Grid>
+</Grid>
                         </Border>
                     </Grid>
                 </Border>
