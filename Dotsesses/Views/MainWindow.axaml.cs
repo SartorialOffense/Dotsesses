@@ -41,7 +41,7 @@ public partial class MainWindow : Window
 
     private void UpdateHoverOverlay()
     {
-        // Clear existing hover markers
+        // Clear existing hover markers and tooltips
         DotPlotHoverOverlay.Children.Clear();
 
         if (DataContext is not MainWindowViewModel vm || !vm.HoveredStudentId.HasValue)
@@ -105,6 +105,59 @@ public partial class MainWindow : Window
         Canvas.SetTop(hoverMarker, screenPoint.Y - markerSize / 2);
 
         DotPlotHoverOverlay.Children.Add(hoverMarker);
+
+        // Create tooltip
+        CreateDotPlotTooltip(student.AggregateGrade, dotColor, screenPoint.X, screenPoint.Y);
+    }
+
+    private void CreateDotPlotTooltip(int score, Color dotColor, double screenX, double screenY)
+    {
+        var tooltipBorder = new Border
+        {
+            Background = new SolidColorBrush(Colors.Black),
+            BorderBrush = new SolidColorBrush(Colors.White),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(3),
+            Padding = new Thickness(4, 2)
+        };
+
+        // Score value only
+        // Lighten color if too dark
+        double luminance = 0.2126 * dotColor.R + 0.7152 * dotColor.G + 0.0722 * dotColor.B;
+        if (luminance < 128)
+        {
+            double factor = 0.6;
+            dotColor = Color.FromRgb(
+                (byte)(dotColor.R + (255 - dotColor.R) * factor),
+                (byte)(dotColor.G + (255 - dotColor.G) * factor),
+                (byte)(dotColor.B + (255 - dotColor.B) * factor));
+        }
+
+        var scoreText = new TextBlock
+        {
+            Text = score.ToString(),
+            FontSize = 11,
+            Foreground = new SolidColorBrush(dotColor)
+        };
+
+        tooltipBorder.Child = scoreText;
+
+        // Measure tooltip to determine positioning
+        tooltipBorder.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        double tooltipWidth = tooltipBorder.DesiredSize.Width;
+
+        // Get canvas width
+        double canvasWidth = DotPlotHoverOverlay.Bounds.Width;
+
+        // Position on left if too close to right edge, otherwise on right
+        double leftPos = screenX + 20 + tooltipWidth > canvasWidth
+            ? screenX - tooltipWidth - 20
+            : screenX + 20;
+
+        Canvas.SetLeft(tooltipBorder, leftPos);
+        Canvas.SetTop(tooltipBorder, screenY - 10);
+
+        DotPlotHoverOverlay.Children.Add(tooltipBorder);
     }
 
     /// <summary>

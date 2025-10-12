@@ -293,22 +293,7 @@ public partial class ViolinPlotControl : UserControl
             Padding = new Thickness(4, 2)
         };
 
-        var stackPanel = new StackPanel
-        {
-            Orientation = Avalonia.Layout.Orientation.Horizontal,
-            Spacing = 6
-        };
-
-        // Student ID
-        var idText = new TextBlock
-        {
-            Text = $"S{point.StudentId:D3}",
-            FontSize = 11,
-            FontWeight = FontWeight.Bold,
-            Foreground = new SolidColorBrush(Colors.White)
-        };
-
-        // Score value
+        // Score value only
         var scoreColor = Color.Parse(point.Color);
         // Lighten if too dark
         double luminance = 0.2126 * scoreColor.R + 0.7152 * scoreColor.G + 0.0722 * scoreColor.B;
@@ -328,11 +313,21 @@ public partial class ViolinPlotControl : UserControl
             Foreground = new SolidColorBrush(scoreColor)
         };
 
-        stackPanel.Children.Add(idText);
-        stackPanel.Children.Add(scoreText);
-        tooltipBorder.Child = stackPanel;
+        tooltipBorder.Child = scoreText;
 
-        Canvas.SetLeft(tooltipBorder, displayX + 20);
+        // Measure tooltip to determine positioning
+        tooltipBorder.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        double tooltipWidth = tooltipBorder.DesiredSize.Width;
+
+        // Get canvas width
+        double canvasWidth = TooltipsOverlay.Bounds.Width;
+
+        // Position on left if too close to right edge, otherwise on right
+        double leftPos = displayX + 20 + tooltipWidth > canvasWidth
+            ? displayX - tooltipWidth - 20
+            : displayX + 20;
+
+        Canvas.SetLeft(tooltipBorder, leftPos);
         Canvas.SetTop(tooltipBorder, displayY - 10);
 
         TooltipsOverlay.Children.Add(tooltipBorder);
