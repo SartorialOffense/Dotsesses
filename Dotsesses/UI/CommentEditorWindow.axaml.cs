@@ -37,7 +37,7 @@ public partial class CommentEditorWindow : Window
     {
         if (DataContext is CommentEditorViewModel vm)
         {
-            return vm.Comment;
+            return vm.Comment?.Trim();
         }
         return null;
     }
