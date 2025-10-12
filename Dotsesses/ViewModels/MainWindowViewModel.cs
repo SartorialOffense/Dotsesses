@@ -1224,7 +1224,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             "Yes" => "#00FF00",      // Green
             "No" => "#FF0000",       // Red
-            "✓✓+" => "#800080",      // Purple
+            "✓✓+" => "#BB66FF",      // Bright Purple (was too dark)
             "✓+" => "#00FF00",       // Green
             "✓" => "#FFFF00",        // Yellow
             "✓-" => "#FF0000",       // Red

@@ -10,59 +10,136 @@
         TransparencyLevelHint="Transparent">
     <Border Background="#1E1E2E" CornerRadius="12" BorderBrush="#9B59B6" BorderThickness="2">
         <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="*" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="60" />
-            </Grid.RowDefinitions>
+            <!-- Background dots spread over entire window -->
+            <Canvas>
+                <!-- More dots spread across entire window (600x400) -->
+                <!-- Top left area -->
+                <Ellipse Width="45" Height="45" Fill="#3498DB" Canvas.Left="30" Canvas.Top="25" Opacity="0.7" />
+                <Ellipse Width="18" Height="18" Fill="#9B59B6" Canvas.Left="65" Canvas.Top="50" Opacity="0.5" />
+                <Ellipse Width="30" Height="30" Fill="#E74C3C" Canvas.Left="100" Canvas.Top="15" Opacity="0.6" />
+                <Ellipse Width="22" Height="22" Fill="#1ABC9C" Canvas.Left="140" Canvas.Top="60" Opacity="0.55" />
+                <Ellipse Width="38" Height="38" Fill="#2ECC71" Canvas.Left="175" Canvas.Top="40" Opacity="0.7" />
+                <Ellipse Width="16" Height="16" Fill="#E67E22" Canvas.Left="215" Canvas.Top="10" Opacity="0.5" />
+                <Ellipse Width="42" Height="42" Fill="#F39C12" Canvas.Left="250" Canvas.Top="20" Opacity="0.65" />
+                <Ellipse Width="20" Height="20" Fill="#3498DB" Canvas.Left="295" Canvas.Top="55" Opacity="0.55" />
+                <Ellipse Width="35" Height="35" Fill="#9B59B6" Canvas.Left="330" Canvas.Top="35" Opacity="0.7" />
+                <Ellipse Width="24" Height="24" Fill="#2ECC71" Canvas.Left="375" Canvas.Top="12" Opacity="0.6" />
+                <Ellipse Width="28" Height="28" Fill="#E67E22" Canvas.Left="415" Canvas.Top="25" Opacity="0.6" />
+                <Ellipse Width="19" Height="19" Fill="#E74C3C" Canvas.Left="455" Canvas.Top="58" Opacity="0.55" />
+                <Ellipse Width="40" Height="40" Fill="#1ABC9C" Canvas.Left="490" Canvas.Top="30" Opacity="0.7" />
+                <Ellipse Width="15" Height="15" Fill="#F39C12" Canvas.Left="525" Canvas.Top="50" Opacity="0.5" />
+                <Ellipse Width="32" Height="32" Fill="#3498DB" Canvas.Left="545" Canvas.Top="20" Opacity="0.65" />
 
-            <!-- Logo/Icon -->
-            <Viewbox Grid.Row="0" Width="200" Height="200" Margin="0,40,0,0">
-                <Canvas Width="200" Height="200">
-                    <!-- Messy scattered dots with varying sizes -->
-                    <Ellipse Width="85" Height="85" Fill="#3498DB" Canvas.Left="15" Canvas.Top="65" Opacity="0.9" />
-                    <Ellipse Width="35" Height="35" Fill="#E74C3C" Canvas.Left="145" Canvas.Top="25" Opacity="0.85" />
-                    <Ellipse Width="95" Height="95" Fill="#2ECC71" Canvas.Left="70" Canvas.Top="90" Opacity="0.9" />
-                    <Ellipse Width="42" Height="42" Fill="#F39C12" Canvas.Left="8" Canvas.Top="10" Opacity="0.8" />
-                    <Ellipse Width="68" Height="68" Fill="#9B59B6" Canvas.Left="130" Canvas.Top="120" Opacity="0.9" />
-                    <Ellipse Width="30" Height="30" Fill="#E67E22" Canvas.Left="105" Canvas.Top="15" Opacity="0.75" />
-                    <Ellipse Width="55" Height="55" Fill="#1ABC9C" Canvas.Left="155" Canvas.Top="75" Opacity="0.85" />
-                    <Ellipse Width="48" Height="48" Fill="#3498DB" Canvas.Left="45" Canvas.Top="145" Opacity="0.8" />
-                    <Ellipse Width="38" Height="38" Fill="#E74C3C" Canvas.Left="110" Canvas.Top="165" Opacity="0.85" />
-                    <Ellipse Width="52" Height="52" Fill="#F39C12" Canvas.Left="165" Canvas.Top="145" Opacity="0.8" />
-                    <Ellipse Width="28" Height="28" Fill="#9B59B6" Canvas.Left="75" Canvas.Top="35" Opacity="0.75" />
-                    <Ellipse Width="45" Height="45" Fill="#2ECC71" Canvas.Left="25" Canvas.Top="155" Opacity="0.8" />
-                </Canvas>
-            </Viewbox>
+                <!-- Top-middle area -->
+                <Ellipse Width="17" Height="17" Fill="#1ABC9C" Canvas.Left="20" Canvas.Top="80" Opacity="0.5" />
+                <Ellipse Width="50" Height="50" Fill="#E74C3C" Canvas.Left="60" Canvas.Top="85" Opacity="0.75" />
+                <Ellipse Width="23" Height="23" Fill="#F39C12" Canvas.Left="120" Canvas.Top="120" Opacity="0.55" />
+                <Ellipse Width="36" Height="36" Fill="#2ECC71" Canvas.Left="150" Canvas.Top="95" Opacity="0.7" />
+                <Ellipse Width="19" Height="19" Fill="#9B59B6" Canvas.Left="195" Canvas.Top="78" Opacity="0.55" />
+                <Ellipse Width="44" Height="44" Fill="#F39C12" Canvas.Left="220" Canvas.Top="100" Opacity="0.7" />
+                <Ellipse Width="21" Height="21" Fill="#E74C3C" Canvas.Left="275" Canvas.Top="120" Opacity="0.55" />
+                <Ellipse Width="48" Height="48" Fill="#9B59B6" Canvas.Left="305" Canvas.Top="90" Opacity="0.75" />
+                <Ellipse Width="16" Height="16" Fill="#3498DB" Canvas.Left="360" Canvas.Top="80" Opacity="0.5" />
+                <Ellipse Width="38" Height="38" Fill="#1ABC9C" Canvas.Left="390" Canvas.Top="105" Opacity="0.7" />
+                <Ellipse Width="25" Height="25" Fill="#2ECC71" Canvas.Left="435" Canvas.Top="125" Opacity="0.6" />
+                <Ellipse Width="42" Height="42" Fill="#E67E22" Canvas.Left="465" Canvas.Top="95" Opacity="0.7" />
+                <Ellipse Width="18" Height="18" Fill="#1ABC9C" Canvas.Left="515" Canvas.Top="115" Opacity="0.55" />
+                <Ellipse Width="34" Height="34" Fill="#3498DB" Canvas.Left="535" Canvas.Top="100" Opacity="0.65" />
+                <Ellipse Width="20" Height="20" Fill="#E67E22" Canvas.Left="570" Canvas.Top="85" Opacity="0.55" />
 
-            <!-- Title and Version -->
-            <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="0,0,0,20">
-                <TextBlock Text="Dotsesses"
-                          FontSize="32"
-                          FontWeight="Bold"
-                          Foreground="White"
-                          HorizontalAlignment="Center"
-                          Margin="0,0,0,8" />
-                <TextBlock Text="Dot Wrangler"
-                          FontSize="14"
-                          Foreground="#B4B4C8"
-                          HorizontalAlignment="Center" />
-            </StackPanel>
+                <!-- Center area -->
+                <Ellipse Width="15" Height="15" Fill="#F39C12" Canvas.Left="10" Canvas.Top="145" Opacity="0.5" />
+                <Ellipse Width="55" Height="55" Fill="#2ECC71" Canvas.Left="25" Canvas.Top="165" Opacity="0.75" />
+                <Ellipse Width="22" Height="22" Fill="#9B59B6" Canvas.Left="75" Canvas.Top="145" Opacity="0.55" />
+                <Ellipse Width="46" Height="46" Fill="#F39C12" Canvas.Left="110" Canvas.Top="170" Opacity="0.7" />
+                <Ellipse Width="18" Height="18" Fill="#1ABC9C" Canvas.Left="165" Canvas.Top="195" Opacity="0.55" />
+                <Ellipse Width="40" Height="40" Fill="#E74C3C" Canvas.Left="195" Canvas.Top="160" Opacity="0.7" />
+                <Ellipse Width="24" Height="24" Fill="#3498DB" Canvas.Left="245" Canvas.Top="150" Opacity="0.6" />
+                <Ellipse Width="52" Height="52" Fill="#1ABC9C" Canvas.Left="270" Canvas.Top="175" Opacity="0.75" />
+                <Ellipse Width="16" Height="16" Fill="#E67E22" Canvas.Left="330" Canvas.Top="195" Opacity="0.5" />
+                <Ellipse Width="44" Height="44" Fill="#9B59B6" Canvas.Left="355" Canvas.Top="165" Opacity="0.7" />
+                <Ellipse Width="20" Height="20" Fill="#E74C3C" Canvas.Left="405" Canvas.Top="145" Opacity="0.55" />
+                <Ellipse Width="38" Height="38" Fill="#E67E22" Canvas.Left="430" Canvas.Top="170" Opacity="0.7" />
+                <Ellipse Width="19" Height="19" Fill="#2ECC71" Canvas.Left="480" Canvas.Top="195" Opacity="0.55" />
+                <Ellipse Width="48" Height="48" Fill="#3498DB" Canvas.Left="505" Canvas.Top="160" Opacity="0.75" />
+                <Ellipse Width="17" Height="17" Fill="#F39C12" Canvas.Left="560" Canvas.Top="180" Opacity="0.5" />
 
-            <!-- Loading indicator -->
-            <StackPanel Grid.Row="2" VerticalAlignment="Center" Margin="0,0,0,20">
-                <TextBlock x:Name="LoadingText"
-                          Text="Initializing Python environment..."
-                          FontSize="12"
-                          Foreground="#8B8B9E"
-                          HorizontalAlignment="Center"
-                          Margin="0,0,0,10" />
-                <ProgressBar IsIndeterminate="True"
-                            Height="4"
-                            Width="300"
-                            Foreground="#9B59B6"
-                            Background="#2E2E3E" />
-            </StackPanel>
+                <!-- Lower area -->
+                <Ellipse Width="21" Height="21" Fill="#E74C3C" Canvas.Left="15" Canvas.Top="225" Opacity="0.55" />
+                <Ellipse Width="42" Height="42" Fill="#1ABC9C" Canvas.Left="50" Canvas.Top="245" Opacity="0.7" />
+                <Ellipse Width="17" Height="17" Fill="#3498DB" Canvas.Left="105" Canvas.Top="270" Opacity="0.5" />
+                <Ellipse Width="50" Height="50" Fill="#9B59B6" Canvas.Left="135" Canvas.Top="250" Opacity="0.75" />
+                <Ellipse Width="23" Height="23" Fill="#F39C12" Canvas.Left="190" Canvas.Top="225" Opacity="0.55" />
+                <Ellipse Width="36" Height="36" Fill="#2ECC71" Canvas.Left="215" Canvas.Top="240" Opacity="0.7" />
+                <Ellipse Width="18" Height="18" Fill="#E67E22" Canvas.Left="265" Canvas.Top="270" Opacity="0.55" />
+                <Ellipse Width="45" Height="45" Fill="#E74C3C" Canvas.Left="290" Canvas.Top="255" Opacity="0.7" />
+                <Ellipse Width="20" Height="20" Fill="#1ABC9C" Canvas.Left="345" Canvas.Top="230" Opacity="0.55" />
+                <Ellipse Width="40" Height="40" Fill="#F39C12" Canvas.Left="370" Canvas.Top="245" Opacity="0.7" />
+                <Ellipse Width="16" Height="16" Fill="#9B59B6" Canvas.Left="420" Canvas.Top="270" Opacity="0.5" />
+                <Ellipse Width="48" Height="48" Fill="#E67E22" Canvas.Left="445" Canvas.Top="250" Opacity="0.75" />
+                <Ellipse Width="24" Height="24" Fill="#2ECC71" Canvas.Left="500" Canvas.Top="230" Opacity="0.6" />
+                <Ellipse Width="34" Height="34" Fill="#1ABC9C" Canvas.Left="525" Canvas.Top="240" Opacity="0.65" />
+                <Ellipse Width="19" Height="19" Fill="#E74C3C" Canvas.Left="570" Canvas.Top="265" Opacity="0.55" />
+
+                <!-- Bottom area -->
+                <Ellipse Width="22" Height="22" Fill="#2ECC71" Canvas.Left="10" Canvas.Top="305" Opacity="0.55" />
+                <Ellipse Width="38" Height="38" Fill="#3498DB" Canvas.Left="40" Canvas.Top="325" Opacity="0.7" />
+                <Ellipse Width="16" Height="16" Fill="#E67E22" Canvas.Left="85" Canvas.Top="350" Opacity="0.5" />
+                <Ellipse Width="44" Height="44" Fill="#E74C3C" Canvas.Left="125" Canvas.Top="335" Opacity="0.7" />
+                <Ellipse Width="20" Height="20" Fill="#1ABC9C" Canvas.Left="175" Canvas.Top="310" Opacity="0.55" />
+                <Ellipse Width="32" Height="32" Fill="#F39C12" Canvas.Left="200" Canvas.Top="325" Opacity="0.65" />
+                <Ellipse Width="18" Height="18" Fill="#9B59B6" Canvas.Left="245" Canvas.Top="355" Opacity="0.55" />
+                <Ellipse Width="46" Height="46" Fill="#2ECC71" Canvas.Left="275" Canvas.Top="330" Opacity="0.7" />
+                <Ellipse Width="24" Height="24" Fill="#E74C3C" Canvas.Left="330" Canvas.Top="305" Opacity="0.6" />
+                <Ellipse Width="40" Height="40" Fill="#9B59B6" Canvas.Left="355" Canvas.Top="325" Opacity="0.7" />
+                <Ellipse Width="17" Height="17" Fill="#F39C12" Canvas.Left="405" Canvas.Top="355" Opacity="0.5" />
+                <Ellipse Width="36" Height="36" Fill="#1ABC9C" Canvas.Left="425" Canvas.Top="340" Opacity="0.7" />
+                <Ellipse Width="21" Height="21" Fill="#3498DB" Canvas.Left="470" Canvas.Top="310" Opacity="0.55" />
+                <Ellipse Width="42" Height="42" Fill="#E67E22" Canvas.Left="500" Canvas.Top="330" Opacity="0.7" />
+                <Ellipse Width="19" Height="19" Fill="#2ECC71" Canvas.Left="545" Canvas.Top="360" Opacity="0.55" />
+                <Ellipse Width="30" Height="30" Fill="#3498DB" Canvas.Left="555" Canvas.Top="335" Opacity="0.65" />
+            </Canvas>
+
+            <!-- Text and progress bar in solid box -->
+            <Border Background="#1E1E2E"
+                   CornerRadius="8"
+                   BorderBrush="#9B59B6"
+                   BorderThickness="2"
+                   Padding="40,25,40,25"
+                   Margin="80,120,80,120"
+                   VerticalAlignment="Center"
+                   HorizontalAlignment="Center">
+                <StackPanel Spacing="15">
+                    <!-- Title -->
+                    <TextBlock Text="Dotsesses"
+                              FontSize="32"
+                              FontWeight="Bold"
+                              Foreground="White"
+                              HorizontalAlignment="Center" />
+
+                    <!-- Subtitle -->
+                    <TextBlock Text="Wrangle those dots!!!"
+                              FontSize="14"
+                              Foreground="#B4B4C8"
+                              HorizontalAlignment="Center"
+                              Margin="0,-10,0,0" />
+
+                    <!-- Loading Status -->
+                    <TextBlock x:Name="LoadingText"
+                              Text="Initializing Python environment..."
+                              FontSize="12"
+                              Foreground="#8B8B9E"
+                              HorizontalAlignment="Center"
+                              Margin="0,5,0,0" />
+
+                    <!-- Progress Bar -->
+                    <ProgressBar IsIndeterminate="True"
+                                Height="4"
+                                Width="300"
+                                Foreground="#9B59B6"
+                                Background="#2E2E3E" />
+                </StackPanel>
+            </Border>
         </Grid>
     </Border>
 </Window>
