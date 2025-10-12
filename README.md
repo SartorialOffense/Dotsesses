@@ -2,19 +2,48 @@
 
 A cross-platform desktop application demonstrating Avalonia UI and CSnakes (Python interop for .NET) through an interactive grade distribution visualization tool.
 
+## UI on MacOS
+
+![Main Interface](docs/screenshots/main-interface.png)
+
 ## Table of Contents
 
 - [Project Overview](#project-overview)
-- [Work In Progress](#work-in-progress)
 - [Key Features](#key-features)
+  - [Interactive Visualization](#interactive-visualization)
+  - [Data Exploration](#data-exploration)
+  - [Grade Management](#grade-management)
+- [Work In Progress](#work-in-progress)
 - [Technologies](#technologies)
+  - [Avalonia UI (11.3.6)](#avalonia-ui-1136)
+  - [CSnakes (1.2.1)](#csnakes-121)
+  - [CommunityToolkit.Mvvm (8.2.1)](#communitytoolkitmvvm-821)
+  - [OxyPlot (2.1.0)](#oxyplot-210)
 - [Architecture](#architecture)
+  - [MVVM Pattern](#mvvm-pattern)
+  - [Messaging Pattern](#messaging-pattern)
+  - [Python Integration](#python-integration)
+  - [Three-Part Plot Layout](#three-part-plot-layout)
 - [Key Interactions](#key-interactions)
+  - [Hover Synchronization](#hover-synchronization)
+  - [Tooltip Display](#tooltip-display)
+  - [Comment Editing](#comment-editing)
+  - [Cursor Dragging](#cursor-dragging)
 - [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Building the Project](#building-the-project)
+  - [Testing](#testing)
 - [Project Structure](#project-structure)
 - [Configuration](#configuration)
+  - [Python Environment](#python-environment)
+  - [Dependency Injection](#dependency-injection)
 - [Technical Highlights](#technical-highlights)
+  - [Screen-Space Hit Testing](#screen-space-hit-testing)
+  - [Dynamic Color Mapping](#dynamic-color-mapping)
+  - [Synthetic Data Generation](#synthetic-data-generation)
 - [Development Notes](#development-notes)
+  - [Compiled Bindings](#compiled-bindings)
+  - [Coordinate Systems](#coordinate-systems)
 - [License](#license)
 - [Acknowledgments](#acknowledgments)
 
@@ -23,8 +52,6 @@ A cross-platform desktop application demonstrating Avalonia UI and CSnakes (Pyth
 Dotsesses visualizes student grade distributions using interactive dotplot histograms with drill-down capabilities. The application demonstrates modern .NET desktop development with cross-platform UI, MVVM patterns, and seamless Python integration for advanced visualizations.
 
 The name is a playful take on incorrect pluralization of "dot," reflecting the application's whimsical, grade-school aesthetic.
-
-![Main Interface](docs/screenshots/main-interface.png)
 
 ## Key Features
 
