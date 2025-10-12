@@ -11,8 +11,7 @@ using Avalonia.Threading;
 using CSnakes.Runtime;
 using CommunityToolkit.Mvvm.Messaging;
 using Dotsesses.Services;
-using Dotsesses.ViewModels;
-using Dotsesses.Views;
+using Dotsesses.UI;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Dotsesses;

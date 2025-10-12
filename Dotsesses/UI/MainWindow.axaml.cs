@@ -12,10 +12,10 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.Messaging;
 using Dotsesses.Messages;
-using Dotsesses.ViewModels;
+using Dotsesses.UI;
 using OxyPlot;
 
-namespace Dotsesses.Views;
+namespace Dotsesses.UI;
 
 public partial class MainWindow : Window
 {

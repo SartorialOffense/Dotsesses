@@ -245,14 +245,14 @@ dotnet run --project Dotsesses/Dotsesses.csproj -- --snapshot
 
 ```
 Dotsesses/
-├── ViewModels/           # MVVM ViewModels with CommunityToolkit
+├── UI/                   # User interface components (ViewModels and Views)
 │   ├── MainWindowViewModel.cs      # Main dotplot and coordination
 │   ├── ViolinPlotViewModel.cs      # Python violin plot integration
 │   ├── StudentCardViewModel.cs     # Drill-down card data
-│   └── CursorViewModel.cs          # Grade cursor state
-├── Views/                # Avalonia XAML views
+│   ├── CursorViewModel.cs          # Grade cursor state
 │   ├── MainWindow.axaml            # Main application window
-│   └── ViolinPlotView.axaml        # SVG violin plot display
+│   ├── ViolinPlotControl.axaml     # SVG violin plot display
+│   └── ...                         # Other UI components
 ├── Models/               # Data models and records
 │   ├── StudentAssessment.cs        # Student score data
 │   ├── Grade.cs                    # Grade definitions

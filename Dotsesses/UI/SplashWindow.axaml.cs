@@ -1,6 +1,6 @@
 using Avalonia.Controls;
 
-namespace Dotsesses.Views;
+namespace Dotsesses.UI;
 
 public partial class SplashWindow : Window
 {

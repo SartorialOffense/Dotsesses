@@ -1,8 +1,8 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using Dotsesses.ViewModels;
+using Dotsesses.UI;
 
-namespace Dotsesses.Views;
+namespace Dotsesses.UI;
 
 public partial class CommentEditorWindow : Window
 {

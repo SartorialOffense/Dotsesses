@@ -16,9 +16,9 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Messaging;
 using Dotsesses.Messages;
 using Dotsesses.Models;
-using Dotsesses.ViewModels;
+using Dotsesses.UI;
 
-namespace Dotsesses.Views;
+namespace Dotsesses.UI;
 
 public partial class ViolinPlotControl : UserControl
 {

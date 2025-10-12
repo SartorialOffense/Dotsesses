@@ -8,7 +8,7 @@ using Dotsesses.Messages;
 using Dotsesses.Models;
 using Dotsesses.Services;
 
-namespace Dotsesses.ViewModels;
+namespace Dotsesses.UI;
 
 /// <summary>
 /// ViewModel for the violin plot visualization.

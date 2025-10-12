@@ -1,6 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace Dotsesses.ViewModels;
+namespace Dotsesses.UI;
 
 public class ViewModelBase : ObservableObject
 {

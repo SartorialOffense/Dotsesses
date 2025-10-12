@@ -1,7 +1,7 @@
 namespace Dotsesses.Tests.ViewModels;
 
 using CommunityToolkit.Mvvm.Messaging;
-using Dotsesses.ViewModels;
+using Dotsesses.UI;
 using Dotsesses.Models;
 using OxyPlot;
 

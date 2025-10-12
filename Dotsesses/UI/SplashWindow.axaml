@@ -1,6 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        x:Class="Dotsesses.Views.SplashWindow"
+        x:Class="Dotsesses.UI.SplashWindow"
         Title="Dotsesses"
         Width="600" Height="400"
         WindowStartupLocation="CenterScreen"

@@ -1,6 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace Dotsesses.ViewModels;
+namespace Dotsesses.UI;
 
 /// <summary>
 /// ViewModel for the comment editor window.

@@ -604,8 +604,7 @@ When control size changes:
 
 ```
 Dotsesses/
-├── ViewModels/       # MVVM ViewModels (MainWindow, ViolinPlot, StudentCard, etc.)
-├── Views/            # Avalonia UserControls and Windows
+├── UI/               # User interface components (ViewModels and Views)
 ├── Models/           # Data models (StudentAssessment, Score, Grade, etc.)
 ├── Calculators/      # Grade calculation logic
 ├── Services/         # ViolinPlotService, data generation, MuppetName generation

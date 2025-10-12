@@ -1,4 +1,4 @@
-namespace Dotsesses.ViewModels;
+namespace Dotsesses.UI;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using Dotsesses.Models;
