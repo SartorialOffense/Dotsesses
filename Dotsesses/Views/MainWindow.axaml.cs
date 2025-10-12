@@ -92,7 +92,7 @@ public partial class MainWindow : Window
 
         // Draw hover marker as annulus/ring in screen coordinates (6x normal size)
         double markerSize = vm.DotSize * 6;
-        double ringThickness = vm.DotSize * 0.5;
+        double ringThickness = vm.DotSize * 1.0;
         var hoverMarker = new Ellipse
         {
             Width = markerSize,
