@@ -2,16 +2,43 @@
 
 ## Overview
 
-Dotsesses visualizes aggregate student grades as dotplot histograms with drill-down
-and interactive cursors for grade cutoffs. It shows score distributions,
-individual components, and helps assign letter grades that match the school's curve policy.
+Dotsesses visualizes aggregate student grades as dotplot histograms with hover-based drill-down and interactive cursors for grade cutoffs. It shows score distributions, individual components via violin plots, and helps assign letter grades that match the school's curve policy.
 
-The name is a play on incorrect pluralization of "dot". The theme is playful and
-reminiscent of early grade school.
+The name is a play on incorrect pluralization of "dot". The theme is playful and reminiscent of early grade school.
 
 ## User Experience
 
-**Note:** All visualizations are data-driven. The number of grade regions varies based on which grades are enabled. Statistical markers (mean, standard deviations, median) are calculated from the current dataset and do not change when grades are enabled/disabled.
+**Note:** All visualizations are data-driven. The number of grade regions varies based on which grades are enabled. Statistical markers (mean, standard deviations) are calculated from the current dataset and do not change when grades are enabled/disabled.
+
+### Interaction Model
+
+The application uses **hover-based interaction** for all student data viewing:
+- Hovering over dots (in dotplot or violin plot) displays student details in the drill-down panel
+- Double-click or right-click a dot to open the comment editor
+- Hover state is synchronized between dotplot and violin plot
+- No persistent selection - hover state changes as mouse moves
+
+### Layout
+
+The main window uses a two-row layout with resizable splitters:
+
+**Top Section - Fixed 175px Height:**
+Left-to-right layout:
+1. **Color Selection Panel** - Collapsible side panel for coloring dots by attribute
+2. **Size Panel** - Collapsible side panel with slider to adjust dot size
+3. **Three-Part Dotplot** - Main visualization (Statistics, Dot Display, Grade Cursors)
+4. **Curve Compliance Panel** - Collapsible side panel showing grade distribution
+
+**Horizontal Splitter:**
+- Subtle horizontal splitter between top and bottom sections
+- Dragging adjusts only Dotplot height (Statistics and Grade Cursors areas remain fixed at ~30px each)
+
+**Bottom Section - Variable Height:**
+Left-to-right layout with vertical splitter:
+1. **Drill-Down Panel** (left, 300px initial) - Shows hovered student details
+2. **Violin Plot Panel** (right, fills remaining space) - Multi-series violin plot with swarm overlay
+
+All collapsible panels use hamburger menu icons with rotated text in collapsed state.
 
 ### Dotplot Visualization
 
@@ -37,28 +64,18 @@ Dot Display stretches horizontally to fill available width and autoscales vertic
 
 #### Hover
 
-Hovering over a point displays a formatted summary table of the student's scores and attributes, organized by name and index (if present).
-
-#### Selection
-
-Click a point to toggle selection. **Selection persists when cursors move.**
-
-**Visual Indicator:** Selected students display a crosshair (dimension = 2× dot diameter) drawn behind the dot as a non-interactive series.
+Hovering over a point displays the student's data in the drill-down panel and broadcasts a hover message to synchronize with the violin plot.
 
 #### Click Detection
 
 All click detection uses screen space (pixel) coordinates to ensure consistent behavior regardless of data scale or zoom level.
 
-**Student Selection:**
+**Student Interaction:**
 - Uses Euclidean distance in screen space (pixels)
-- Selection occurs only if click is within 10 pixels of a student dot
+- Hover detection occurs when within 10 pixels of a student dot
 - Distance formula: `sqrt((screenX - dotScreenX)² + (screenY - dotScreenY)²)`
 - Click must be within Dot Display Y-axis bounds (between DotY minimum and maximum)
-- Algorithm:
-  1. Transform click position from screen coordinates to data coordinates using Dot Display axes
-  2. For each student, transform their data position to screen coordinates
-  3. Calculate pixel distance between click and each dot
-  4. Select nearest student if distance ≤ 10 pixels
+- Double-click or right-click opens comment editor for that student
 
 **Cursor Dragging:**
 - Horizontal proximity check: cursor must be within 3 data units of click X position
@@ -76,9 +93,30 @@ All click detection uses screen space (pixel) coordinates to ensure consistent b
 
 #### Dot Appearance
 
-- **Size:** Marker radius is 4 to reduce overlap
-- **Color:** Solid white
-- **Background:** RGB(24, 24, 24) matching all other controls
+- **Size:** Adjustable via Size slider (range 2-10, default 2)
+- **Shape:**
+  - Circle (filled) for students without comments
+  - Square (hollow) for students with comments
+- **Color:**
+  - White by default (when no attribute selected)
+  - Colored by attribute value when color-by-attribute is enabled
+- **Background:** RGB(0, 0, 0) matching all other controls
+
+#### Color-by-Attribute
+
+The Color Selection panel allows coloring dots by student attributes:
+- Dropdown to select attribute (default: "[None]")
+- Color legend displays distinct values and their colors
+- Each unique attribute value gets its own color
+- Predefined color mapping for common values:
+  - "Yes" → Green (#00FF00)
+  - "No" → Red (#FF0000)
+  - "✓✓+" → Bright Purple (#BB66FF)
+  - "✓+" → Green (#00FF00)
+  - "✓" → Yellow (#FFFF00)
+  - "✓-" → Red (#FF0000)
+  - Default → White (#FFFFFF)
+- Separate series for circles and squares to preserve marker type distinction
 
 #### Grade Region Bands
 
@@ -95,58 +133,18 @@ Alternating subtle background rectangles indicate grade regions between cursors.
 - When a grade cursor is disabled, its region band disappears
 - Number of bands varies with dataset (depends on how many grades are enabled)
 
-**Example:** If grades A, A-, B+, B are enabled, there would be 5 regions with
-alternating transparency (include ends).
+**Example:** If grades A, A-, B+, B are enabled, there would be 5 regions with alternating transparency (include ends).
 
 #### Axis Display
 
 - **X-Axis:** Hidden (no line, no ticks, no labels)
 - **Y-Axis:** Hidden (no line, no ticks, no labels)
-- **Borders:** Full outline (top, left, right, bottom) with thin gray line, faint styling
+- **Borders:** Full outline (top, left, right, bottom) with thin gray line
 - **Title:** None
-
-### Layout
-
-The main window uses a multi-row layout with resizable splitters:
-
-**Top Section - Three-Part Plot:**
-A single OxyPlot instance with three separate rendering areas (subplot regions),
-all sharing the same x-axis for perfect alignment:
-
-1. **Statistics Display** (top, fixed height ~30px)
-   - Shows statistical labels (mean, standard deviations)
-   - Thin rectangle border for visual separation
-   - Fixed height, does not resize with splitter
-
-2. **Dot Display** (middle, variable height ~145px initial)
-   - Student score histogram with alternating grade region bands
-   - Height controlled by horizontal splitter below
-   - No minimum/maximum height constraints currently
-
-3. **Grade Cursors** (bottom of plot area, fixed height ~30px)
-   - Draggable vertical cursors for grade cutoffs
-   - Grade labels displayed below cursors
-   - Fixed height, does not resize with splitter
-
-All three areas maintain pixel-perfect x-axis alignment during window resize.
-
-**Right Panel:**
-- Curve Compliance grid in a collapsible SplitView pane
-  - When collapsed, plot uses full width
-  - Standard Avalonia SplitView with hamburger menu toggle
-
-**Horizontal Splitter:**
-- Subtle horizontal splitter between Dot Display and Drill Down section
-- Dragging adjusts only Dot Display height (Statistics and Grade Cursors remain fixed)
-- Compliance grid gets scrollbar when too short
-
-**Bottom Section:**
-- Selected student cards span full width below both plot and compliance grid
 
 ### Statistics Display
 
-The Statistics Display is the top rendering area of the three-part plot, showing statistical
-labels for the dataset.
+The Statistics Display is the top rendering area of the three-part plot, showing statistical labels for the dataset.
 
 #### Labels
 
@@ -175,47 +173,7 @@ labels for the dataset.
 - Color: RGB(60, 60, 60)
 - Thickness: 1px
 
-### Drill Down
-
-Selected students appear as rectangular cards with embedded tables.
-Cards flow left to right, then wrap to next row. A vertical scrollbar appears when cards don't fit.
-
-**Clear Selections Button:**
-- Positioned above the drill-down section, left-aligned
-- Displays eraser symbol (⌫) with tooltip "Clear all selections"
-- Disabled when no students are selected
-- Enabled when one or more students are selected
-
-**Card Content:**
-1. Header: MuppetName and assigned grade
-2. Two-column table (Name | Value):
-   - Scores appear first
-   - Thin light gray separator line
-   - Attributes appear below
-   - No section headers ("Scores" / "Attributes")
-   - Check symbols match text color (not dark gray)
-3. Vertical spacing between cards
-
-**Background:** RGB(24, 24, 24)
-
-### Curve Compliance
-
-The collapsible SplitView pane shows:
-- Letter grades (display as "D-" not "DMinus")
-- Target counts (from school's curve policy)
-- Current counts
-- Absolute deviation (only if > 0)
-  - Negative deviations (below target): Light blue color
-  - Positive deviations (above target): Red color
-
-**Grade Checkboxes:** Checkboxes to the left of the table control which grades are enabled. Unchecking a grade hides its cursor and recalculates binning.
-
-**Table Styling:**
-- Vertical spacing: 50% of default
-- Proper column alignment and spacing
-- Background: RGB(24, 24, 24)
-
-### Cursors
+### Grade Cursors
 
 The Grade Cursors rendering area (bottom of the three-part plot) displays draggable vertical lines for grade cutoffs.
 
@@ -259,6 +217,105 @@ When a disabled cursor is enabled:
 2. **If at edge:** Place to the left/right of existing cursors
 3. **If placement causes overlap:** Reset ALL enabled cursors to even spacing across score range (min to max)
 
+### Drill-Down Panel
+
+Left panel (300px initial width) shows details for the currently hovered student.
+
+**Card Content:**
+1. Header: MuppetName and assigned grade
+2. Two-column table (Name | Value):
+   - Scores appear first
+   - Thin light gray separator line
+   - Attributes appear below
+   - No section headers ("Scores" / "Attributes")
+   - Check symbols match text color (not dark gray)
+3. Comment section:
+   - Separator line
+   - "Comment" label
+   - Comment text box (read-only display)
+   - Instruction text: "(Double-click or right-click a dot to edit comment)"
+
+**Background:** RGB(0, 0, 0)
+
+**Border:** Blue border (#007ACC) with 2px thickness when student is hovered
+
+### Violin Plot
+
+Right panel in bottom section shows multi-series violin plot with swarm overlay.
+
+**Features:**
+- Generated via Python (matplotlib/seaborn) through CSnakes integration
+- SVG rendering with interactive dot overlays
+- Synchronized hover with dotplot
+- One series per score component (Quiz Total, Participation Total, Final)
+- Violin shows distribution density
+- Swarm dots show individual student scores
+- Hollow squares for students with comments
+- Filled circles for students without comments
+- Click/double-click opens comment editor (same as dotplot)
+
+**Interaction:**
+- Hover over dots highlights corresponding student in dotplot
+- Hover ring appears around all dots for that student (across all series)
+- Tooltips show score values
+- Dots dim when another student is hovered
+- Responsive resizing with 300ms debounce to regenerate Python plot
+
+**Technical:**
+- SVG content generated by Python module via CSnakes
+- Avalonia shapes overlay for hit testing and hover effects
+- Coordinate transformation between SVG and display space
+- Data points stored with student IDs for synchronized interaction
+
+### Curve Compliance
+
+The collapsible panel shows:
+- Letter grades (display as "D-" not "DMinus")
+- Target counts (from school's curve policy)
+- Current counts
+- Absolute deviation (only if > 0)
+  - Negative deviations (below target): Light blue color
+  - Positive deviations (above target): Red color
+
+**Grade Checkboxes:** Checkboxes to the left of the table control which grades are enabled. Unchecking a grade hides its cursor and recalculates binning.
+
+**Table Styling:**
+- Vertical spacing: 50% of default
+- Proper column alignment and spacing
+- Background: RGB(0, 0, 0)
+
+**Collapsible Behavior:**
+- Hamburger menu icon to toggle
+- Rotated "Curve Compliance" text when collapsed
+- Full table when expanded
+
+### Color Selection Panel
+
+Collapsible side panel for color-by-attribute functionality:
+- Dropdown to select attribute
+- Color legend showing value-to-color mapping
+- Hamburger menu icon to toggle
+- Rotated "Color by" text when collapsed
+
+### Size Panel
+
+Collapsible side panel for adjusting dot size:
+- Slider control (range 2-10, default 2)
+- Current size display
+- Hamburger menu icon to toggle
+- Rotated "Size" text when collapsed
+- Affects both dotplot and violin plot markers
+
+### Student Comment System
+
+Students can have multiline comments associated with them:
+- Comments stored in `StudentAssessment.Comment` property
+- Students with comments display as hollow squares (in both dotplot and violin plot)
+- Students without comments display as filled circles
+- Double-click or right-click any student dot opens comment editor dialog
+- Comments visible in drill-down panel
+- Changes trigger refresh of both dotplot and violin plot
+
 ### Export
 
 Export to Excel with columns for student ID, aggregate score, individual scores, attributes, and final grade.
@@ -297,6 +354,7 @@ classDiagram
         +Score[] Scores
         +StudentAttribute[] Attributes
         +string MuppetName
+        +string? Comment
     }
 
     class Score {
@@ -337,6 +395,7 @@ class StudentAssessment
     Score[] Scores                  // individual numeric scores
     StudentAttribute[] Attributes   // non-numeric data like "Accommodation"
     string MuppetName               // whimsical identifier (see MuppetName Generation)
+    string? Comment                 // optional multiline comment
 }
 ```
 
@@ -436,6 +495,7 @@ Each student gets a whimsical "MuppetName" instead of showing their numeric ID.
 - **UI Framework**: Avalonia 11.3.6
 - **MVVM Toolkit**: CommunityToolkit.Mvvm 8.2.1
 - **Plotting Library**: OxyPlot.Avalonia 2.1.0-Avalonia11
+- **Python Integration**: CSnakes.Runtime (for violin plot generation)
 - **Excel Export**: ClosedXML
 - **Logging**: Serilog with rolling file appenders
 - **Testing**: xUnit
@@ -447,10 +507,53 @@ Each student gets a whimsical "MuppetName" instead of showing their numeric ID.
 - Convention-based View resolution via `ViewLocator`
 - Compiled bindings enabled by default
 
+### Messaging System
+
+Uses CommunityToolkit.Mvvm.Messaging for cross-component communication:
+
+**StudentHoverMessage:**
+- Synchronizes hover state between dotplot and violin plot
+- Contains: StudentId, Source ("dotplot" or "violin"), ScreenPosition (optional)
+- Prevents infinite message loops by checking source
+
+**EditStudentMessage:**
+- Triggers comment editor dialog for a specific student
+- Sent on double-click or right-click of student dots
+
+**StudentEditedMessage:**
+- Broadcast after student comment is saved
+- Triggers refresh of dotplot and violin plot visualizations
+
+### Python Integration (CSnakes)
+
+Violin plots are generated via Python integration using CSnakes:
+
+**ViolinPlotService:**
+- Wraps Python module for violin plot generation
+- Converts .NET data structures to Python-compatible format
+- Returns SVG content and data point coordinates
+- Uses matplotlib/seaborn for plotting
+
+**Python Module (violin_swarm.py):**
+- `create_violin_swarm_plot()` function
+- Generates violin plot with swarm overlay
+- Normalizes scores to 0-1 range for consistent visualization
+- Returns tuple of (plot object, SVG string, point data)
+- Point data includes (x, y) coordinates in SVG space for hit testing
+
+**Data Flow:**
+1. MainWindowViewModel prepares series data from StudentAssessments
+2. ViolinPlotViewModel calls ViolinPlotService
+3. Service invokes Python module via CSnakes
+4. Python returns SVG and point coordinates
+5. ViolinPlotControl displays SVG and overlays interactive shapes
+6. Coordinate transformations enable hover detection and synchronization
+
 ### Dependency Injection
 
 - Use Microsoft's framework
 - Single class for dependency configuration
+- Services registered: ViolinPlotService, IMessenger, ViewModels
 
 ### Logging
 
@@ -489,15 +592,24 @@ When cursors change:
 4. Assign to ClassAssessment.Current
 5. Update compliance table
 
+#### Violin Plot Resize Behavior
+
+When control size changes:
+1. Immediately update dot positions to match SVG scaling
+2. Debounce full plot regeneration (300ms delay)
+3. Cancel previous regeneration if new resize occurs
+4. Regenerate Python plot with new dimensions when debounce completes
+
 ### Project Structure
 
 ```
 Dotsesses/
-├── ViewModels/       # MVVM ViewModels
+├── ViewModels/       # MVVM ViewModels (MainWindow, ViolinPlot, StudentCard, etc.)
 ├── Views/            # Avalonia UserControls and Windows
-├── Models/           # Data models
+├── Models/           # Data models (StudentAssessment, Score, Grade, etc.)
 ├── Calculators/      # Grade calculation logic
-├── Services/         # Data generation, MuppetName generation
+├── Services/         # ViolinPlotService, data generation, MuppetName generation
+├── Messages/         # Messenger classes (StudentHoverMessage, EditStudentMessage, etc.)
 └── Assets/           # Application resources
 ```
 
@@ -550,6 +662,10 @@ Standard curve: A, A-, B+, B, B-, C+, and C. Grades below C are not required.
 - All ViewModels must have unit tests
 - Cursor changes with validation of student grade counts
 - Cursor changes at a variety of speeds
+
+#### Services
+- ViolinPlotService integration tests (requires Python environment)
+- Test data format conversions and coordinate transformations
 
 ### View Testing
 
