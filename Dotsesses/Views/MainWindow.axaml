@@ -196,16 +196,20 @@
 
             <!-- Dotplot -->
             <Border Grid.Column="2" Background="#000000">
-                <oxy:PlotView Model="{Binding DotplotModel}">
-                    <oxy:PlotView.Cursor>
-                        <MultiBinding>
-                            <MultiBinding.Converter>
-                                <local:ResizeCursorConverter/>
-                            </MultiBinding.Converter>
-                            <Binding Path="IsResizeCursor"/>
-                        </MultiBinding>
-                    </oxy:PlotView.Cursor>
-                </oxy:PlotView>
+                <Grid>
+                    <oxy:PlotView x:Name="DotPlotView" Model="{Binding DotplotModel}">
+                        <oxy:PlotView.Cursor>
+                            <MultiBinding>
+                                <MultiBinding.Converter>
+                                    <local:ResizeCursorConverter/>
+                                </MultiBinding.Converter>
+                                <Binding Path="IsResizeCursor"/>
+                            </MultiBinding>
+                        </oxy:PlotView.Cursor>
+                    </oxy:PlotView>
+                    <!-- Canvas overlay for hover marker in screen coordinates -->
+                    <Canvas x:Name="DotPlotHoverOverlay" Background="Transparent" IsHitTestVisible="False" />
+                </Grid>
             </Border>
 
             <!-- Compliance Panel -->

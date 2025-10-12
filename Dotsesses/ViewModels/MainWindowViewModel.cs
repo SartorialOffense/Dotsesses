@@ -26,6 +26,8 @@ public partial class MainWindowViewModel : ViewModelBase
     private GradeAssigner _gradeAssigner = null!;
     private CursorViewModel? _draggingCursor;
     private bool _isDraggingCursor;
+
+    [ObservableProperty]
     private int? _hoveredStudentId;
 
     [ObservableProperty]
@@ -98,8 +100,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             if (m.Source != "dotplot") // Only respond to violin messages
             {
-                _hoveredStudentId = m.StudentId;
-                UpdateDotplotHover();
+                HoveredStudentId = m.StudentId;
             }
         });
 
@@ -1015,17 +1016,15 @@ public partial class MainWindowViewModel : ViewModelBase
             var student = FindNearestStudent(e.Position);
             int? newHoveredId = student?.Id;
 
-            if (newHoveredId != _hoveredStudentId)
+            if (newHoveredId != HoveredStudentId)
             {
-                _hoveredStudentId = newHoveredId;
+                HoveredStudentId = newHoveredId;
 
                 // Broadcast hover message to violin plot
                 _messenger.Send(new StudentHoverMessage(
-                    _hoveredStudentId,
+                    HoveredStudentId,
                     "dotplot",
                     null));
-
-                UpdateDotplotHover();
             }
 
             e.Handled = true;
@@ -1209,7 +1208,7 @@ public partial class MainWindowViewModel : ViewModelBase
         };
     }
 
-    private OxyColor GetOxyColorForValue(string value)
+    public OxyColor GetOxyColorForValue(string value)
     {
         var hexColor = GetColorForValue(value);
         // Remove # and parse
@@ -1220,70 +1219,4 @@ public partial class MainWindowViewModel : ViewModelBase
         return OxyColor.FromRgb(r, g, b);
     }
 
-    private void UpdateDotplotHover()
-    {
-        // Remove previous hover annotations
-        var hoverAnnotations = DotplotModel.Annotations
-            .Where(a => a.Tag is "hover")
-            .ToList();
-
-        foreach (var ann in hoverAnnotations)
-        {
-            DotplotModel.Annotations.Remove(ann);
-        }
-
-        if (_hoveredStudentId.HasValue)
-        {
-            var student = ClassAssessment.Assessments
-                .FirstOrDefault(s => s.Id == _hoveredStudentId.Value);
-
-            if (student != null)
-            {
-                // Find Y position (same logic as UpdateDotplotPoints)
-                var studentsAtScore = ClassAssessment.Assessments
-                    .Where(a => a.AggregateGrade == student.AggregateGrade)
-                    .OrderBy(s => s.Id)
-                    .ToList();
-
-                int index = studentsAtScore.IndexOf(student);
-                double binOffset = student.AggregateGrade % 2 == 1 ? 0.1 : 0.0;
-                double yPos = index * 2 + binOffset;
-
-                // Add larger marker annotation (3x size)
-                var hoverMarker = new EllipseAnnotation
-                {
-                    X = student.AggregateGrade,
-                    Y = yPos,
-                    Width = DotSize * 6, // 3x diameter
-                    Height = DotSize * 6,
-                    Fill = OxyColor.FromArgb(128, 70, 130, 180), // Semi-transparent blue
-                    XAxisKey = "SharedX",
-                    YAxisKey = "DotY",
-                    Tag = "hover"
-                };
-                DotplotModel.Annotations.Add(hoverMarker);
-
-                // Add tooltip annotation
-                var muppetName = ClassAssessment.MuppetNameMap
-                    .TryGetValue(student.Id, out var info) ? info.Name : "Unknown";
-
-                var tooltip = new TextAnnotation
-                {
-                    Text = $"{muppetName}\nScore: {student.AggregateGrade}",
-                    TextPosition = new DataPoint(student.AggregateGrade, yPos + 1.5),
-                    Background = OxyColors.Black,
-                    TextColor = OxyColors.White,
-                    Stroke = OxyColors.White,
-                    StrokeThickness = 1,
-                    Padding = new OxyThickness(4, 2, 4, 2), // left, top, right, bottom
-                    XAxisKey = "SharedX",
-                    YAxisKey = "DotY",
-                    Tag = "hover"
-                };
-                DotplotModel.Annotations.Add(tooltip);
-            }
-        }
-
-        DotplotModel.InvalidatePlot(true);
-    }
 }

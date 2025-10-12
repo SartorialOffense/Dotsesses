@@ -1,12 +1,17 @@
 using System;
+using System.ComponentModel;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Shapes;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Dotsesses.ViewModels;
+using OxyPlot;
 
 namespace Dotsesses.Views;
 
@@ -15,6 +20,91 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        DataContextChanged += OnDataContextChanged;
+    }
+
+    private void OnDataContextChanged(object? sender, EventArgs e)
+    {
+        if (DataContext is MainWindowViewModel vm)
+        {
+            vm.PropertyChanged += OnViewModelPropertyChanged;
+        }
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainWindowViewModel.HoveredStudentId))
+        {
+            UpdateHoverOverlay();
+        }
+    }
+
+    private void UpdateHoverOverlay()
+    {
+        // Clear existing hover markers
+        DotPlotHoverOverlay.Children.Clear();
+
+        if (DataContext is not MainWindowViewModel vm || !vm.HoveredStudentId.HasValue)
+            return;
+
+        var student = vm.ClassAssessment.Assessments
+            .FirstOrDefault(s => s.Id == vm.HoveredStudentId.Value);
+
+        if (student == null)
+            return;
+
+        // Calculate data coordinates (same logic as in ViewModel)
+        var studentsAtScore = vm.ClassAssessment.Assessments
+            .Where(a => a.AggregateGrade == student.AggregateGrade)
+            .OrderBy(s => s.Id)
+            .ToList();
+
+        int index = studentsAtScore.IndexOf(student);
+        double binOffset = student.AggregateGrade % 2 == 1 ? 0.1 : 0.0;
+        double yPos = index * 2 + binOffset;
+
+        // Convert data coordinates to screen coordinates using the same axes as the dots
+        var xAxis = DotPlotView.ActualModel?.Axes.FirstOrDefault(a => a.Key == "SharedX");
+        var yAxis = DotPlotView.ActualModel?.Axes.FirstOrDefault(a => a.Key == "DotY");
+
+        if (xAxis == null || yAxis == null)
+            return;
+
+        var screenPoint = xAxis.Transform(student.AggregateGrade, yPos, yAxis);
+        if (double.IsNaN(screenPoint.Y))
+            return;
+
+        // Get the actual dot color (same alpha as main dots)
+        Color dotColor;
+        bool colorByAttribute = !string.IsNullOrEmpty(vm.SelectedColorAttribute) && vm.SelectedColorAttribute != "[None]";
+
+        if (colorByAttribute)
+        {
+            var attributeValue = student.Attributes
+                .FirstOrDefault(attr => attr.Name == vm.SelectedColorAttribute)?.Value ?? "Unknown";
+            var oxyColor = vm.GetOxyColorForValue(attributeValue);
+            dotColor = Color.FromArgb(255, oxyColor.R, oxyColor.G, oxyColor.B);
+        }
+        else
+        {
+            dotColor = Color.FromArgb(255, 255, 255, 255); // White
+        }
+
+        // Draw hover marker as annulus/ring in screen coordinates (6x normal size)
+        double markerSize = vm.DotSize * 6;
+        double ringThickness = vm.DotSize * 0.5;
+        var hoverMarker = new Ellipse
+        {
+            Width = markerSize,
+            Height = markerSize,
+            Stroke = new SolidColorBrush(dotColor),
+            StrokeThickness = ringThickness
+        };
+
+        Canvas.SetLeft(hoverMarker, screenPoint.X - markerSize / 2);
+        Canvas.SetTop(hoverMarker, screenPoint.Y - markerSize / 2);
+
+        DotPlotHoverOverlay.Children.Add(hoverMarker);
     }
 
     /// <summary>
@@ -28,11 +118,11 @@ public partial class MainWindow : Window
         if (string.IsNullOrWhiteSpace(outputPath))
         {
             var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            outputPath = Path.Combine(Path.GetTempPath(), $"dotsesses_snapshot_{timestamp}.png");
+            outputPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"dotsesses_snapshot_{timestamp}.png");
         }
 
         // Ensure directory exists
-        var directory = Path.GetDirectoryName(outputPath);
+        var directory = System.IO.Path.GetDirectoryName(outputPath);
         if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
         {
             Directory.CreateDirectory(directory);
