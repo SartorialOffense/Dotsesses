@@ -10,6 +10,8 @@ using Avalonia.Controls.Shapes;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using CommunityToolkit.Mvvm.Messaging;
+using Dotsesses.Messages;
 using Dotsesses.ViewModels;
 using OxyPlot;
 
@@ -21,6 +23,12 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+
+        // Subscribe to edit student messages
+        WeakReferenceMessenger.Default.Register<EditStudentMessage>(this, async (r, m) =>
+        {
+            await HandleEditStudentRequest(m);
+        });
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
@@ -160,6 +168,30 @@ public partial class MainWindow : Window
         DotPlotHoverOverlay.Children.Add(tooltipBorder);
     }
 
+    private async Task HandleEditStudentRequest(EditStudentMessage message)
+    {
+        if (DataContext is not MainWindowViewModel vm)
+            return;
+
+        var student = vm.ClassAssessment.Assessments.FirstOrDefault(s => s.Id == message.StudentId);
+        if (student == null)
+            return;
+
+        var muppetName = vm.ClassAssessment.MuppetNameMap.TryGetValue(student.Id, out var info) ? info.Name : "Unknown";
+        var editor = new CommentEditorWindow(muppetName, student.Comment);
+
+        await editor.ShowDialog(this);
+
+        if (editor.WasOkClicked)
+        {
+            var newComment = editor.GetComment();
+            student.Comment = newComment;
+
+            // Broadcast that the student was edited
+            WeakReferenceMessenger.Default.Send(new StudentEditedMessage(message.StudentId));
+        }
+    }
+
     /// <summary>
     /// Saves a PNG snapshot of the window to the specified path or temp folder.
     /// </summary>
@@ -245,6 +277,29 @@ public class ResizeCursorConverter : IMultiValueConverter
         }
 
         return new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Arrow);
+    }
+
+    public object?[] ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>
+/// Converts comment string to display text (shows placeholder if empty).
+/// </summary>
+public class CommentDisplayConverter : IMultiValueConverter
+{
+    public static readonly CommentDisplayConverter Instance = new();
+
+    public object? Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (values.Count > 0 && values[0] is string comment && !string.IsNullOrWhiteSpace(comment))
+        {
+            return comment;
+        }
+
+        return "(No comment)";
     }
 
     public object?[] ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture)

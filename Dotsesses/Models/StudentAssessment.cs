@@ -13,6 +13,11 @@ public class StudentAssessment
     public string MuppetName { get; }
 
     /// <summary>
+    /// Optional multiline comment for this student.
+    /// </summary>
+    public string? Comment { get; set; }
+
+    /// <summary>
     /// Cached aggregate grade calculated on construction.
     /// </summary>
     public int AggregateGrade => _aggregateGrade;

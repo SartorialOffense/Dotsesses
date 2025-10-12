@@ -9,4 +9,5 @@ public record ViolinDataPoint(
     int StudentId,
     string Series,
     string Color,
-    double Value);
+    double Value,
+    string Comment = "");

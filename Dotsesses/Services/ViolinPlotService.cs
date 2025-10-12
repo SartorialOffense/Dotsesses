@@ -21,11 +21,13 @@ public class ViolinPlotService
     /// </summary>
     /// <param name="figSize">Figure size in inches (width, height)</param>
     /// <param name="seriesData">List of (series name, student ID to score mapping)</param>
+    /// <param name="commentMap">Map of student IDs to their comments</param>
     /// <param name="dotSize">Size of swarm dots</param>
     /// <returns>Tuple of (SVG content string, list of data points for rendering)</returns>
     public (string SvgContent, List<ViolinDataPoint> DataPoints) GeneratePlot(
         (double Width, double Height) figSize,
         List<(string SeriesName, Dictionary<string, double> Scores)> seriesData,
+        Dictionary<int, string> commentMap,
         double dotSize = 5.0)
     {
         // Convert to format expected by Python module
@@ -64,7 +66,10 @@ public class ViolinPlotService
             // Parse student ID from string format "S001" -> 1
             int studentId = int.Parse(idStr.TrimStart('S'));
 
-            dataPoints.Add(new ViolinDataPoint(x, y, studentId, series, color, value));
+            // Get comment for this student
+            string comment = commentMap.TryGetValue(studentId, out string? commentValue) ? commentValue : "";
+
+            dataPoints.Add(new ViolinDataPoint(x, y, studentId, series, color, value, comment));
         }
 
         return (svgContent, dataPoints);

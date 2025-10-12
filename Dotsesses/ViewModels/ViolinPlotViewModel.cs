@@ -23,6 +23,7 @@ public partial class ViolinPlotViewModel : ViewModelBase
     private double _displayWidth;
     private double _displayHeight;
     private List<(string SeriesName, Dictionary<string, double> Scores)> _seriesData = new();
+    private Dictionary<int, string> _commentMap = new();
     private double _dotSize = 3.0;
 
     [ObservableProperty]
@@ -52,10 +53,12 @@ public partial class ViolinPlotViewModel : ViewModelBase
     public void GeneratePlot(
         (double Width, double Height) displaySize,
         List<(string SeriesName, Dictionary<string, double> Scores)> seriesData,
+        Dictionary<int, string> commentMap,
         double dotSize = 5.0)
     {
         // Store data for later regeneration
         _seriesData = seriesData;
+        _commentMap = commentMap;
         _dotSize = dotSize;
         _displayWidth = displaySize.Width;
         _displayHeight = displaySize.Height;
@@ -69,6 +72,7 @@ public partial class ViolinPlotViewModel : ViewModelBase
         var (svgContent, dataPoints) = _violinService.GeneratePlot(
             (widthInches, heightInches),
             seriesData,
+            commentMap,
             dotSize);
 
         SvgContent = svgContent;
@@ -91,7 +95,7 @@ public partial class ViolinPlotViewModel : ViewModelBase
             return;
         }
 
-        GeneratePlot((displayWidth, displayHeight), _seriesData, _dotSize);
+        GeneratePlot((displayWidth, displayHeight), _seriesData, _commentMap, _dotSize);
     }
 
     /// <summary>

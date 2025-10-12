@@ -27,6 +27,11 @@ public partial class MainWindowViewModel : ViewModelBase
     private CursorViewModel? _draggingCursor;
     private bool _isDraggingCursor;
 
+    // Double-click tracking
+    private DateTime _lastClickTime;
+    private int? _lastClickedStudentId;
+    private const int DoubleClickThresholdMs = 500;
+
     [ObservableProperty]
     private int? _hoveredStudentId;
 
@@ -105,6 +110,13 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 HoveredStudentId = m.StudentId;
             }
+        });
+
+        // Register for student edited messages to refresh plots
+        _messenger.Register<StudentEditedMessage>(this, (r, m) =>
+        {
+            UpdateDotplotPoints();
+            InitializeViolinPlot();
         });
 
         InitializeWithSyntheticData();
@@ -312,11 +324,16 @@ public partial class MainWindowViewModel : ViewModelBase
             seriesData.Add((seriesName, seriesScores));
         }
 
+        // Create comment map
+        var commentMap = ClassAssessment.Assessments.ToDictionary(
+            a => a.Id,
+            a => a.Comment ?? "");
+
         // Generate the violin plot with default figure size
-        ViolinPlotViewModel.GeneratePlot((800, 400), seriesData, 3.0);
+        ViolinPlotViewModel.GeneratePlot((800, 400), seriesData, commentMap, 3.0);
     }
 
-    private void UpdateDotplotPoints()
+    public void UpdateDotplotPoints()
     {
         // Clear existing series (keep axes)
         DotplotModel.Series.Clear();
@@ -348,8 +365,9 @@ public partial class MainWindowViewModel : ViewModelBase
 
         if (colorByAttribute)
         {
-            // Create separate series for each attribute value
-            var seriesByValue = new Dictionary<string, ScatterSeries>();
+            // Create separate series for each attribute value, split by marker type
+            var seriesByValueCircle = new Dictionary<string, ScatterSeries>();
+            var seriesByValueSquare = new Dictionary<string, ScatterSeries>();
 
             foreach (var group in scoreGroups)
             {
@@ -375,17 +393,22 @@ public partial class MainWindowViewModel : ViewModelBase
                     var attributeValue = student.Attributes
                         .FirstOrDefault(attr => attr.Name == SelectedColorAttribute)?.Value ?? "Unknown";
 
-                    // Get or create series for this value
+                    // Determine if student has a comment
+                    bool hasComment = !string.IsNullOrEmpty(student.Comment);
+                    var seriesByValue = hasComment ? seriesByValueSquare : seriesByValueCircle;
+                    var markerType = hasComment ? MarkerType.Square : MarkerType.Circle;
+
+                    // Get or create series for this value and marker type
                     if (!seriesByValue.ContainsKey(attributeValue))
                     {
                         var color = GetOxyColorForValue(attributeValue);
                         seriesByValue[attributeValue] = new ScatterSeries
                         {
-                            MarkerType = MarkerType.Circle,
+                            MarkerType = markerType,
                             MarkerSize = markerSize,
-                            MarkerFill = color,
+                            MarkerFill = hasComment ? OxyColors.Transparent : color,
                             MarkerStroke = color,
-                            MarkerStrokeThickness = 0.5,
+                            MarkerStrokeThickness = hasComment ? 1.5 : 0.5,
                             XAxisKey = "SharedX",
                             YAxisKey = "DotY",
                             TrackerFormatString = ""
@@ -396,23 +419,39 @@ public partial class MainWindowViewModel : ViewModelBase
                 }
             }
 
-            // Add selected series first (behind), then colored series
+            // Add selected series first (behind), then colored series (circles then squares)
             DotplotModel.Series.Add(selectedSeries);
-            foreach (var series in seriesByValue.Values)
+            foreach (var series in seriesByValueCircle.Values)
+            {
+                DotplotModel.Series.Add(series);
+            }
+            foreach (var series in seriesByValueSquare.Values)
             {
                 DotplotModel.Series.Add(series);
             }
         }
         else
         {
-            // Original white dots behavior
-            var dotSeries = new ScatterSeries
+            // Original white dots behavior - separate series for circles and squares
+            var dotSeriesCircle = new ScatterSeries
             {
                 MarkerType = MarkerType.Circle,
                 MarkerSize = markerSize,
                 MarkerFill = OxyColors.White,
                 MarkerStroke = OxyColors.White,
                 MarkerStrokeThickness = 0.5,
+                XAxisKey = "SharedX",
+                YAxisKey = "DotY",
+                TrackerFormatString = ""
+            };
+
+            var dotSeriesSquare = new ScatterSeries
+            {
+                MarkerType = MarkerType.Square,
+                MarkerSize = markerSize,
+                MarkerFill = OxyColors.Transparent,
+                MarkerStroke = OxyColors.White,
+                MarkerStrokeThickness = 1.5,
                 XAxisKey = "SharedX",
                 YAxisKey = "DotY",
                 TrackerFormatString = ""
@@ -437,13 +476,23 @@ public partial class MainWindowViewModel : ViewModelBase
                         selectedSeries.Points.Add(point);
                     }
 
-                    dotSeries.Points.Add(point);
+                    // Add to appropriate series based on whether student has a comment
+                    bool hasComment = !string.IsNullOrEmpty(student.Comment);
+                    if (hasComment)
+                    {
+                        dotSeriesSquare.Points.Add(point);
+                    }
+                    else
+                    {
+                        dotSeriesCircle.Points.Add(point);
+                    }
                 }
             }
 
-            // Add selected series first (behind), then main dots
+            // Add selected series first (behind), then main dots (circles then squares)
             DotplotModel.Series.Add(selectedSeries);
-            DotplotModel.Series.Add(dotSeries);
+            DotplotModel.Series.Add(dotSeriesCircle);
+            DotplotModel.Series.Add(dotSeriesSquare);
         }
 
         DotplotModel.InvalidatePlot(true);
@@ -963,17 +1012,63 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void OnDotplotMouseDown(object? sender, OxyMouseDownEventArgs e)
     {
-        if (e.ChangedButton != OxyMouseButton.Left)
-            return;
-
         var series = DotplotModel.Series.FirstOrDefault() as ScatterSeries;
         if (series == null)
             return;
 
         // Transform click position to data coordinates
-        // This uses the series' axes (SharedX, DotY), so clickPos.Y is already in DotY space
         var clickPos = series.InverseTransform(e.Position);
-        
+
+        // Check if we're in the Dot Display region
+        var dotYAxis = DotplotModel.Axes.FirstOrDefault(a => a.Key == "DotY");
+        if (dotYAxis != null && clickPos.Y >= dotYAxis.Minimum && clickPos.Y <= dotYAxis.Maximum)
+        {
+            // Find nearest student using screen space distance
+            var nearestPoint = FindNearestStudent(e.Position);
+
+            if (nearestPoint != null)
+            {
+                var student = ClassAssessment.Assessments.FirstOrDefault(a => a.Id == nearestPoint.Id);
+
+                // Handle right-click - open comment editor
+                if (e.ChangedButton == OxyMouseButton.Right && student != null)
+                {
+                    _messenger.Send(new Messages.EditStudentMessage(student.Id));
+                    e.Handled = true;
+                    return;
+                }
+
+                // Handle left-click - check for double-click
+                if (e.ChangedButton == OxyMouseButton.Left)
+                {
+                    var now = DateTime.Now;
+                    var timeSinceLastClick = (now - _lastClickTime).TotalMilliseconds;
+
+                    if (_lastClickedStudentId == nearestPoint.Id && timeSinceLastClick < DoubleClickThresholdMs && student != null)
+                    {
+                        // Double-click detected - open comment editor
+                        _messenger.Send(new Messages.EditStudentMessage(student.Id));
+                        _lastClickedStudentId = null; // Reset to prevent triple-click
+                        e.Handled = true;
+                        return;
+                    }
+
+                    // Single click - record for potential double-click
+                    _lastClickTime = now;
+                    _lastClickedStudentId = nearestPoint.Id;
+
+                    // Toggle student selection
+                    ToggleStudent(nearestPoint);
+                    e.Handled = true;
+                    return;
+                }
+            }
+        }
+
+        // Handle left-click only for cursor dragging
+        if (e.ChangedButton != OxyMouseButton.Left)
+            return;
+
         // Check if clicking near a cursor (within 3 units horizontally)
         var nearestCursor = FindNearestCursor(clickPos.X);
         var cursorYAxis = DotplotModel.Axes.FirstOrDefault(a => a.Key == "CursorY");
@@ -983,7 +1078,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             // Transform the Y position using the cursor Y axis
             var cursorY = cursorYAxis.InverseTransform(e.Position.Y);
-            
+
             // Only allow cursor dragging if clicking in the Grade Cursors area
             if (cursorY >= cursorYAxis.Minimum && cursorY <= cursorYAxis.Maximum)
             {
@@ -995,19 +1090,6 @@ public partial class MainWindowViewModel : ViewModelBase
             }
         }
 
-        // Check if we're in the Dot Display region and find nearest student
-        var dotYAxis = DotplotModel.Axes.FirstOrDefault(a => a.Key == "DotY");
-        if (dotYAxis != null && clickPos.Y >= dotYAxis.Minimum && clickPos.Y <= dotYAxis.Maximum)
-        {
-            // Find nearest student using screen space distance
-            var nearestPoint = FindNearestStudent(e.Position);
-            
-            if (nearestPoint != null)
-            {
-                ToggleStudent(nearestPoint);
-            }
-        }
-        
         // Always mark event as handled to prevent default OxyPlot tracker behavior
         e.Handled = true;
     }

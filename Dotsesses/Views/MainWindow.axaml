@@ -441,6 +441,45 @@
                                                                         </DataTemplate>
                                                                     </ItemsControl.ItemTemplate>
                                                                 </ItemsControl>
+
+                                                                <!-- Comment Section -->
+                                                                <Border Height="1"
+                                                                       Background="#666666"
+                                                                       Margin="0,8"
+                                                                       HorizontalAlignment="Stretch"/>
+
+                                                                <TextBlock Text="Comment"
+                                                                          Foreground="#AAAAAA"
+                                                                          FontSize="11"
+                                                                          FontWeight="SemiBold"
+                                                                          Margin="0,4,0,4"/>
+
+                                                                <Border Background="#1E1E1E"
+                                                                       BorderBrush="#3F3F46"
+                                                                       BorderThickness="1"
+                                                                       CornerRadius="3"
+                                                                       Padding="6"
+                                                                       MinHeight="60">
+                                                                    <TextBlock TextWrapping="Wrap"
+                                                                              Foreground="#CCCCCC"
+                                                                              FontSize="11"
+                                                                              FontStyle="Italic">
+                                                                        <TextBlock.Text>
+                                                                            <MultiBinding>
+                                                                                <MultiBinding.Converter>
+                                                                                    <x:Static Member="local:CommentDisplayConverter.Instance"/>
+                                                                                </MultiBinding.Converter>
+                                                                                <Binding Path="Assessment.Comment"/>
+                                                                            </MultiBinding>
+                                                                        </TextBlock.Text>
+                                                                    </TextBlock>
+                                                                </Border>
+
+                                                                <TextBlock Text="(Double-click or right-click a dot to edit comment)"
+                                                                          Foreground="#666666"
+                                                                          FontSize="10"
+                                                                          FontStyle="Italic"
+                                                                          Margin="0,4,0,0"/>
                                                             </StackPanel>
                                     </Grid>
                                 </Border>
