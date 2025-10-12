@@ -284,7 +284,8 @@ Dotsesses/
 │   └── ViolinDataPoint.cs          # Python plot metadata
 ├── Services/             # Business logic and data services
 │   ├── ViolinPlotService.cs        # CSnakes Python bridge
-│   └── SyntheticStudentGenerator.cs # Test data generation
+│   ├── SyntheticStudentGenerator.cs # Test data generation
+│   └── MuppetNameGenerator.cs      # Deterministic student name assignment
 ├── Calculators/          # Grade calculation algorithms
 │   ├── InitialCutoffCalculator.cs  # Cursor placement logic
 │   ├── CutoffCountCalculator.cs    # Grade distribution counting
@@ -365,7 +366,16 @@ Realistic tri-modal distribution with correlated attributes:
 - 75% middle performers (150-225 points)
 - 20% low performers (50-125 points)
 - 60% correlation between performance and attributes
-- Whimsical "Muppet names" with emoji decorations
+
+**Muppet Name Assignment:**
+
+Each student is assigned a whimsical identifier through the `MuppetNameGenerator` service:
+- **Deterministic Generation**: Uses constant seed (42) to ensure reproducibility across sessions
+- **Student ID Mapping**: Each student ID receives a unique Muppet character name from a curated list
+- **Emoji Decoration**: 1-3 random emojis (from a pool of 50) are appended to each name for visual distinction
+- **Uniqueness Guarantee**: Names are drawn from a pool and marked as used to prevent duplicates
+- **Overflow Handling**: If the name pool is exhausted, names are reused with numeric suffixes (e.g., "Kermit 42")
+- **Privacy-Friendly**: Provides memorable identifiers without exposing actual student information
 
 ## Development Notes
 
