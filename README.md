@@ -24,6 +24,8 @@ Dotsesses visualizes student grade distributions using interactive dotplot histo
 
 The name is a playful take on incorrect pluralization of "dot," reflecting the application's whimsical, grade-school aesthetic.
 
+![Main Interface](docs/screenshots/main-interface.png)
+
 ## Key Features
 
 ### Interactive Visualization
@@ -44,10 +46,6 @@ The name is a playful take on incorrect pluralization of "dot," reflecting the a
 - **Curve Compliance**: Live tracking of grade distribution against target curve policy
 - **Enable/Disable Grades**: Toggle grade levels dynamically with automatic cursor recalculation
 - **Deviation Tracking**: Color-coded indicators for grades above/below target counts
-
-![Main Interface](docs/screenshots/main-interface.png)
-![Violin Plot](docs/screenshots/violin-plot.png)
-![Color By Attribute](docs/screenshots/color-by-attribute.png)
 
 ## Work In Progress
 
