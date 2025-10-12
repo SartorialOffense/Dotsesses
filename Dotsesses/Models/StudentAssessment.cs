@@ -26,18 +26,21 @@ public class StudentAssessment
         int id,
         IReadOnlyCollection<Score> scores,
         IReadOnlyCollection<StudentAttribute> attributes,
-        string muppetName)
+        string muppetName,
+        string aggregateScoreName = "Total")
     {
         ArgumentNullException.ThrowIfNull(scores);
         ArgumentNullException.ThrowIfNull(attributes);
         ArgumentNullException.ThrowIfNull(muppetName);
+        ArgumentNullException.ThrowIfNull(aggregateScoreName);
 
         Id = id;
         Scores = scores;
         Attributes = attributes;
         MuppetName = muppetName;
 
-        // Calculate and cache aggregate grade on construction
-        _aggregateGrade = (int)scores.Sum(s => s.Value);
+        // Look up aggregate grade by name (default "Total")
+        var aggregateScore = scores.FirstOrDefault(s => s.Name == aggregateScoreName);
+        _aggregateGrade = aggregateScore != null ? (int)aggregateScore.Value : 0;
     }
 }
