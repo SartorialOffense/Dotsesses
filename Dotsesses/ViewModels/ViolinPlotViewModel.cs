@@ -99,6 +99,26 @@ public partial class ViolinPlotViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Updates the stored data and regenerates the plot with current display dimensions.
+    /// </summary>
+    public void UpdateDataAndRegenerate(
+        List<(string SeriesName, Dictionary<string, double> Scores)> seriesData,
+        Dictionary<int, string> commentMap,
+        double dotSize)
+    {
+        // Store new data
+        _seriesData = seriesData;
+        _commentMap = commentMap;
+        _dotSize = dotSize;
+
+        // Regenerate with stored display dimensions (or defaults if not yet set)
+        var displayWidth = _displayWidth > 0 ? _displayWidth : 800;
+        var displayHeight = _displayHeight > 0 ? _displayHeight : 400;
+
+        GeneratePlot((displayWidth, displayHeight), _seriesData, _commentMap, _dotSize);
+    }
+
+    /// <summary>
     /// Handles pointer moved event for hover detection.
     /// </summary>
     public void OnPointerMoved(Point position, double displayWidth, double displayHeight)

@@ -48,9 +48,6 @@ public partial class MainWindowViewModel : ViewModelBase
     private ObservableCollection<CursorViewModel> _cursors;
 
     [ObservableProperty]
-    private ObservableCollection<StudentCardViewModel> _selectedStudents;
-
-    [ObservableProperty]
     private ObservableCollection<ComplianceRowViewModel> _complianceRows;
 
     [ObservableProperty]
@@ -83,9 +80,6 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private double _dotSize = 2.0;
 
-
-    public bool CanClearSelections => SelectedStudents.Any();
-
     public List<string> AvailableColorAttributes { get; private set; } = new();
 
     public MainWindowViewModel(IMessenger messenger, ViolinPlotViewModel violinPlotViewModel)
@@ -97,11 +91,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _cursorValidation = new CursorValidation();
 
         _cursors = new ObservableCollection<CursorViewModel>();
-        _selectedStudents = new ObservableCollection<StudentCardViewModel>();
         _complianceRows = new ObservableCollection<ComplianceRowViewModel>();
-
-        // Hook up collection changed to update command state
-        _selectedStudents.CollectionChanged += (s, e) => ClearSelectionsCommand.NotifyCanExecuteChanged();
 
         // Register for hover messages from violin plot
         _messenger.Register<StudentHoverMessage>(this, (r, m) =>
@@ -329,8 +319,8 @@ public partial class MainWindowViewModel : ViewModelBase
             a => a.Id,
             a => a.Comment ?? "");
 
-        // Generate the violin plot with default figure size
-        ViolinPlotViewModel.GeneratePlot((800, 400), seriesData, commentMap, 3.0);
+        // Update data and regenerate with stored display dimensions
+        ViolinPlotViewModel.UpdateDataAndRegenerate(seriesData, commentMap, 3.0);
     }
 
     public void UpdateDotplotPoints()
@@ -345,20 +335,6 @@ public partial class MainWindowViewModel : ViewModelBase
 
         // Use dynamic dot size from slider
         var markerSize = DotSize;
-        var crosshairSize = markerSize * 2;
-
-        // Create series for selected students (crosshairs behind)
-        var selectedSeries = new ScatterSeries
-        {
-            MarkerType = MarkerType.Cross,
-            MarkerSize = crosshairSize,
-            MarkerFill = OxyColor.FromRgb(70, 130, 180), // Medium blue
-            MarkerStroke = OxyColor.FromRgb(70, 130, 180),
-            MarkerStrokeThickness = 2,
-            XAxisKey = "SharedX",
-            YAxisKey = "DotY",
-            TrackerFormatString = "" // Disable tracker
-        };
 
         // Check if we're coloring by attribute
         bool colorByAttribute = !string.IsNullOrEmpty(SelectedColorAttribute) && SelectedColorAttribute != "[None]";
@@ -381,13 +357,6 @@ public partial class MainWindowViewModel : ViewModelBase
                     var muppetName = ClassAssessment.MuppetNameMap.TryGetValue(student.Id, out var info) ? info.Name : "Unknown";
 
                     var point = new ScatterPoint(group.Key, yPos, tag: $"{muppetName}\nScore: {student.AggregateGrade}");
-
-                    // Add to selected series if selected
-                    var isSelected = SelectedStudents.Any(s => s.Assessment.Id == student.Id);
-                    if (isSelected)
-                    {
-                        selectedSeries.Points.Add(point);
-                    }
 
                     // Get the attribute value for this student
                     var attributeValue = student.Attributes
@@ -419,8 +388,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 }
             }
 
-            // Add selected series first (behind), then colored series (circles then squares)
-            DotplotModel.Series.Add(selectedSeries);
+            // Add colored series (circles then squares)
             foreach (var series in seriesByValueCircle.Values)
             {
                 DotplotModel.Series.Add(series);
@@ -470,12 +438,6 @@ public partial class MainWindowViewModel : ViewModelBase
 
                     var point = new ScatterPoint(group.Key, yPos, tag: $"{muppetName}\nScore: {student.AggregateGrade}");
 
-                    var isSelected = SelectedStudents.Any(s => s.Assessment.Id == student.Id);
-                    if (isSelected)
-                    {
-                        selectedSeries.Points.Add(point);
-                    }
-
                     // Add to appropriate series based on whether student has a comment
                     bool hasComment = !string.IsNullOrEmpty(student.Comment);
                     if (hasComment)
@@ -489,8 +451,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 }
             }
 
-            // Add selected series first (behind), then main dots (circles then squares)
-            DotplotModel.Series.Add(selectedSeries);
+            // Add main dots (circles then squares)
             DotplotModel.Series.Add(dotSeriesCircle);
             DotplotModel.Series.Add(dotSeriesSquare);
         }
@@ -926,25 +887,6 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void ToggleStudent(StudentAssessment student)
-    {
-        var existing = SelectedStudents.FirstOrDefault(s => s.Assessment.Id == student.Id);
-        if (existing != null)
-        {
-            SelectedStudents.Remove(existing);
-        }
-        else
-        {
-            // Determine assigned grade based on current cutoffs
-            var grade = GetGradeForStudent(student);
-            SelectedStudents.Add(new StudentCardViewModel(student, grade));
-        }
-
-        // Update dotplot to reflect selection color changes
-        UpdateDotplotPoints();
-    }
-
-    [RelayCommand]
     private void ToggleCompliancePane()
     {
         IsCompliancePaneOpen = !IsCompliancePaneOpen;
@@ -974,13 +916,6 @@ public partial class MainWindowViewModel : ViewModelBase
     private void ToggleViolinPane()
     {
         IsViolinPaneOpen = !IsViolinPaneOpen;
-    }
-
-    [RelayCommand(CanExecute = nameof(CanClearSelections))]
-    private void ClearSelections()
-    {
-        SelectedStudents.Clear();
-        UpdateDotplotPoints();
     }
 
     private string GetGradeForStudent(StudentAssessment student)
@@ -1056,9 +991,6 @@ public partial class MainWindowViewModel : ViewModelBase
                     // Single click - record for potential double-click
                     _lastClickTime = now;
                     _lastClickedStudentId = nearestPoint.Id;
-
-                    // Toggle student selection
-                    ToggleStudent(nearestPoint);
                     e.Handled = true;
                     return;
                 }
