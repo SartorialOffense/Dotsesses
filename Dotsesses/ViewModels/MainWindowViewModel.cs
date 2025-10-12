@@ -937,7 +937,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private string GetGradeForStudent(StudentAssessment student)
     {
         var grade = _gradeAssigner.AssignGrade(student.AggregateGrade);
-        return grade.LetterGrade.ToString();
+        return grade.DisplayName;
     }
 
     partial void OnHoveredStudentIdChanged(int? value)

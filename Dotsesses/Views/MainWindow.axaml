@@ -357,87 +357,25 @@
 
         <!-- Bottom Row: Drill-Down and Violin Plot with Horizontal Expanders -->
         <Border Grid.Row="2" Background="#000000" BorderBrush="#3F3F46" BorderThickness="0,1,0,0">
-            <Grid ColumnDefinitions="Auto,5,*">
+            <Grid ColumnDefinitions="300,5,*">
 
                 <!-- Left: Drill-Down Panel -->
                 <Border Grid.Column="0"
                        Background="#000000"
                        BorderBrush="#3F3F46"
                        BorderThickness="0,0,1,0"
-                       Padding="0">
-                    <Grid>
-                        <!-- Collapsed State: Hamburger icon with rotated text -->
-                        <StackPanel IsVisible="{Binding !IsDrillDownPaneOpen}"
-                                   Orientation="Vertical"
-                                   Spacing="0">
-                            <Button Command="{Binding ToggleDrillDownPaneCommand}"
-                                   Width="18"
-                                   Height="18"
-                                   BorderThickness="0"
-                                   Padding="0"
-                                   Margin="3,6,3,3"
-                                   HorizontalAlignment="Center"
-                                   Cursor="Hand"
-                                   ToolTip.Tip="Drill-Down">
-                                <TextBlock Text="☰"
-                                         Foreground="White"
-                                         FontSize="14"
-                                         Margin="0"
-                                         HorizontalAlignment="Center"/>
-                            </Button>
-                            <LayoutTransformControl Margin="2,8,2,0">
-                                <LayoutTransformControl.LayoutTransform>
-                                    <RotateTransform Angle="-90"/>
-                                </LayoutTransformControl.LayoutTransform>
-                                <TextBlock Text="Drill-Down"
-                                       Foreground="White"
-                                       FontSize="14"
-                                       HorizontalAlignment="Center"/>
-                            </LayoutTransformControl>
-                        </StackPanel>
-
-                        <!-- Expanded State: Full Panel -->
-                        <Border IsVisible="{Binding IsDrillDownPaneOpen}"
-                               Padding="3,6,10,10"
-                               MinWidth="350">
-                            <Grid RowDefinitions="Auto,*">
-                                <!-- Header with hamburger -->
-                                <Grid Grid.Row="0" ColumnDefinitions="Auto,*" Margin="0,0,0,8">
-                                    <Button Grid.Column="0"
-                                           Command="{Binding ToggleDrillDownPaneCommand}"
-                                           Height="18"
-                                           Width="18"
-                                           BorderThickness="0"
-                                           Padding="0"
-                                           Margin="0"
-                                           Cursor="Hand"
-                                           ToolTip.Tip="Collapse">
-                                        <TextBlock Text="☰"
-                                                 Foreground="White"
-                                                 FontSize="14"
-                                                 Margin="0"
-                                                 HorizontalAlignment="Center"/>
-                                    </Button>
-                                    <TextBlock Grid.Column="1"
-                                             Text="Drill-Down"
-                                             Foreground="White"
-                                             FontSize="14"
-                                             Margin="8,0,0,0"
-                                             VerticalAlignment="Center"/>
-                                </Grid>
-
-                                <!-- Hovered Student (temporary preview) -->
-<Border Grid.Row="1" Background="#000000" Padding="0,0,0,10" IsVisible="{Binding HoveredStudent, Converter={x:Static ObjectConverters.IsNotNull}}">
-                                    <StackPanel>
-                                        <ContentControl Content="{Binding HoveredStudent}">
-                                            <ContentControl.ContentTemplate>
-                                                <DataTemplate x:DataType="vm:StudentCardViewModel">
-                                                    <Border Background="#1A1A1A"
-                                                           BorderBrush="#007ACC"
-                                                           BorderThickness="2"
-                                                           CornerRadius="4"
-                                                           Padding="15"
-                                                           Margin="0">
+                       Padding="3,6,3,6">
+                    <ContentControl Content="{Binding HoveredStudent}"
+                                   HorizontalAlignment="Stretch"
+                                   HorizontalContentAlignment="Stretch">
+                        <ContentControl.ContentTemplate>
+                            <DataTemplate x:DataType="vm:StudentCardViewModel">
+                                <Border Background="#1A1A1A"
+                                       BorderBrush="#007ACC"
+                                       BorderThickness="2"
+                                       CornerRadius="4"
+                                       Padding="15"
+                                       HorizontalAlignment="Stretch">
                                                         <Grid RowDefinitions="Auto,Auto">
                                                             <!-- Header: Name and Grade -->
                                                             <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
@@ -504,17 +442,11 @@
                                                                     </ItemsControl.ItemTemplate>
                                                                 </ItemsControl>
                                                             </StackPanel>
-                                                        </Grid>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ContentControl.ContentTemplate>
-                                        </ContentControl>
-                                    </StackPanel>
+                                    </Grid>
                                 </Border>
-
-</Grid>
-                        </Border>
-                    </Grid>
+                            </DataTemplate>
+                        </ContentControl.ContentTemplate>
+                    </ContentControl>
                 </Border>
 
                 <!-- Vertical Splitter -->
@@ -528,72 +460,8 @@
                        Background="#000000"
                        BorderBrush="#3F3F46"
                        BorderThickness="1,0,0,0"
-                       Padding="0">
-                    <Grid>
-                        <!-- Collapsed State: Hamburger icon with rotated text -->
-                        <StackPanel IsVisible="{Binding !IsViolinPaneOpen}"
-                                   Orientation="Vertical"
-                                   Spacing="0">
-                            <Button Command="{Binding ToggleViolinPaneCommand}"
-                                   Width="18"
-                                   Height="18"
-                                   BorderThickness="0"
-                                   Padding="0"
-                                   Margin="3,6,3,3"
-                                   HorizontalAlignment="Center"
-                                   Cursor="Hand"
-                                   ToolTip.Tip="Violin Plot">
-                                <TextBlock Text="☰"
-                                         Foreground="White"
-                                         FontSize="14"
-                                         Margin="0"
-                                         HorizontalAlignment="Center"/>
-                            </Button>
-                            <LayoutTransformControl Margin="2,8,2,0">
-                                <LayoutTransformControl.LayoutTransform>
-                                    <RotateTransform Angle="-90"/>
-                                </LayoutTransformControl.LayoutTransform>
-                                <TextBlock Text="Violin Plot"
-                                       Foreground="White"
-                                       FontSize="14"
-                                       HorizontalAlignment="Center"/>
-                            </LayoutTransformControl>
-                        </StackPanel>
-
-                        <!-- Expanded State: Full Panel -->
-                        <Border IsVisible="{Binding IsViolinPaneOpen}"
-                               Padding="3,6,10,10">
-                            <Grid RowDefinitions="Auto,*">
-                                <!-- Header with hamburger -->
-                                <Grid Grid.Row="0" ColumnDefinitions="Auto,*" Margin="0,0,0,8">
-                                    <Button Grid.Column="0"
-                                           Command="{Binding ToggleViolinPaneCommand}"
-                                           Height="18"
-                                           Width="18"
-                                           BorderThickness="0"
-                                           Padding="0"
-                                           Margin="0"
-                                           Cursor="Hand"
-                                           ToolTip.Tip="Collapse">
-                                        <TextBlock Text="☰"
-                                                 Foreground="White"
-                                                 FontSize="14"
-                                                 Margin="0"
-                                                 HorizontalAlignment="Center"/>
-                                    </Button>
-                                    <TextBlock Grid.Column="1"
-                                             Text="Violin Plot"
-                                             Foreground="White"
-                                             FontSize="14"
-                                             Margin="8,0,0,0"
-                                             VerticalAlignment="Center"/>
-                                </Grid>
-
-                                <!-- Violin Plot Control -->
-                                <local:ViolinPlotControl Grid.Row="1" DataContext="{Binding ViolinPlotViewModel}" />
-                            </Grid>
-                        </Border>
-                    </Grid>
+                       Padding="3,6,10,10">
+                    <local:ViolinPlotControl DataContext="{Binding ViolinPlotViewModel}" />
                 </Border>
             </Grid>
         </Border>
