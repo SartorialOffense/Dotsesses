@@ -78,7 +78,10 @@ The name is a playful take on incorrect pluralization of "dot," reflecting the a
 
 This project is under active development. The following features are planned for future releases:
 
-- **Data Persistence**: Import and export student assessment data from CSV and JSON file formats
+- Needs internal work - "vibe coded"
+  - Make sure use of Messenger is consistent
+  - optimize return type from violin plot script
+- **Data Persistence**: Import and export student assessment data from Excel
 - **File Operations**: Save grade distributions, curve configurations, and student comments to persistent storage
 - **Flexible Curve Policies**: Support for grade distributions using percentage ranges instead of exact count targets
 - **Configurable Color Schemes**: User-defined color mappings for custom attribute values and categorical data
