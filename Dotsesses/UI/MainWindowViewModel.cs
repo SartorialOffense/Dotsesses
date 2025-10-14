@@ -1,6 +1,9 @@
 namespace Dotsesses.UI;
 
+using System;
 using System.Collections.ObjectModel;
+using System.IO;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
@@ -18,6 +21,17 @@ using OxyPlot.Series;
 /// </summary>
 public partial class MainWindowViewModel : ViewModelBase
 {
+    private static readonly string LogPath = Path.Combine(Path.GetTempPath(), "dotsesses_startup.log");
+
+    private static void Log(string message)
+    {
+        try
+        {
+            File.AppendAllText(LogPath, $"[{DateTime.Now:HH:mm:ss.fff}] {message}\n");
+        }
+        catch { }
+    }
+
     private readonly CutoffCountCalculator _cutoffCountCalculator = null!;
     private readonly InitialCutoffCalculator _initialCutoffCalculator = null!;
     private readonly CursorValidation _cursorValidation = null!;
@@ -89,8 +103,12 @@ public partial class MainWindowViewModel : ViewModelBase
     
     public MainWindowViewModel(IMessenger messenger, ViolinPlotViewModel violinPlotViewModel)
     {
+        Log("MainWindowViewModel: Constructor started");
+
         _messenger = messenger;
         _violinPlotViewModel = violinPlotViewModel;
+
+        Log("MainWindowViewModel: Creating calculators");
         _cutoffCountCalculator = new CutoffCountCalculator();
         _initialCutoffCalculator = new InitialCutoffCalculator();
         _cursorValidation = new CursorValidation();
@@ -98,6 +116,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _cursors = new ObservableCollection<CursorViewModel>();
         _complianceRows = new ObservableCollection<ComplianceRowViewModel>();
 
+        Log("MainWindowViewModel: Registering message handlers");
         // Register for hover messages from violin plot
         _messenger.Register<StudentHoverMessage>(this, (r, m) =>
         {
@@ -114,11 +133,76 @@ public partial class MainWindowViewModel : ViewModelBase
             InitializeViolinPlot();
         });
 
+        Log("MainWindowViewModel: Initializing with synthetic data");
         InitializeWithSyntheticData();
+
+        Log("MainWindowViewModel: Initializing cursors");
         InitializeCursors();
+
+        Log("MainWindowViewModel: Initializing compliance grid");
         InitializeComplianceGrid();
+
+        Log("MainWindowViewModel: Initializing dotplot");
         InitializeDotplot();
-        InitializeViolinPlot();
+
+        Log("MainWindowViewModel: Constructor completed (violin plot deferred)");
+        // Defer violin plot initialization to avoid blocking UI on startup
+    }
+
+    /// <summary>
+    /// Initializes the violin plot asynchronously after the UI is loaded.
+    /// Call this from MainWindow.Loaded event to avoid blocking startup.
+    /// </summary>
+    public void InitializeViolinPlotAsync()
+    {
+        Log("MainWindowViewModel: Starting async violin plot initialization");
+        Task.Run(async () =>
+        {
+            Log("MainWindowViewModel: Calling InitializeViolinPlot on background thread");
+
+            // The actual violin plot generation can happen on background thread,
+            // but we need to prepare the data first
+            if (ViolinPlotViewModel == null)
+            {
+                Log("MainWindowViewModel: ViolinPlotViewModel is null, skipping");
+                return;
+            }
+
+            // Transform student assessment data into violin plot series format (CPU work, can be on background thread)
+            var seriesData = new List<(string SeriesName, Dictionary<string, double> Scores)>();
+            var firstStudent = ClassAssessment.Assessments.First();
+
+            foreach (var score in firstStudent.Scores)
+            {
+                var seriesName = score.Index.HasValue ? $"{score.Name} {score.Index}" : score.Name;
+                var seriesScores = new Dictionary<string, double>();
+
+                foreach (var assessment in ClassAssessment.Assessments)
+                {
+                    var studentScore = assessment.Scores.FirstOrDefault(s =>
+                        s.Name == score.Name && s.Index == score.Index);
+
+                    if (studentScore != null)
+                    {
+                        seriesScores[$"S{assessment.Id:D3}"] = studentScore.Value;
+                    }
+                }
+
+                seriesData.Add((seriesName, seriesScores));
+            }
+
+            var commentMap = ClassAssessment.Assessments.ToDictionary(
+                a => a.Id,
+                a => a.Comment ?? "");
+
+            // Now update the ViewModel on the UI thread
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                ViolinPlotViewModel.UpdateDataAndRegenerate(seriesData, commentMap, 3.0);
+            });
+
+            Log("MainWindowViewModel: Violin plot initialization completed");
+        });
     }
 
     private void InitializeWithSyntheticData()

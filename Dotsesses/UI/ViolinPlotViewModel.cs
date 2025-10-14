@@ -34,6 +34,13 @@ public partial class ViolinPlotViewModel : ViewModelBase
 
     public ViolinPlotViewModel(ViolinPlotService violinService, IMessenger messenger)
     {
+        try
+        {
+            var logPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "dotsesses_startup.log");
+            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}] ViolinPlotViewModel: Constructor started\n");
+        }
+        catch { }
+
         _violinService = violinService;
         _messenger = messenger;
 
@@ -45,6 +52,13 @@ public partial class ViolinPlotViewModel : ViewModelBase
                 HoveredStudentId = m.StudentId;
             }
         });
+
+        try
+        {
+            var logPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "dotsesses_startup.log");
+            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}] ViolinPlotViewModel: Constructor completed\n");
+        }
+        catch { }
     }
 
     /// <summary>

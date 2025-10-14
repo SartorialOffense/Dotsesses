@@ -10,7 +10,8 @@
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
         Title="Dotsesses - Grade Distribution"
-        Width="1200" Height="800">
+        Width="1200" Height="800"
+        WindowStartupLocation="CenterScreen">
 
     <Design.DataContext>
         <vm:MainWindowViewModel/>

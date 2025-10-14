@@ -19,21 +19,39 @@ namespace Dotsesses;
 public partial class App : Application
 {
     public static IServiceProvider? Services { get; private set; }
+    private static readonly string LogPath = Path.Combine(Path.GetTempPath(), "dotsesses_startup.log");
+
+    private static void Log(string message)
+    {
+        try
+        {
+            File.AppendAllText(LogPath, $"[{DateTime.Now:HH:mm:ss.fff}] {message}\n");
+        }
+        catch { }
+    }
 
     public override void Initialize()
     {
+        Log("App.Initialize() called");
         AvaloniaXamlLoader.Load(this);
+        Log("App.Initialize() completed");
     }
 
     public override void OnFrameworkInitializationCompleted()
     {
+        Log("=== APPLICATION STARTUP BEGIN ===");
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            Log("Desktop lifetime detected");
+
             // Avoid duplicate validations from both Avalonia and the CommunityToolkit.
             // More info: https://docs.avaloniaui.net/docs/guides/development-guides/data-validation#manage-validationplugins
             DisableAvaloniaDataAnnotationValidation();
+            Log("Data validation disabled");
 
             // Handle snapshot mode - skip splash screen
+            Log($"Snapshot mode: {StartupConfig.SnapshotMode}");
             if (StartupConfig.SnapshotMode)
             {
                 // Set up Python environment and services synchronously for snapshot mode
@@ -65,46 +83,115 @@ public partial class App : Application
             }
             else
             {
+                Log("Startup: Showing splash screen");
+
                 // Show splash screen
                 var splashWindow = new SplashWindow();
                 desktop.MainWindow = splashWindow;
                 splashWindow.Show();
 
-                // Initialize Python environment asynchronously
+                Log("Startup: Splash screen visible");
+
+                // Initialize Python environment and services asynchronously with progress reporting
                 Task.Run(async () =>
                 {
                     try
                     {
-                        // Update status
-                        await Dispatcher.UIThread.InvokeAsync(() =>
-                            splashWindow.UpdateStatus("Configuring Python environment..."));
+                        Log("Startup: Background task started");
 
-                        // Set up Python environment and services
+                        // Set up services with progress callbacks
                         var services = new ServiceCollection();
-                        ConfigureServices(services);
-                        Services = services.BuildServiceProvider();
 
-                        await Dispatcher.UIThread.InvokeAsync(() =>
-                            splashWindow.UpdateStatus("Loading main window..."));
+                        // Check if this is first-time Python setup
+                        var pythonHome = Path.Combine(AppContext.BaseDirectory, "Python", "Violin");
+                        var venvPath = Path.Combine(pythonHome, ".venv");
+                        bool isFirstTimeSetup = !Directory.Exists(venvPath);
+                        Log($"Startup: Checking for .venv at: {venvPath}");
+                        Log($"Startup: .venv exists: {Directory.Exists(venvPath)}");
+                        Log($"Startup: First-time Python setup: {isFirstTimeSetup}");
+
+                        if (isFirstTimeSetup)
+                        {
+                            await Dispatcher.UIThread.InvokeAsync(() =>
+                                splashWindow.UpdateStatus("Installing Python VENV: scipy, seaborn, matplotlib, pandas, numpy, etc..."));
+                            await Task.Delay(100); // Brief pause to ensure message is visible
+                        }
+
+                        await Task.Run(() =>
+                        {
+                            ConfigureServices(services, message =>
+                            {
+                                Log($"Progress: {message}");
+                                // For first-time setup, show a simplified message during the long setup process
+                                if (isFirstTimeSetup && message.Contains("Installing Python dependencies"))
+                                {
+                                    // This step takes the longest during first-time setup, keep the special message
+                                    Dispatcher.UIThread.InvokeAsync(() =>
+                                        splashWindow.UpdateStatus("Creating Python environment for first time use...")).Wait();
+                                }
+                                else if (!isFirstTimeSetup)
+                                {
+                                    // Show detailed progress for subsequent runs (fast)
+                                    Dispatcher.UIThread.InvokeAsync(() => splashWindow.UpdateStatus(message)).Wait();
+                                }
+                            });
+                        });
+
+                        // Build service provider (this is where Python environment is actually initialized)
+                        Log("Startup: Building service provider...");
+                        await Dispatcher.UIThread.InvokeAsync(() => splashWindow.UpdateStatus("Initializing Python runtime..."));
+
+                        Services = await Task.Run(() => services.BuildServiceProvider());
+                        Log("Startup: Service provider built");
+
+                        // Warm up ViolinPlotService on background thread to initialize Python interop
+                        // During first-time setup, this is where the actual Python environment creation happens (can take 30-60 seconds)
+                        if (isFirstTimeSetup)
+                        {
+                            await Dispatcher.UIThread.InvokeAsync(() =>
+                                splashWindow.UpdateStatus("Installing Python .venv (scipy, seaborn, matplotlib, pandas, numpy, etc.)"));
+                        }
+                        else
+                        {
+                            await Dispatcher.UIThread.InvokeAsync(() =>
+                                splashWindow.UpdateStatus("Initializing Python interop..."));
+                        }
+
+                        Log("Startup: Warming up ViolinPlotService");
+                        await Task.Run(() =>
+                        {
+                            // Force ViolinPlotService to be created, which initializes Python interop
+                            var _ = Services.GetRequiredService<ViolinPlotService>();
+                            Log("Startup: ViolinPlotService initialized");
+                        });
+
+                        await Dispatcher.UIThread.InvokeAsync(() => splashWindow.UpdateStatus("Creating main window..."));
 
                         // Small delay to show the status
-                        await Task.Delay(500);
+                        await Task.Delay(200);
+
+                        Log("Startup: Creating MainWindow");
 
                         // Switch to main window on UI thread
                         await Dispatcher.UIThread.InvokeAsync(() =>
                         {
+                            Log("Startup: Instantiating MainWindow");
                             var mainWindow = new MainWindow
                             {
                                 DataContext = Services.GetRequiredService<MainWindowViewModel>(),
                             };
 
+                            Log("Startup: Showing MainWindow");
                             desktop.MainWindow = mainWindow;
                             mainWindow.Show();
                             splashWindow.Close();
+                            Log("Startup: MainWindow visible, splash closed");
                         });
                     }
                     catch (Exception ex)
                     {
+                        Log($"ERROR: {ex.Message}");
+                        Log(ex.StackTrace ?? "No stack trace");
                         await Dispatcher.UIThread.InvokeAsync(() =>
                             splashWindow.UpdateStatus($"Error: {ex.Message}"));
                         await Task.Delay(3000);
@@ -118,18 +205,38 @@ public partial class App : Application
         base.OnFrameworkInitializationCompleted();
     }
 
-    private void ConfigureServices(ServiceCollection services)
+    /// <summary>
+    /// Configures services with optional progress reporting.
+    /// </summary>
+    /// <param name="services">Service collection to configure</param>
+    /// <param name="progressCallback">Optional callback to report progress</param>
+    private static void ConfigureServices(ServiceCollection services, Action<string>? progressCallback = null)
     {
-        // Set up Python environment
+        // Set up Python environment with progress reporting
+        Log("ConfigureServices: Starting");
+
+        progressCallback?.Invoke("Locating Python home directory...");
+        Log("ConfigureServices: Locating Python home directory");
         var pythonHome = Path.Combine(AppContext.BaseDirectory, "Python", "Violin");
         var venvPath = Path.Combine(pythonHome, ".venv");
         var pyprojectPath = Path.Combine(pythonHome, "pyproject.toml");
 
-        services.WithPython()
+        progressCallback?.Invoke("Configuring Python redistributable...");
+        Log("ConfigureServices: Configuring Python redistributable");
+        var pythonBuilder = services.WithPython()
             .WithHome(pythonHome)
-            .FromRedistributable()
-            .WithVirtualEnvironment(venvPath)
-            .WithUvInstaller(pyprojectPath);
+            .FromRedistributable();
+
+        progressCallback?.Invoke("Setting up virtual environment...");
+        Log("ConfigureServices: Setting up virtual environment");
+        pythonBuilder = pythonBuilder.WithVirtualEnvironment(venvPath);
+
+        progressCallback?.Invoke("Installing Python dependencies...");
+        Log("ConfigureServices: Installing Python dependencies");
+        pythonBuilder.WithUvInstaller(pyprojectPath);
+
+        progressCallback?.Invoke("Registering application services...");
+        Log("ConfigureServices: Registering application services");
 
         // Register messenger
         services.AddSingleton<IMessenger>(WeakReferenceMessenger.Default);
@@ -140,6 +247,8 @@ public partial class App : Application
         // Register ViewModels
         services.AddTransient<MainWindowViewModel>();
         services.AddTransient<ViolinPlotViewModel>();
+
+        Log("ConfigureServices: Completed");
     }
 
     private void DisableAvaloniaDataAnnotationValidation()

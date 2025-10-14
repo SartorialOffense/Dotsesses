@@ -23,12 +23,28 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+        Loaded += OnWindowLoaded;
 
         // Subscribe to edit student messages
         WeakReferenceMessenger.Default.Register<EditStudentMessage>(this, async (r, m) =>
         {
             await HandleEditStudentRequest(m);
         });
+    }
+
+    private void OnWindowLoaded(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] MainWindow: Loaded event fired");
+        // Initialize violin plot asynchronously after window is displayed
+        if (DataContext is MainWindowViewModel vm)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] MainWindow: Triggering async violin plot initialization");
+            vm.InitializeViolinPlotAsync();
+        }
+        else
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] MainWindow: DataContext is not MainWindowViewModel!");
+        }
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
