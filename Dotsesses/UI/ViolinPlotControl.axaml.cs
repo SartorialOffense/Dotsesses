@@ -66,8 +66,8 @@ public partial class ViolinPlotControl : UserControl
         _resizeCts = new CancellationTokenSource();
         var token = _resizeCts.Token;
 
-        // Debounce: wait 300ms after resize finishes before regenerating full plot
-        Task.Delay(300, token).ContinueWith(t =>
+        // Debounce: wait 150ms after resize finishes before regenerating full plot
+        Task.Delay(150, token).ContinueWith(t =>
         {
             if (!t.IsCanceled)
             {
