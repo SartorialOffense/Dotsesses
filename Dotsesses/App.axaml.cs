@@ -128,7 +128,8 @@ public partial class App : Application
         services.WithPython()
             .WithHome(pythonHome)
             .FromRedistributable()
-            .WithVirtualEnvironment(venvPath);
+            .WithVirtualEnvironment(venvPath)
+            .WithUvInstaller(pyprojectPath);
 
         // Register messenger
         services.AddSingleton<IMessenger>(WeakReferenceMessenger.Default);
