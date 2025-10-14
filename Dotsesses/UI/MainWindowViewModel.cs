@@ -18,10 +18,10 @@ using OxyPlot.Series;
 /// </summary>
 public partial class MainWindowViewModel : ViewModelBase
 {
-    private readonly CutoffCountCalculator _cutoffCountCalculator;
-    private readonly InitialCutoffCalculator _initialCutoffCalculator;
-    private readonly CursorValidation _cursorValidation;
-    private readonly IMessenger _messenger;
+    private readonly CutoffCountCalculator _cutoffCountCalculator = null!;
+    private readonly InitialCutoffCalculator _initialCutoffCalculator = null!;
+    private readonly CursorValidation _cursorValidation = null!;
+    private readonly IMessenger _messenger = null!;
 
     private GradeAssigner _gradeAssigner = null!;
     private CursorViewModel? _draggingCursor;
@@ -45,10 +45,10 @@ public partial class MainWindowViewModel : ViewModelBase
     private PlotModel _dotplotModel = null!;
 
     [ObservableProperty]
-    private ObservableCollection<CursorViewModel> _cursors;
+    private ObservableCollection<CursorViewModel> _cursors = null!;
 
     [ObservableProperty]
-    private ObservableCollection<ComplianceRowViewModel> _complianceRows;
+    private ObservableCollection<ComplianceRowViewModel> _complianceRows = null!;
 
     [ObservableProperty]
     private bool _isCompliancePaneOpen = true;
@@ -82,6 +82,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public List<string> AvailableColorAttributes { get; private set; } = new();
 
+    public MainWindowViewModel()
+    {
+        
+    }
+    
     public MainWindowViewModel(IMessenger messenger, ViolinPlotViewModel violinPlotViewModel)
     {
         _messenger = messenger;
