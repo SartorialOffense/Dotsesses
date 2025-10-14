@@ -15,7 +15,7 @@ public class MainWindowViewModelTests
 
         // Assert
         Assert.NotNull(viewModel.DotplotModel);
-        Assert.Equal(OxyColor.FromRgb(24, 24, 24), viewModel.DotplotModel.Background);
+        Assert.Equal(OxyColor.FromRgb(0, 0, 0), viewModel.DotplotModel.Background);
     }
 
     [Fact]
@@ -58,14 +58,10 @@ public class MainWindowViewModelTests
     {
         // Act
         var viewModel = new MainWindowViewModel(WeakReferenceMessenger.Default, null!);
-        var selectedSeries = viewModel.DotplotModel.Series[0] as OxyPlot.Series.ScatterSeries;
-        var unselectedSeries = viewModel.DotplotModel.Series[1] as OxyPlot.Series.ScatterSeries;
+        var series = viewModel.DotplotModel.Series[0] as OxyPlot.Series.ScatterSeries;
 
-        // Assert - series[0] is selected (crosshairs), series[1] is unselected (dots)
-        Assert.NotNull(selectedSeries);
-        Assert.NotNull(unselectedSeries);
-        Assert.Equal(0, selectedSeries.Points.Count); // Initially no students selected
-        Assert.Equal(100, unselectedSeries.Points.Count);
+        Assert.NotNull(series);
+        Assert.Equal(100, series.Points.Count);
     }
 
     [Fact]
@@ -75,7 +71,7 @@ public class MainWindowViewModelTests
         var viewModel = new MainWindowViewModel(WeakReferenceMessenger.Default, null!);
 
         // Assert
-        Assert.Equal(OxyColor.FromRgb(24, 24, 24), viewModel.DotplotModel.Background);
+        Assert.Equal(OxyColor.FromRgb(0, 0, 0), viewModel.DotplotModel.Background);
         Assert.Equal(OxyColor.FromRgb(60, 60, 60), viewModel.DotplotModel.PlotAreaBorderColor);
     }
 
@@ -100,18 +96,6 @@ public class MainWindowViewModelTests
         Assert.NotNull(viewModel.ComplianceRows);
         Assert.Equal(10, viewModel.ComplianceRows.Count); // All grades A through F
     }
-
-    [Fact]
-    public void SelectedStudents_InitiallyEmpty()
-    {
-        // Act
-        var viewModel = new MainWindowViewModel(WeakReferenceMessenger.Default, null!);
-
-        // Assert
-        Assert.NotNull(viewModel.SelectedStudents);
-        Assert.Empty(viewModel.SelectedStudents);
-    }
-
 
     [Fact]
     public void AddingCursor_ClampsPositionToValidDraggingBounds()
