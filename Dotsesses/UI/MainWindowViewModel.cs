@@ -213,9 +213,14 @@ public partial class MainWindowViewModel : ViewModelBase
         var students = scoreReader.Read(scoresFilePath);
 
         var curveGenerator = new DefaultCurveGenerator();
-        var defaultCurve = curveGenerator.Generate();
+        var defaultCurve = curveGenerator.GenerateRanges();
 
-        var initialCutoffs = _initialCutoffCalculator.Calculate(students, defaultCurve);
+        // Use midpoints for initial cursor placement
+        var midpointCurve = defaultCurve
+            .Select(r => new CutoffCount(r.Grade, r.Midpoint))
+            .ToList();
+
+        var initialCutoffs = _initialCutoffCalculator.Calculate(students, midpointCurve);
         var current = _cutoffCountCalculator.Calculate(students, initialCutoffs);
 
         // Get MuppetName map from generator
@@ -882,13 +887,15 @@ public partial class MainWindowViewModel : ViewModelBase
             var defaultEntry = ClassAssessment.DefaultCurve.FirstOrDefault(cc => cc.Grade.Equals(grade));
             var currentEntry = ClassAssessment.Current.FirstOrDefault(cc => cc.Grade.Equals(grade));
 
-            int targetCount = defaultEntry?.Count ?? 0;
+            int lowerTarget = defaultEntry?.LowerBound ?? 0;
+            int upperTarget = defaultEntry?.UpperBound ?? 0;
             int currentCount = currentEntry?.Count ?? 0;
             bool isEnabled = defaultEntry != null;
 
             ComplianceRows.Add(new ComplianceRowViewModel(
                 grade,
-                targetCount,
+                lowerTarget,
+                upperTarget,
                 currentCount,
                 isEnabled,
                 OnComplianceCheckboxChanged
@@ -925,12 +932,12 @@ public partial class MainWindowViewModel : ViewModelBase
             var totalStudents = ClassAssessment.Assessments.Count;
             var studentsPerGrade = totalStudents / Math.Max(1, enabledGrades.Count);
             
-            // Build curve: use DefaultCurve counts where available, otherwise distribute evenly
+            // Build curve: use DefaultCurve midpoints where available, otherwise distribute evenly
             var enabledCurve = new List<CutoffCount>();
             foreach (var grade in enabledGrades.OrderBy(g => g.Order))
             {
                 var defaultEntry = ClassAssessment.DefaultCurve.FirstOrDefault(cc => cc.Grade.Equals(grade));
-                var count = defaultEntry?.Count ?? studentsPerGrade;
+                var count = defaultEntry?.Midpoint ?? studentsPerGrade;
                 enabledCurve.Add(new CutoffCount(grade, count));
             }
 

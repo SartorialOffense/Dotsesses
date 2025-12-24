@@ -26,6 +26,31 @@ public class DefaultCurveGenerator
     }
 
     /// <summary>
+    /// Creates the standard curve with 30% variation ranges.
+    /// </summary>
+    public IReadOnlyCollection<CutoffCountRange> GenerateRanges()
+    {
+        return new List<CutoffCountRange>
+        {
+            CreateRange(new Grade(LetterGrade.A, 0), 5),
+            CreateRange(new Grade(LetterGrade.AMinus, 1), 8),
+            CreateRange(new Grade(LetterGrade.BPlus, 2), 15),
+            CreateRange(new Grade(LetterGrade.B, 3), 20),
+            CreateRange(new Grade(LetterGrade.BMinus, 4), 18),
+            CreateRange(new Grade(LetterGrade.CPlus, 5), 12),
+            CreateRange(new Grade(LetterGrade.C, 6), 10)
+        };
+    }
+
+    private static CutoffCountRange CreateRange(Grade grade, int baseCount)
+    {
+        double variation = baseCount * 0.30;
+        int lower = Math.Max(0, (int)Math.Floor(baseCount - variation));
+        int upper = (int)Math.Ceiling(baseCount + variation);
+        return new CutoffCountRange(grade, lower, upper);
+    }
+
+    /// <summary>
     /// Gets all possible grades in the system (for UI checkboxes).
     /// </summary>
     public IReadOnlyCollection<Grade> GetAllGrades()

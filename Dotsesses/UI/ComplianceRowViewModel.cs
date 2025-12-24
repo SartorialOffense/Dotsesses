@@ -12,7 +12,10 @@ public partial class ComplianceRowViewModel : ObservableObject
     private Grade _grade;
 
     [ObservableProperty]
-    private int _targetCount;
+    private int _lowerTarget;
+
+    [ObservableProperty]
+    private int _upperTarget;
 
     [ObservableProperty]
     private int _currentCount;
@@ -20,16 +23,41 @@ public partial class ComplianceRowViewModel : ObservableObject
     [ObservableProperty]
     private bool _isEnabled;
 
-    public int Deviation => Math.Abs(CurrentCount - TargetCount);
+    /// <summary>
+    /// Display format for target range: "L-U" (e.g., "3-7").
+    /// </summary>
+    public string TargetRange => $"{LowerTarget}-{UpperTarget}";
 
-    public int SignedDeviation => CurrentCount - TargetCount;
+    /// <summary>
+    /// Signed deviation from the violated bound.
+    /// Negative if below lower bound, positive if above upper bound, zero if in range.
+    /// </summary>
+    public int SignedDeviation
+    {
+        get
+        {
+            if (CurrentCount < LowerTarget) return CurrentCount - LowerTarget;
+            if (CurrentCount > UpperTarget) return CurrentCount - UpperTarget;
+            return 0;
+        }
+    }
 
-    public bool HasDeviation => Deviation > 0;
+    /// <summary>
+    /// True if current count is outside the target range.
+    /// </summary>
+    public bool HasDeviation => SignedDeviation != 0;
 
-    public ComplianceRowViewModel(Grade grade, int targetCount, int currentCount, bool isEnabled, Action? onEnabledChanged = null)
+    public ComplianceRowViewModel(
+        Grade grade,
+        int lowerTarget,
+        int upperTarget,
+        int currentCount,
+        bool isEnabled,
+        Action? onEnabledChanged = null)
     {
         _grade = grade;
-        _targetCount = targetCount;
+        _lowerTarget = lowerTarget;
+        _upperTarget = upperTarget;
         _currentCount = currentCount;
         _isEnabled = isEnabled;
         _onEnabledChanged = onEnabledChanged;
@@ -39,14 +67,20 @@ public partial class ComplianceRowViewModel : ObservableObject
 
     partial void OnCurrentCountChanged(int value)
     {
-        OnPropertyChanged(nameof(Deviation));
         OnPropertyChanged(nameof(SignedDeviation));
         OnPropertyChanged(nameof(HasDeviation));
     }
 
-    partial void OnTargetCountChanged(int value)
+    partial void OnLowerTargetChanged(int value)
     {
-        OnPropertyChanged(nameof(Deviation));
+        OnPropertyChanged(nameof(TargetRange));
+        OnPropertyChanged(nameof(SignedDeviation));
+        OnPropertyChanged(nameof(HasDeviation));
+    }
+
+    partial void OnUpperTargetChanged(int value)
+    {
+        OnPropertyChanged(nameof(TargetRange));
         OnPropertyChanged(nameof(SignedDeviation));
         OnPropertyChanged(nameof(HasDeviation));
     }

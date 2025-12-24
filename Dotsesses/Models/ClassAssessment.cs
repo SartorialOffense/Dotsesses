@@ -7,7 +7,7 @@ public class ClassAssessment
 {
     public IReadOnlyCollection<StudentAssessment> Assessments { get; }
     public IReadOnlyCollection<GradeCutoff> CurrentCutoffs { get; set; }
-    public IReadOnlyCollection<CutoffCount> DefaultCurve { get; }
+    public IReadOnlyCollection<CutoffCountRange> DefaultCurve { get; }
     public IReadOnlyCollection<CutoffCount> Current { get; set; }
     public Dictionary<string, IReadOnlyCollection<GradeCutoff>> SavedCutoffs { get; }
     public Dictionary<int, MuppetNameInfo> MuppetNameMap { get; }
@@ -15,7 +15,7 @@ public class ClassAssessment
     public ClassAssessment(
         IReadOnlyCollection<StudentAssessment> assessments,
         IReadOnlyCollection<GradeCutoff> currentCutoffs,
-        IReadOnlyCollection<CutoffCount> defaultCurve,
+        IReadOnlyCollection<CutoffCountRange> defaultCurve,
         IReadOnlyCollection<CutoffCount> current,
         Dictionary<int, MuppetNameInfo> muppetNameMap)
     {

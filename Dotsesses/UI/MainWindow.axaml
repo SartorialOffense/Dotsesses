@@ -300,9 +300,9 @@
                                                           VerticalAlignment="Center"
                                                           FontWeight="Medium"/>
 
-                                                <!-- Target Count -->
+                                                <!-- Target Range -->
                                                 <TextBlock Grid.Column="2"
-                                                          Text="{Binding TargetCount}"
+                                                          Text="{Binding TargetRange}"
                                                           Foreground="#CCCCCC"
                                                           Margin="5,0"
                                                           VerticalAlignment="Center"
