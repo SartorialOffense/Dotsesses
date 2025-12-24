@@ -207,8 +207,10 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void InitializeWithSyntheticData()
     {
-        var generator = new SyntheticStudentGenerator();
-        var students = generator.Generate();
+        // Read real scores from CSV file
+        const string scoresFilePath = "/Users/trumbjd/Dev/Dotsesses/Dotsesses/2024 Final Scores.csv";
+        var scoreReader = new ScoreReader();
+        var students = scoreReader.Read(scoresFilePath);
 
         var curveGenerator = new DefaultCurveGenerator();
         var defaultCurve = curveGenerator.Generate();
