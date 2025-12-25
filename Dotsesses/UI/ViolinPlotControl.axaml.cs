@@ -565,6 +565,11 @@ public partial class ViolinPlotControl : UserControl
         }
     }
 
+    // Barbell cursor state
+    private CursorViewModel? _draggingBarbellCursor;
+    private bool _isDraggingBarbell;
+    private const double BarbellHandleSize = 8;
+
     private void RenderRegionBands()
     {
         RegionBandsOverlay.Children.Clear();
@@ -575,12 +580,11 @@ public partial class ViolinPlotControl : UserControl
         var width = RegionBandsOverlay.Bounds.Width;
         if (height <= 0 || width <= 0) return;
 
-        // Get the Total series bounds - only draw bands over the Total column
+        // Get the Total series bounds - only draw barbells over the Total column
         var totalBounds = vm.GetTotalSeriesDisplayBounds(width, height);
         if (totalBounds == null) return;
 
         var (bandLeft, bandRight) = totalBounds.Value;
-        var bandWidth = bandRight - bandLeft;
 
         var enabledCursors = vm.Cursors.Where(c => c.IsEnabled).OrderBy(c => c.Score).ToList();
         if (!enabledCursors.Any()) return;
@@ -590,26 +594,125 @@ public partial class ViolinPlotControl : UserControl
 
         if (!cursorsWithLines.Any()) return;
 
-        var lineBrush = new SolidColorBrush(Color.FromArgb(0x80, 255, 255, 255));
+        var lineBrush = Brushes.White;
 
-        // Draw horizontal lines at each cursor position (grade boundary)
+        // Draw barbell cursors at each grade boundary
         foreach (var cursor in cursorsWithLines)
         {
             var y = vm.ScoreToDisplayY(cursor.Score, height);
 
+            // Draw the horizontal line (bar)
             var line = new Line
             {
                 StartPoint = new Point(bandLeft, y),
                 EndPoint = new Point(bandRight, y),
                 Stroke = lineBrush,
-                StrokeThickness = 1
+                StrokeThickness = 1,
+                Tag = cursor,
+                IsHitTestVisible = false
             };
             RegionBandsOverlay.Children.Add(line);
+
+            // Left handle (square) - right edge touches line
+            var leftHandle = new Rectangle
+            {
+                Width = BarbellHandleSize,
+                Height = BarbellHandleSize,
+                Fill = lineBrush,
+                Tag = cursor,
+                Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.SizeNorthSouth)
+            };
+            Canvas.SetLeft(leftHandle, bandLeft - BarbellHandleSize);
+            Canvas.SetTop(leftHandle, y - BarbellHandleSize / 2);
+            RegionBandsOverlay.Children.Add(leftHandle);
+
+            // Right handle (square) - left edge touches line
+            var rightHandle = new Rectangle
+            {
+                Width = BarbellHandleSize,
+                Height = BarbellHandleSize,
+                Fill = lineBrush,
+                Tag = cursor,
+                Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.SizeNorthSouth)
+            };
+            Canvas.SetLeft(rightHandle, bandRight);
+            Canvas.SetTop(rightHandle, y - BarbellHandleSize / 2);
+            RegionBandsOverlay.Children.Add(rightHandle);
+        }
+    }
+
+    private void OnBarbellPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (DataContext is not ViolinPlotViewModel vm || vm.Cursors == null) return;
+
+        var point = e.GetCurrentPoint(RegionBandsOverlay);
+        if (!point.Properties.IsLeftButtonPressed) return;
+
+        // Check if we clicked on a handle
+        var clickedElement = RegionBandsOverlay.InputHitTest(point.Position);
+        if (clickedElement is Rectangle rect && rect.Tag is CursorViewModel cursor)
+        {
+            _draggingBarbellCursor = cursor;
+            _isDraggingBarbell = true;
+            e.Pointer.Capture(RegionBandsOverlay);
+            e.Handled = true;
+        }
+    }
+
+    private void OnBarbellPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (!_isDraggingBarbell || _draggingBarbellCursor == null) return;
+        if (DataContext is not ViolinPlotViewModel vm || vm.Cursors == null) return;
+
+        var height = RegionBandsOverlay.Bounds.Height;
+        if (height <= 0) return;
+
+        var point = e.GetCurrentPoint(RegionBandsOverlay);
+        var mouseY = point.Position.Y;
+
+        // Convert display Y to score using plot area bounds
+        var plotTop = vm.GetPlotAreaTopFraction() * height;
+        var plotBottom = vm.GetPlotAreaBottomFraction() * height;
+        var plotHeight = plotBottom - plotTop;
+
+        if (plotHeight <= 0) return;
+
+        // Clamp mouseY to plot area
+        mouseY = Math.Max(plotTop, Math.Min(plotBottom, mouseY));
+
+        // Convert Y to normalized value (inverted: top = 1.0, bottom = 0.0)
+        var normalized = 1.0 - (mouseY - plotTop) / plotHeight;
+
+        // Convert to raw score
+        var newScore = vm.NormalizedToScore(normalized);
+
+        // Build cutoffs with proposed position
+        var allCutoffs = vm.Cursors
+            .Where(c => c.IsEnabled)
+            .Select(c => new GradeCutoff(c.Grade, c == _draggingBarbellCursor ? newScore : c.Score))
+            .ToList();
+
+        // Validate movement
+        var validated = _cursorValidation.ValidateMovement(
+            _draggingBarbellCursor.Grade, newScore, allCutoffs, vm.MinScore - 1, vm.MaxScore + 1);
+
+        _draggingBarbellCursor.Score = validated;
+        e.Handled = true;
+    }
+
+    private void OnBarbellPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (_isDraggingBarbell)
+        {
+            e.Pointer.Capture(null);
+            _isDraggingBarbell = false;
+            _draggingBarbellCursor = null;
+            e.Handled = true;
         }
     }
 
     /// <summary>
-    /// Renders the cursor column with horizontal cursor lines and grade labels.
+    /// Renders the cursor column with grade labels only (cursor lines replaced by barbells).
     /// </summary>
     private void RenderCursorColumn()
     {
@@ -626,23 +729,6 @@ public partial class ViolinPlotControl : UserControl
 
         var lowestGrade = enabledCursors.OrderByDescending(c => c.Grade.Order).FirstOrDefault();
         var cursorsWithLines = enabledCursors.Where(c => c != lowestGrade).OrderBy(c => c.Score).ToList();
-
-        // Draw horizontal dashed cursor lines (excluding lowest grade)
-        var lineBrush = new SolidColorBrush(Colors.White);
-        foreach (var cursor in cursorsWithLines)
-        {
-            var y = vm.ScoreToDisplayY(cursor.Score, height);
-
-            var line = new Line
-            {
-                StartPoint = new Point(0, y),
-                EndPoint = new Point(width, y),
-                Stroke = lineBrush,
-                StrokeThickness = 2,
-                StrokeDashArray = new Avalonia.Collections.AvaloniaList<double> { 4, 2 }
-            };
-            CursorColumnCanvas.Children.Add(line);
-        }
 
         // Draw grade labels
         // Top grade (A): locked just below its cursor line

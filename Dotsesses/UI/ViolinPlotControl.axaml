@@ -14,8 +14,12 @@
             <!-- SVG Background -->
             <Image x:Name="SvgView" Stretch="Fill" />
 
-            <!-- Canvas for grade region bands -->
-            <Canvas x:Name="RegionBandsOverlay" IsHitTestVisible="False" />
+            <!-- Canvas for grade boundary cursors (barbells) -->
+            <Canvas x:Name="RegionBandsOverlay"
+                    PointerPressed="OnBarbellPointerPressed"
+                    PointerMoved="OnBarbellPointerMoved"
+                    PointerReleased="OnBarbellPointerReleased"
+                    Background="Transparent" />
 
             <!-- Canvas for swarm point overlays -->
             <Canvas x:Name="PointsOverlay" />
