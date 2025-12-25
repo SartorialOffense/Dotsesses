@@ -139,6 +139,9 @@ public partial class MainWindowViewModel : ViewModelBase
         Log("MainWindowViewModel: Initializing cursors");
         InitializeCursors();
 
+        Log("MainWindowViewModel: Wiring cursors to violin plot");
+        WireCursorsToViolinPlot();
+
         Log("MainWindowViewModel: Initializing compliance grid");
         InitializeComplianceGrid();
 
@@ -862,6 +865,8 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
+    private bool _isUpdatingCursorsFromSubscription;
+
     private void InitializeCursors()
     {
         // Create cursors for ALL grades, enabled based on DefaultCurve
@@ -874,8 +879,38 @@ public partial class MainWindowViewModel : ViewModelBase
             bool isEnabled = defaultGrades.Contains(grade);
             int score = cutoff?.Score ?? 0; // Will be calculated when enabled
 
-            Cursors.Add(new CursorViewModel(grade, score, isEnabled));
+            var cursor = new CursorViewModel(grade, score, isEnabled);
+            cursor.PropertyChanged += OnCursorPropertyChanged;
+            Cursors.Add(cursor);
         }
+    }
+
+    private void OnCursorPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (_isUpdatingCursorsFromSubscription) return; // Prevent re-entrancy
+
+        if (e.PropertyName == nameof(CursorViewModel.Score))
+        {
+            // Cursor was moved (possibly from violin plot)
+            _isUpdatingCursorsFromSubscription = true;
+            try
+            {
+                UpdateCursors(); // Refresh dot plot annotations
+            }
+            finally
+            {
+                _isUpdatingCursorsFromSubscription = false;
+            }
+        }
+    }
+
+    private void WireCursorsToViolinPlot()
+    {
+        if (ViolinPlotViewModel == null) return;
+
+        ViolinPlotViewModel.Cursors = Cursors;
+        ViolinPlotViewModel.MinScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade);
+        ViolinPlotViewModel.MaxScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade);
     }
 
     private void InitializeComplianceGrid()
@@ -1181,8 +1216,16 @@ public partial class MainWindowViewModel : ViewModelBase
 
         var validatedScore = _cursorValidation.ValidateMovement(_draggingCursor.Grade, newScore, allCutoffs, (int)minBound, (int)maxBound);
 
-        _draggingCursor.Score = validatedScore;
-        UpdateCursors();
+        _isUpdatingCursorsFromSubscription = true;
+        try
+        {
+            _draggingCursor.Score = validatedScore;
+            UpdateCursors();
+        }
+        finally
+        {
+            _isUpdatingCursorsFromSubscription = false;
+        }
         e.Handled = true;
     }
 

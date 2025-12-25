@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
@@ -14,6 +15,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Messaging;
+using Dotsesses.Calculators;
 using Dotsesses.Messages;
 using Dotsesses.Models;
 using Dotsesses.UI;
@@ -29,6 +31,11 @@ public partial class ViolinPlotControl : UserControl
     private int? _lastClickedStudentId;
     private const int DoubleClickThresholdMs = 500;
 
+    // Cursor dragging state
+    private CursorViewModel? _draggingCursor;
+    private bool _isDraggingCursor;
+    private readonly CursorValidation _cursorValidation = new();
+
     public ViolinPlotControl()
     {
         InitializeComponent();
@@ -38,6 +45,9 @@ public partial class ViolinPlotControl : UserControl
 
         // Add click handler to the points overlay
         PointsOverlay.PointerPressed += OnPointsOverlayClick;
+
+        // Render cursor column when its layout is updated (bounds become available)
+        CursorColumnCanvas.LayoutUpdated += OnCursorColumnLayoutUpdated;
     }
 
     private void OnLoaded(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -46,6 +56,30 @@ public partial class ViolinPlotControl : UserControl
         if (DataContext is ViolinPlotViewModel vm && !string.IsNullOrEmpty(vm.SvgContent))
         {
             RenderPointsAsShapes();
+            RenderRegionBands();
+            RenderCursorColumn();
+        }
+    }
+
+    private bool _cursorColumnHasRenderedOnce;
+    private double _lastCursorColumnHeight;
+
+    private void OnCursorColumnLayoutUpdated(object? sender, EventArgs e)
+    {
+        var height = CursorColumnCanvas.Bounds.Height;
+        var width = CursorColumnCanvas.Bounds.Width;
+
+        // Render when canvas gets valid bounds for the first time, or when height changes significantly
+        if (height > 0 && width > 0 && DataContext is ViolinPlotViewModel vm && vm.Cursors != null && vm.Cursors.Count > 0)
+        {
+            // Only re-render if this is the first time or height changed significantly (avoid excessive renders)
+            if (!_cursorColumnHasRenderedOnce || Math.Abs(height - _lastCursorColumnHeight) > 1)
+            {
+                _cursorColumnHasRenderedOnce = true;
+                _lastCursorColumnHeight = height;
+                RenderCursorColumn();
+                Console.WriteLine($"[ViolinPlot] Cursor column rendered via LayoutUpdated: {width}x{height}");
+            }
         }
     }
 
@@ -54,12 +88,16 @@ public partial class ViolinPlotControl : UserControl
         // Immediately reposition dots to match SVG scaling during resize
         if (DataContext is ViolinPlotViewModel vm && !string.IsNullOrEmpty(vm.SvgContent))
         {
-            var controlBounds = Bounds;
-            if (controlBounds.Width > 0 && controlBounds.Height > 0)
+            var plotBounds = ViolinPlotArea.Bounds;
+            if (plotBounds.Width > 0 && plotBounds.Height > 0)
             {
-                UpdateDotPositions(controlBounds.Width, controlBounds.Height);
+                UpdateDotPositions(plotBounds.Width, plotBounds.Height);
             }
         }
+
+        // Re-render region bands and cursor column on resize
+        RenderRegionBands();
+        RenderCursorColumn();
 
         // Cancel previous resize operation
         _resizeCts?.Cancel();
@@ -75,9 +113,9 @@ public partial class ViolinPlotControl : UserControl
                 {
                     if (!token.IsCancellationRequested && DataContext is ViolinPlotViewModel viewModel)
                     {
-                        var controlBounds = Bounds;
-                        var displayWidth = controlBounds.Width > 0 ? controlBounds.Width : 800;
-                        var displayHeight = controlBounds.Height > 0 ? controlBounds.Height : 400;
+                        var plotBounds = ViolinPlotArea.Bounds;
+                        var displayWidth = plotBounds.Width > 0 ? plotBounds.Width : 800;
+                        var displayHeight = plotBounds.Height > 0 ? plotBounds.Height : 400;
 
                         Console.WriteLine($"[ViolinPlot] Regenerating plot: {displayWidth}x{displayHeight}");
 
@@ -107,6 +145,38 @@ public partial class ViolinPlotControl : UserControl
             {
                 UpdateSvgDisplay(vm.SvgContent);
             }
+
+            // Subscribe to cursor changes
+            SubscribeToCursors(vm);
+
+            vm.PropertyChanged += (s, args) =>
+            {
+                if (args.PropertyName == nameof(ViolinPlotViewModel.Cursors))
+                {
+                    SubscribeToCursors(vm);
+                    RenderRegionBands();
+                }
+            };
+        }
+    }
+
+    private void SubscribeToCursors(ViolinPlotViewModel vm)
+    {
+        if (vm.Cursors == null) return;
+
+        foreach (var cursor in vm.Cursors)
+        {
+            cursor.PropertyChanged += OnCursorPropertyChanged;
+        }
+    }
+
+    private void OnCursorPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(CursorViewModel.Score) ||
+            e.PropertyName == nameof(CursorViewModel.IsEnabled))
+        {
+            RenderRegionBands();    // Update Canvas bands
+            RenderCursorColumn();   // Update Canvas cursor column
         }
     }
 
@@ -129,9 +199,9 @@ public partial class ViolinPlotControl : UserControl
         if (DataContext is ViolinPlotViewModel vm)
         {
             var position = e.GetPosition(this);
-            var controlBounds = Bounds;
-            var displayWidth = controlBounds.Width > 0 ? controlBounds.Width : 800;
-            var displayHeight = controlBounds.Height > 0 ? controlBounds.Height : 400;
+            var plotBounds = ViolinPlotArea.Bounds;
+            var displayWidth = plotBounds.Width > 0 ? plotBounds.Width : 800;
+            var displayHeight = plotBounds.Height > 0 ? plotBounds.Height : 400;
             vm.OnPointerMoved(position, displayWidth, displayHeight);
         }
     }
@@ -158,7 +228,9 @@ public partial class ViolinPlotControl : UserControl
             Dispatcher.UIThread.Post(() =>
             {
                 RenderPointsAsShapes();
-                Console.WriteLine("[ViolinPlot] Points re-rendered after SVG update");
+                RenderRegionBands();
+                RenderCursorColumn();
+                Console.WriteLine("[ViolinPlot] Points, bands, and cursors re-rendered after SVG update");
             }, Avalonia.Threading.DispatcherPriority.Background);
         }
         catch (Exception ex)
@@ -180,11 +252,11 @@ public partial class ViolinPlotControl : UserControl
             return;
 
         // Get actual rendered bounds - use control bounds as the display area
-        var controlBounds = Bounds;
-        var displayWidth = controlBounds.Width > 0 ? controlBounds.Width : 800;
-        var displayHeight = controlBounds.Height > 0 ? controlBounds.Height : 400;
+        var plotBounds = ViolinPlotArea.Bounds;
+        var displayWidth = plotBounds.Width > 0 ? plotBounds.Width : 800;
+        var displayHeight = plotBounds.Height > 0 ? plotBounds.Height : 400;
 
-        Console.WriteLine($"[ViolinPlot] RenderPointsAsShapes: Control bounds = {controlBounds.Width}x{controlBounds.Height}, Using {displayWidth}x{displayHeight}, Points count = {allPoints.Count}");
+        Console.WriteLine($"[ViolinPlot] RenderPointsAsShapes: Control bounds = {plotBounds.Width}x{plotBounds.Height}, Using {displayWidth}x{displayHeight}, Points count = {allPoints.Count}");
 
         for (int i = 0; i < allPoints.Count; i++)
         {
@@ -302,9 +374,9 @@ public partial class ViolinPlotControl : UserControl
             var studentPoints = vm.GetPointsForStudent(vm.HoveredStudentId.Value);
 
             // Use actual display size
-            var controlBounds = Bounds;
-            var displayWidth = controlBounds.Width > 0 ? controlBounds.Width : 800;
-            var displayHeight = controlBounds.Height > 0 ? controlBounds.Height : 400;
+            var plotBounds = ViolinPlotArea.Bounds;
+            var displayWidth = plotBounds.Width > 0 ? plotBounds.Width : 800;
+            var displayHeight = plotBounds.Height > 0 ? plotBounds.Height : 400;
 
             foreach (var point in studentPoints)
             {
@@ -490,6 +562,273 @@ public partial class ViolinPlotControl : UserControl
                 _lastClickedStudentId = studentId;
                 e.Handled = true;
             }
+        }
+    }
+
+    private void RenderRegionBands()
+    {
+        RegionBandsOverlay.Children.Clear();
+
+        if (DataContext is not ViolinPlotViewModel vm || vm.Cursors == null) return;
+
+        var height = RegionBandsOverlay.Bounds.Height;
+        var width = RegionBandsOverlay.Bounds.Width;
+        if (height <= 0 || width <= 0) return;
+
+        var enabledCursors = vm.Cursors.Where(c => c.IsEnabled).OrderBy(c => c.Score).ToList();
+        if (!enabledCursors.Any()) return;
+
+        var lowestGrade = enabledCursors.OrderByDescending(c => c.Grade.Order).FirstOrDefault();
+        var cursorsWithLines = enabledCursors.Where(c => c != lowestGrade).OrderBy(c => c.Score).ToList();
+
+        if (!cursorsWithLines.Any()) return;
+
+        var grayBrush = new SolidColorBrush(Color.FromArgb(0x20, 255, 255, 255));
+
+        // Build regions from top (high score) to bottom (low score)
+        var regions = new List<(double top, double bottom, bool isGray)>();
+
+        // Top region: above highest cursor
+        regions.Add((0, vm.ScoreToDisplayY(cursorsWithLines.Last().Score, height), false));
+
+        // Between cursors (alternating)
+        for (int i = cursorsWithLines.Count - 1; i > 0; i--)
+        {
+            var top = vm.ScoreToDisplayY(cursorsWithLines[i].Score, height);
+            var bottom = vm.ScoreToDisplayY(cursorsWithLines[i - 1].Score, height);
+            bool isGray = (cursorsWithLines.Count - i) % 2 == 1;
+            regions.Add((top, bottom, isGray));
+        }
+
+        // Bottom region: below lowest cursor
+        regions.Add((vm.ScoreToDisplayY(cursorsWithLines.First().Score, height), height,
+                     cursorsWithLines.Count % 2 == 1));
+
+        // Draw only the gray bands (skip transparent)
+        foreach (var (top, bottom, isGray) in regions)
+        {
+            if (!isGray) continue;
+
+            var rect = new Rectangle
+            {
+                Width = width,
+                Height = Math.Max(0, bottom - top),
+                Fill = grayBrush
+            };
+            Canvas.SetTop(rect, top);
+            RegionBandsOverlay.Children.Add(rect);
+        }
+    }
+
+    /// <summary>
+    /// Renders the cursor column with horizontal cursor lines and grade labels.
+    /// </summary>
+    private void RenderCursorColumn()
+    {
+        CursorColumnCanvas.Children.Clear();
+
+        if (DataContext is not ViolinPlotViewModel vm || vm.Cursors == null) return;
+
+        var height = CursorColumnCanvas.Bounds.Height;
+        var width = CursorColumnCanvas.Bounds.Width;
+        if (height <= 0 || width <= 0) return;
+
+        var enabledCursors = vm.Cursors.Where(c => c.IsEnabled).OrderBy(c => c.Score).ToList();
+        if (!enabledCursors.Any()) return;
+
+        var lowestGrade = enabledCursors.OrderByDescending(c => c.Grade.Order).FirstOrDefault();
+        var cursorsWithLines = enabledCursors.Where(c => c != lowestGrade).OrderBy(c => c.Score).ToList();
+
+        // Draw horizontal dashed cursor lines (excluding lowest grade)
+        var lineBrush = new SolidColorBrush(Colors.White);
+        foreach (var cursor in cursorsWithLines)
+        {
+            var y = vm.ScoreToDisplayY(cursor.Score, height);
+
+            var line = new Line
+            {
+                StartPoint = new Point(0, y),
+                EndPoint = new Point(width, y),
+                Stroke = lineBrush,
+                StrokeThickness = 2,
+                StrokeDashArray = new Avalonia.Collections.AvaloniaList<double> { 4, 2 }
+            };
+            CursorColumnCanvas.Children.Add(line);
+        }
+
+        // Draw grade labels
+        // Top grade (A): locked just below its cursor line
+        // Bottom grade (F): locked just above the plot bottom (no cursor)
+        // Middle grades: centered between their cursor lines
+        var enabledGrades = enabledCursors.Select(c => c.Grade).OrderBy(g => g.Order).ToList();
+
+        // Get plot area bounds for label positioning
+        var plotTop = vm.GetPlotAreaTopFraction() * height;
+        var plotBottom = vm.GetPlotAreaBottomFraction() * height;
+
+        const double labelOffset = 4; // pixels from cursor line
+
+        for (int i = 0; i < enabledGrades.Count; i++)
+        {
+            var grade = enabledGrades[i];
+
+            var label = new TextBlock
+            {
+                Text = grade.DisplayName,
+                Foreground = Brushes.White,
+                FontSize = 12,
+                FontWeight = FontWeight.Bold,
+                TextAlignment = TextAlignment.Center
+            };
+
+            // Measure first to get height
+            label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            var labelHeight = label.DesiredSize.Height;
+
+            double labelY;
+
+            if (i == 0)
+            {
+                // Top grade (A): position ABOVE its cursor line
+                var cursor = enabledCursors.FirstOrDefault(c => c.Grade.Order == grade.Order);
+                if (cursor != null)
+                {
+                    var cursorY = vm.ScoreToDisplayY(cursor.Score, height);
+                    labelY = cursorY - labelHeight - labelOffset; // Above the cursor line
+                }
+                else
+                {
+                    labelY = plotTop + labelOffset;
+                }
+            }
+            else if (i == enabledGrades.Count - 1)
+            {
+                // Bottom grade (F): position BELOW the lowest cursor line
+                // The lowest cursor is the one that separates this grade from the one above
+                var lowestCursor = cursorsWithLines.FirstOrDefault(); // First = lowest score
+                if (lowestCursor != null)
+                {
+                    var cursorY = vm.ScoreToDisplayY(lowestCursor.Score, height);
+                    labelY = cursorY + labelOffset; // Below the cursor line
+                }
+                else
+                {
+                    labelY = plotBottom + labelOffset;
+                }
+            }
+            else
+            {
+                // Middle grades: centered between adjacent cursors
+                var cursorAbove = enabledCursors.FirstOrDefault(c => c.Grade.Order == enabledGrades[i - 1].Order);
+                var cursorBelow = enabledCursors.FirstOrDefault(c => c.Grade.Order == grade.Order);
+                if (cursorAbove != null && cursorBelow != null)
+                {
+                    var aboveY = vm.ScoreToDisplayY(cursorAbove.Score, height);
+                    var belowY = vm.ScoreToDisplayY(cursorBelow.Score, height);
+                    labelY = (aboveY + belowY) / 2.0 - labelHeight / 2.0;
+                }
+                else
+                {
+                    continue;
+                }
+            }
+
+            Canvas.SetLeft(label, (width - label.DesiredSize.Width) / 2);
+            Canvas.SetTop(label, labelY);
+
+            CursorColumnCanvas.Children.Add(label);
+        }
+    }
+
+    private void OnCursorColumnPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (DataContext is not ViolinPlotViewModel vm || vm.Cursors == null) return;
+
+        var point = e.GetCurrentPoint(CursorColumnCanvas);
+        if (!point.Properties.IsLeftButtonPressed) return;
+
+        var height = CursorColumnCanvas.Bounds.Height;
+        if (height <= 0) return;
+
+        var clickY = point.Position.Y;
+
+        // Find nearest cursor line
+        var lowestGrade = vm.Cursors.Where(c => c.IsEnabled)
+            .OrderByDescending(c => c.Grade.Order).FirstOrDefault();
+
+        CursorViewModel? nearest = null;
+        double minDist = double.MaxValue;
+
+        foreach (var cursor in vm.Cursors.Where(c => c.IsEnabled && c != lowestGrade))
+        {
+            var cursorY = vm.ScoreToDisplayY(cursor.Score, height);
+            var dist = Math.Abs(cursorY - clickY);
+            if (dist < minDist)
+            {
+                minDist = dist;
+                nearest = cursor;
+            }
+        }
+
+        // Start dragging if close enough (within 10 pixels)
+        if (nearest != null && minDist < 10)
+        {
+            _draggingCursor = nearest;
+            _isDraggingCursor = true;
+            e.Pointer.Capture(CursorColumnCanvas);
+            e.Handled = true;
+        }
+    }
+
+    private void OnCursorColumnPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (!_isDraggingCursor || _draggingCursor == null) return;
+        if (DataContext is not ViolinPlotViewModel vm || vm.Cursors == null) return;
+
+        var height = CursorColumnCanvas.Bounds.Height;
+        if (height <= 0) return;
+
+        var point = e.GetCurrentPoint(CursorColumnCanvas);
+        var mouseY = point.Position.Y;
+
+        // Convert display Y to score using plot area bounds
+        var plotTop = vm.GetPlotAreaTopFraction() * height;
+        var plotBottom = vm.GetPlotAreaBottomFraction() * height;
+        var plotHeight = plotBottom - plotTop;
+
+        if (plotHeight <= 0) return;
+
+        // Clamp mouseY to plot area
+        mouseY = Math.Max(plotTop, Math.Min(plotBottom, mouseY));
+
+        // Convert Y to normalized value (inverted: top = 1.0, bottom = 0.0)
+        var normalized = 1.0 - (mouseY - plotTop) / plotHeight;
+
+        // Convert to raw score
+        var newScore = vm.NormalizedToScore(normalized);
+
+        // Build cutoffs with proposed position
+        var allCutoffs = vm.Cursors
+            .Where(c => c.IsEnabled)
+            .Select(c => new GradeCutoff(c.Grade, c == _draggingCursor ? newScore : c.Score))
+            .ToList();
+
+        // Validate movement
+        var validated = _cursorValidation.ValidateMovement(
+            _draggingCursor.Grade, newScore, allCutoffs, vm.MinScore - 1, vm.MaxScore + 1);
+
+        _draggingCursor.Score = validated;
+        e.Handled = true;
+    }
+
+    private void OnCursorColumnPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (_isDraggingCursor)
+        {
+            e.Pointer.Capture(null);
+            _isDraggingCursor = false;
+            _draggingCursor = null;
+            e.Handled = true;
         }
     }
 }

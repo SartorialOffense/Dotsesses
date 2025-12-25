@@ -8,15 +8,30 @@
              x:DataType="vm:ViolinPlotViewModel"
              Background="#000000">
 
-    <Grid PointerMoved="OnPointerMoved" Background="Transparent">
-        <!-- SVG Background -->
-        <Image x:Name="SvgView"
-               Stretch="Fill" />
+    <Grid ColumnDefinitions="*,60">
+        <!-- Violin plot area - left column -->
+        <Grid x:Name="ViolinPlotArea" Grid.Column="0" PointerMoved="OnPointerMoved" Background="Transparent">
+            <!-- SVG Background -->
+            <Image x:Name="SvgView" Stretch="Fill" />
 
-        <!-- Canvas for swarm point overlays -->
-        <Canvas x:Name="PointsOverlay" />
+            <!-- Canvas for grade region bands -->
+            <Canvas x:Name="RegionBandsOverlay" IsHitTestVisible="False" />
 
-        <!-- Canvas for tooltips -->
-        <Canvas x:Name="TooltipsOverlay" />
+            <!-- Canvas for swarm point overlays -->
+            <Canvas x:Name="PointsOverlay" />
+
+            <!-- Canvas for tooltips -->
+            <Canvas x:Name="TooltipsOverlay" />
+        </Grid>
+
+        <!-- Cursor column (Canvas-based) - right column -->
+        <Border Grid.Column="1"
+                BorderBrush="Gray" BorderThickness="1,0,0,0" Background="Transparent">
+            <Canvas x:Name="CursorColumnCanvas"
+                    PointerPressed="OnCursorColumnPointerPressed"
+                    PointerMoved="OnCursorColumnPointerMoved"
+                    PointerReleased="OnCursorColumnPointerReleased"
+                    Background="Transparent" />
+        </Border>
     </Grid>
 </UserControl>

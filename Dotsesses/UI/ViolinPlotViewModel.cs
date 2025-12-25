@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using Avalonia;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -26,11 +27,26 @@ public partial class ViolinPlotViewModel : ViewModelBase
     private Dictionary<int, string> _commentMap = new();
     private double _dotSize = 3.0;
 
+    // Plot area bounds in SVG coordinates (extracted from data points)
+    // In SVG, Y increases downward, so _svgPlotTop < _svgPlotBottom
+    private double _svgPlotTop;    // SVG Y for normalized 1.0 (top of plot)
+    private double _svgPlotBottom; // SVG Y for normalized 0.0 (bottom of plot)
+
     [ObservableProperty]
     private string? _svgContent;
 
     [ObservableProperty]
     private int? _hoveredStudentId;
+
+    [ObservableProperty]
+    private ObservableCollection<CursorViewModel>? _cursors;
+
+    [ObservableProperty]
+    private int _minScore;
+
+    [ObservableProperty]
+    private int _maxScore;
+
 
     public ViolinPlotViewModel(ViolinPlotService violinService, IMessenger messenger)
     {
@@ -94,6 +110,9 @@ public partial class ViolinPlotViewModel : ViewModelBase
 
         // Extract actual SVG dimensions from viewBox
         ExtractSvgDimensions(svgContent);
+
+        // Extract plot area Y bounds from data points
+        ExtractPlotAreaBounds(dataPoints);
     }
 
     /// <summary>
@@ -231,5 +250,97 @@ public partial class ViolinPlotViewModel : ViewModelBase
             _svgWidth = _displayWidth / DPI * 72;
             _svgHeight = _displayHeight / DPI * 72;
         }
+    }
+
+    /// <summary>
+    /// Extracts the plot area Y bounds from data points.
+    /// The data points have Y coordinates in SVG space, and their normalized values
+    /// tell us which Y corresponds to 0.0 and which to 1.0 in the plot.
+    /// </summary>
+    private void ExtractPlotAreaBounds(List<ViolinDataPoint> dataPoints)
+    {
+        if (dataPoints.Count == 0)
+        {
+            // Fallback to full SVG height
+            _svgPlotTop = 0;
+            _svgPlotBottom = _svgHeight;
+            return;
+        }
+
+        // Find points with min and max normalized values to determine Y bounds
+        // The Value field is the raw score - we need to find the actual SVG Y
+        // for the highest and lowest normalized scores
+        var minY = dataPoints.Min(p => p.Y);  // Top of plot in SVG (lowest Y)
+        var maxY = dataPoints.Max(p => p.Y);  // Bottom of plot in SVG (highest Y)
+
+        // In SVG coordinates, Y increases downward
+        // High normalized values (1.0) → low SVG Y (top)
+        // Low normalized values (0.0) → high SVG Y (bottom)
+        _svgPlotTop = minY;
+        _svgPlotBottom = maxY;
+
+        Console.WriteLine($"[ViolinPlotViewModel] Plot area bounds: top={_svgPlotTop:F1}, bottom={_svgPlotBottom:F1}");
+    }
+
+    /// <summary>
+    /// Gets the plot area top position as a fraction of display height.
+    /// </summary>
+    public double GetPlotAreaTopFraction()
+    {
+        if (_svgHeight == 0) return 0;
+        return _svgPlotTop / _svgHeight;
+    }
+
+    /// <summary>
+    /// Gets the plot area bottom position as a fraction of display height.
+    /// </summary>
+    public double GetPlotAreaBottomFraction()
+    {
+        if (_svgHeight == 0) return 1;
+        return _svgPlotBottom / _svgHeight;
+    }
+
+    /// <summary>
+    /// Converts a raw score value to normalized 0-1 scale (matching violin plot Y-axis).
+    /// High scores → 1.0, low scores → 0.0.
+    /// </summary>
+    public double ScoreToNormalized(int score)
+    {
+        if (MaxScore == MinScore) return 0.5;
+        return (double)(score - MinScore) / (MaxScore - MinScore);
+    }
+
+    /// <summary>
+    /// Converts a normalized 0-1 value back to raw score.
+    /// </summary>
+    public int NormalizedToScore(double normalized)
+    {
+        return (int)Math.Round(MinScore + normalized * (MaxScore - MinScore));
+    }
+
+    /// <summary>
+    /// Converts a score value to display Y coordinate (for Canvas region bands).
+    /// Maps to the plot area within the display, accounting for SVG margins.
+    /// High scores at top, low scores at bottom.
+    /// </summary>
+    public double ScoreToDisplayY(int score, double displayHeight)
+    {
+        if (MaxScore == MinScore) return displayHeight / 2;
+
+        // Get the plot area bounds as fractions of total height
+        var topFraction = GetPlotAreaTopFraction();
+        var bottomFraction = GetPlotAreaBottomFraction();
+
+        // Calculate display Y coordinates for plot area
+        var plotAreaTop = topFraction * displayHeight;
+        var plotAreaBottom = bottomFraction * displayHeight;
+        var plotAreaHeight = plotAreaBottom - plotAreaTop;
+
+        if (plotAreaHeight <= 0) return displayHeight / 2;
+
+        // Map normalized score to plot area
+        // normalized 1.0 → plotAreaTop, normalized 0.0 → plotAreaBottom
+        var normalized = ScoreToNormalized(score);
+        return plotAreaTop + (1.0 - normalized) * plotAreaHeight;
     }
 }
