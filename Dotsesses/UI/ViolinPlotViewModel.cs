@@ -207,6 +207,38 @@ public partial class ViolinPlotViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Gets the X bounds (in display coordinates) for the "Total" series.
+    /// Returns null if no Total series found.
+    /// </summary>
+    public (double Left, double Right)? GetTotalSeriesDisplayBounds(double displayWidth, double displayHeight)
+    {
+        // Find all points in the Total series
+        var totalPoints = _dataPoints.Where(p =>
+            p.Series.Equals("Total", StringComparison.OrdinalIgnoreCase)).ToList();
+
+        if (!totalPoints.Any())
+            return null;
+
+        // Get min/max X in SVG coordinates
+        var minSvgX = totalPoints.Min(p => p.X);
+        var maxSvgX = totalPoints.Max(p => p.X);
+
+        // Add some padding to capture the full violin width (points are centered)
+        // Estimate violin half-width based on typical jitter spread
+        var svgPadding = (maxSvgX - minSvgX) * 0.3; // 30% padding on each side
+        if (svgPadding < 5) svgPadding = 5; // Minimum padding
+
+        minSvgX -= svgPadding;
+        maxSvgX += svgPadding;
+
+        // Convert to display coordinates
+        var (left, _) = SvgToDisplayWithSize(minSvgX, 0, displayWidth, displayHeight);
+        var (right, _) = SvgToDisplayWithSize(maxSvgX, 0, displayWidth, displayHeight);
+
+        return (left, right);
+    }
+
+    /// <summary>
     /// Converts SVG coordinates to display coordinates using stored display size.
     /// </summary>
     public (double X, double Y) SvgToDisplay(double svgX, double svgY)

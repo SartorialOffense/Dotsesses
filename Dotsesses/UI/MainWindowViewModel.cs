@@ -896,6 +896,7 @@ public partial class MainWindowViewModel : ViewModelBase
             try
             {
                 UpdateCursors(); // Refresh dot plot annotations
+                RecalculateGradeCounts(); // Update compliance grid counts
             }
             finally
             {

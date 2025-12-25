@@ -575,6 +575,13 @@ public partial class ViolinPlotControl : UserControl
         var width = RegionBandsOverlay.Bounds.Width;
         if (height <= 0 || width <= 0) return;
 
+        // Get the Total series bounds - only draw bands over the Total column
+        var totalBounds = vm.GetTotalSeriesDisplayBounds(width, height);
+        if (totalBounds == null) return;
+
+        var (bandLeft, bandRight) = totalBounds.Value;
+        var bandWidth = bandRight - bandLeft;
+
         var enabledCursors = vm.Cursors.Where(c => c.IsEnabled).OrderBy(c => c.Score).ToList();
         if (!enabledCursors.Any()) return;
 
@@ -604,17 +611,18 @@ public partial class ViolinPlotControl : UserControl
         regions.Add((vm.ScoreToDisplayY(cursorsWithLines.First().Score, height), height,
                      cursorsWithLines.Count % 2 == 1));
 
-        // Draw only the gray bands (skip transparent)
+        // Draw only the gray bands (skip transparent) - positioned over Total column only
         foreach (var (top, bottom, isGray) in regions)
         {
             if (!isGray) continue;
 
             var rect = new Rectangle
             {
-                Width = width,
+                Width = bandWidth,
                 Height = Math.Max(0, bottom - top),
                 Fill = grayBrush
             };
+            Canvas.SetLeft(rect, bandLeft);
             Canvas.SetTop(rect, top);
             RegionBandsOverlay.Children.Add(rect);
         }
