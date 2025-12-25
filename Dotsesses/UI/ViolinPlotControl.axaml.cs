@@ -741,23 +741,79 @@ public partial class ViolinPlotControl : UserControl
         var plotBottom = vm.GetPlotAreaBottomFraction() * height;
 
         const double labelOffset = 4; // pixels from cursor line
+        const double gradeColWidth = 18; // fixed width for grade column
+        const double countColWidth = 16; // fixed width for count column
+        const double deviationColWidth = 26; // fixed width for deviation column
+        const double colSpacing = 2;
 
         for (int i = 0; i < enabledGrades.Count; i++)
         {
             var grade = enabledGrades[i];
 
-            var label = new TextBlock
+            // Get compliance data for this grade
+            var compliance = vm.ComplianceRows?.FirstOrDefault(r => r.Grade.Equals(grade));
+            var currentCount = compliance?.CurrentCount ?? 0;
+            var deviation = compliance?.SignedDeviation ?? 0;
+
+            // Create container with fixed-width columns
+            var container = new StackPanel
             {
-                Text = grade.DisplayName,
-                Foreground = Brushes.White,
-                FontSize = 12,
-                FontWeight = FontWeight.Bold,
-                TextAlignment = TextAlignment.Center
+                Orientation = Avalonia.Layout.Orientation.Horizontal,
+                Spacing = colSpacing
             };
 
-            // Measure first to get height
-            label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-            var labelHeight = label.DesiredSize.Height;
+            // Grade column: white box with black text, centered
+            var gradeBox = new Border
+            {
+                Background = Brushes.White,
+                Width = gradeColWidth,
+                Child = new TextBlock
+                {
+                    Text = grade.DisplayName,
+                    Foreground = Brushes.Black,
+                    FontSize = 11,
+                    FontWeight = FontWeight.Bold,
+                    TextAlignment = TextAlignment.Center,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+                }
+            };
+            container.Children.Add(gradeBox);
+
+            // Count column: right-aligned
+            var countText = new TextBlock
+            {
+                Text = currentCount.ToString(),
+                Foreground = Brushes.White,
+                FontSize = 11,
+                Width = countColWidth,
+                TextAlignment = TextAlignment.Right,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+            };
+            container.Children.Add(countText);
+
+            // Deviation column: right-aligned, fixed width (show empty if zero)
+            IBrush deviationColor = deviation < 0
+                ? new SolidColorBrush(Color.FromRgb(255, 100, 100)) // Red for under
+                : deviation > 0
+                    ? new SolidColorBrush(Color.FromRgb(100, 255, 100)) // Green for over
+                    : Brushes.Transparent;
+
+            var deviationText = new TextBlock
+            {
+                Text = deviation != 0 ? $"[{deviation:+#;-#;0}]" : "",
+                Foreground = deviationColor,
+                FontSize = 11,
+                Width = deviationColWidth,
+                TextAlignment = TextAlignment.Right,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+            };
+            container.Children.Add(deviationText);
+
+            // Measure container to get dimensions
+            container.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            var containerHeight = container.DesiredSize.Height;
+            var containerWidth = container.DesiredSize.Width;
 
             double labelY;
 
@@ -768,7 +824,7 @@ public partial class ViolinPlotControl : UserControl
                 if (cursor != null)
                 {
                     var cursorY = vm.ScoreToDisplayY(cursor.Score, height);
-                    labelY = cursorY - labelHeight - labelOffset; // Above the cursor line
+                    labelY = cursorY - containerHeight - labelOffset; // Above the cursor line
                 }
                 else
                 {
@@ -778,7 +834,6 @@ public partial class ViolinPlotControl : UserControl
             else if (i == enabledGrades.Count - 1)
             {
                 // Bottom grade (F): position BELOW the lowest cursor line
-                // The lowest cursor is the one that separates this grade from the one above
                 var lowestCursor = cursorsWithLines.FirstOrDefault(); // First = lowest score
                 if (lowestCursor != null)
                 {
@@ -799,7 +854,7 @@ public partial class ViolinPlotControl : UserControl
                 {
                     var aboveY = vm.ScoreToDisplayY(cursorAbove.Score, height);
                     var belowY = vm.ScoreToDisplayY(cursorBelow.Score, height);
-                    labelY = (aboveY + belowY) / 2.0 - labelHeight / 2.0;
+                    labelY = (aboveY + belowY) / 2.0 - containerHeight / 2.0;
                 }
                 else
                 {
@@ -807,10 +862,11 @@ public partial class ViolinPlotControl : UserControl
                 }
             }
 
-            Canvas.SetLeft(label, (width - label.DesiredSize.Width) / 2);
-            Canvas.SetTop(label, labelY);
+            // Left align with minimal margin
+            Canvas.SetLeft(container, 1);
+            Canvas.SetTop(container, labelY);
 
-            CursorColumnCanvas.Children.Add(label);
+            CursorColumnCanvas.Children.Add(container);
         }
     }
 

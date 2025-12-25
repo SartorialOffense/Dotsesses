@@ -42,6 +42,9 @@ public partial class ViolinPlotViewModel : ViewModelBase
     private ObservableCollection<CursorViewModel>? _cursors;
 
     [ObservableProperty]
+    private ObservableCollection<ComplianceRowViewModel>? _complianceRows;
+
+    [ObservableProperty]
     private int _minScore;
 
     [ObservableProperty]

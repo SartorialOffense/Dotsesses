@@ -910,6 +910,7 @@ public partial class MainWindowViewModel : ViewModelBase
         if (ViolinPlotViewModel == null) return;
 
         ViolinPlotViewModel.Cursors = Cursors;
+        ViolinPlotViewModel.ComplianceRows = ComplianceRows;
         ViolinPlotViewModel.MinScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade);
         ViolinPlotViewModel.MaxScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade);
     }
