@@ -208,6 +208,8 @@ public partial class ViolinPlotViewModel : ViewModelBase
 
     /// <summary>
     /// Gets the X bounds (in display coordinates) for the "Total" series.
+    /// Left edge is midpoint between rightmost dot of adjacent series and leftmost Total dot.
+    /// Right edge uses symmetric spacing from rightmost Total dot, with margin from plot edge.
     /// Returns null if no Total series found.
     /// </summary>
     public (double Left, double Right)? GetTotalSeriesDisplayBounds(double displayWidth, double displayHeight)
@@ -219,21 +221,53 @@ public partial class ViolinPlotViewModel : ViewModelBase
         if (!totalPoints.Any())
             return null;
 
-        // Get min/max X in SVG coordinates
-        var minSvgX = totalPoints.Min(p => p.X);
-        var maxSvgX = totalPoints.Max(p => p.X);
+        // Get leftmost and rightmost Total point X in SVG coordinates
+        var totalLeftSvgX = totalPoints.Min(p => p.X);
+        var totalRightSvgX = totalPoints.Max(p => p.X);
 
-        // Add some padding to capture the full violin width (points are centered)
-        // Estimate violin half-width based on typical jitter spread
-        var svgPadding = (maxSvgX - minSvgX) * 0.3; // 30% padding on each side
-        if (svgPadding < 5) svgPadding = 5; // Minimum padding
+        // Find the series directly to the left of Total (has the highest X that's less than Total's min X)
+        var adjacentSeriesPoints = _dataPoints
+            .Where(p => !p.Series.Equals("Total", StringComparison.OrdinalIgnoreCase))
+            .GroupBy(p => p.Series)
+            .Select(g => new { Series = g.Key, MaxX = g.Max(p => p.X) })
+            .Where(s => s.MaxX < totalLeftSvgX)
+            .OrderByDescending(s => s.MaxX)
+            .FirstOrDefault();
 
-        minSvgX -= svgPadding;
-        maxSvgX += svgPadding;
+        double leftBoundSvgX;
+        double halfGap;
+        if (adjacentSeriesPoints != null)
+        {
+            // Midpoint between rightmost dot of adjacent series and leftmost Total dot
+            halfGap = (totalLeftSvgX - adjacentSeriesPoints.MaxX) / 2.0;
+            leftBoundSvgX = adjacentSeriesPoints.MaxX + halfGap;
+        }
+        else
+        {
+            // Fallback: use Total's left edge with some padding
+            halfGap = 10;
+            leftBoundSvgX = totalLeftSvgX - halfGap;
+        }
+
+        // Right edge: symmetric spacing from rightmost Total dot
+        var rightBoundSvgX = totalRightSvgX + halfGap;
 
         // Convert to display coordinates
-        var (left, _) = SvgToDisplayWithSize(minSvgX, 0, displayWidth, displayHeight);
-        var (right, _) = SvgToDisplayWithSize(maxSvgX, 0, displayWidth, displayHeight);
+        var (left, _) = SvgToDisplayWithSize(leftBoundSvgX, 0, displayWidth, displayHeight);
+        var (right, _) = SvgToDisplayWithSize(rightBoundSvgX, 0, displayWidth, displayHeight);
+
+        // Ensure right edge doesn't exceed display width minus margin
+        const double rightMargin = 20;
+        if (right > displayWidth - rightMargin)
+        {
+            // Clamp right edge and adjust left to maintain symmetry around Total center
+            var totalCenterSvgX = (totalLeftSvgX + totalRightSvgX) / 2.0;
+            var (centerDisplay, _) = SvgToDisplayWithSize(totalCenterSvgX, 0, displayWidth, displayHeight);
+
+            right = displayWidth - rightMargin;
+            var halfWidth = right - centerDisplay;
+            left = centerDisplay - halfWidth;
+        }
 
         return (left, right);
     }

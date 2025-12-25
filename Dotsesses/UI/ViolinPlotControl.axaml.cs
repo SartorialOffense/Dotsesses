@@ -590,41 +590,21 @@ public partial class ViolinPlotControl : UserControl
 
         if (!cursorsWithLines.Any()) return;
 
-        var grayBrush = new SolidColorBrush(Color.FromArgb(0x20, 255, 255, 255));
+        var lineBrush = new SolidColorBrush(Color.FromArgb(0x80, 255, 255, 255));
 
-        // Build regions from top (high score) to bottom (low score)
-        var regions = new List<(double top, double bottom, bool isGray)>();
-
-        // Top region: above highest cursor
-        regions.Add((0, vm.ScoreToDisplayY(cursorsWithLines.Last().Score, height), false));
-
-        // Between cursors (alternating)
-        for (int i = cursorsWithLines.Count - 1; i > 0; i--)
+        // Draw horizontal lines at each cursor position (grade boundary)
+        foreach (var cursor in cursorsWithLines)
         {
-            var top = vm.ScoreToDisplayY(cursorsWithLines[i].Score, height);
-            var bottom = vm.ScoreToDisplayY(cursorsWithLines[i - 1].Score, height);
-            bool isGray = (cursorsWithLines.Count - i) % 2 == 1;
-            regions.Add((top, bottom, isGray));
-        }
+            var y = vm.ScoreToDisplayY(cursor.Score, height);
 
-        // Bottom region: below lowest cursor
-        regions.Add((vm.ScoreToDisplayY(cursorsWithLines.First().Score, height), height,
-                     cursorsWithLines.Count % 2 == 1));
-
-        // Draw only the gray bands (skip transparent) - positioned over Total column only
-        foreach (var (top, bottom, isGray) in regions)
-        {
-            if (!isGray) continue;
-
-            var rect = new Rectangle
+            var line = new Line
             {
-                Width = bandWidth,
-                Height = Math.Max(0, bottom - top),
-                Fill = grayBrush
+                StartPoint = new Point(bandLeft, y),
+                EndPoint = new Point(bandRight, y),
+                Stroke = lineBrush,
+                StrokeThickness = 1
             };
-            Canvas.SetLeft(rect, bandLeft);
-            Canvas.SetTop(rect, top);
-            RegionBandsOverlay.Children.Add(rect);
+            RegionBandsOverlay.Children.Add(line);
         }
     }
 
