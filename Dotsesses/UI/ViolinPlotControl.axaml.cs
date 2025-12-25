@@ -677,13 +677,11 @@ public partial class ViolinPlotControl : UserControl
 
         if (plotHeight <= 0) return;
 
-        // Clamp mouseY to plot area
-        mouseY = Math.Max(plotTop, Math.Min(plotBottom, mouseY));
-
         // Convert Y to normalized value (inverted: top = 1.0, bottom = 0.0)
+        // Don't clamp mouseY - allow dragging beyond plot area for ±20 range
         var normalized = 1.0 - (mouseY - plotTop) / plotHeight;
 
-        // Convert to raw score
+        // Convert to raw score (can be beyond MinScore/MaxScore)
         var newScore = vm.NormalizedToScore(normalized);
 
         // Build cutoffs with proposed position
@@ -692,9 +690,9 @@ public partial class ViolinPlotControl : UserControl
             .Select(c => new GradeCutoff(c.Grade, c == _draggingBarbellCursor ? newScore : c.Score))
             .ToList();
 
-        // Validate movement
+        // Validate movement - use very wide bounds to allow full range
         var validated = _cursorValidation.ValidateMovement(
-            _draggingBarbellCursor.Grade, newScore, allCutoffs, vm.MinScore - 1, vm.MaxScore + 1);
+            _draggingBarbellCursor.Grade, newScore, allCutoffs, int.MinValue, int.MaxValue);
 
         _draggingBarbellCursor.Score = validated;
         e.Handled = true;
@@ -928,13 +926,11 @@ public partial class ViolinPlotControl : UserControl
 
         if (plotHeight <= 0) return;
 
-        // Clamp mouseY to plot area
-        mouseY = Math.Max(plotTop, Math.Min(plotBottom, mouseY));
-
         // Convert Y to normalized value (inverted: top = 1.0, bottom = 0.0)
+        // Don't clamp mouseY - allow dragging beyond plot area for ±20 range
         var normalized = 1.0 - (mouseY - plotTop) / plotHeight;
 
-        // Convert to raw score
+        // Convert to raw score (can be beyond MinScore/MaxScore)
         var newScore = vm.NormalizedToScore(normalized);
 
         // Build cutoffs with proposed position
@@ -943,9 +939,9 @@ public partial class ViolinPlotControl : UserControl
             .Select(c => new GradeCutoff(c.Grade, c == _draggingCursor ? newScore : c.Score))
             .ToList();
 
-        // Validate movement
+        // Validate movement - use very wide bounds to allow full range
         var validated = _cursorValidation.ValidateMovement(
-            _draggingCursor.Grade, newScore, allCutoffs, vm.MinScore - 1, vm.MaxScore + 1);
+            _draggingCursor.Grade, newScore, allCutoffs, int.MinValue, int.MaxValue);
 
         _draggingCursor.Score = validated;
         e.Handled = true;

@@ -598,75 +598,40 @@ public partial class MainWindowViewModel : ViewModelBase
         };
         DotplotModel.Annotations.Add(cursorRect);
 
-        // ===== Grade Region Bands in Dot Display =====
-        // Alternating pattern: transparent and light gray
-        // Only use cursors that have visible lines (exclude lowest grade)
-        var lowestGradeForRegions = enabledCursors.OrderByDescending(c => c.Grade.Order).FirstOrDefault();
-        var cursorsWithLines = enabledCursors.Where(c => c != lowestGradeForRegions).OrderBy(c => c.Score).ToList();
-        
-        if (cursorsWithLines.Any())
-        {
-            var grayColor = OxyColor.FromArgb(0x20, 255, 255, 255); // White with alpha 0x20
-            var clearColor = OxyColors.Transparent;
-
-            // Create regions from left boundary to first cursor, between cursors, and last cursor to right
-            var regions = new List<(double left, double right, bool isGray)>();
-
-            // First region: left boundary to first visible cursor
-            regions.Add((minScore, cursorsWithLines[0].Score, false)); // Start with clear
-
-            // Between cursors
-            for (int i = 0; i < cursorsWithLines.Count - 1; i++)
-            {
-                bool isGray = (i + 1) % 2 == 1; // Alternate starting with gray for second region
-                regions.Add((cursorsWithLines[i].Score, cursorsWithLines[i + 1].Score, isGray));
-            }
-
-            // Last region: last cursor to right boundary
-            bool lastIsGray = cursorsWithLines.Count % 2 == 1;
-            regions.Add((cursorsWithLines.Last().Score, maxScore, lastIsGray));
-
-            // Draw region bands
-            foreach (var (left, right, isGray) in regions)
-            {
-                // Extend boundaries slightly to be flush with cursor lines (StrokeThickness=2)
-                var extendedLeft = left - 0.5;
-                var extendedRight = right + 0.5; // Extend edges to align with cursor
-                
-                var rect = new RectangleAnnotation
-                {
-                    MinimumX = extendedLeft,
-                    MaximumX = extendedRight,
-                    MinimumY = dotYAxis.Minimum,
-                    MaximumY = dotYAxis.Maximum,
-                    Fill = isGray ? grayColor : clearColor,
-                    Layer = AnnotationLayer.BelowSeries,
-                    XAxisKey = "SharedX",
-                    YAxisKey = "DotY",
-                    Selectable = false
-                };
-                DotplotModel.Annotations.Add(rect);
-            }
-        }
-
-        // ===== Vertical Cursors in Grade Cursors Area =====
+        // ===== Vertical Cursor Lines with Square Handles =====
         // Skip the lowest grade (highest Order) - it has no cursor, just a label
         var lowestGrade = enabledCursors.OrderByDescending(c => c.Grade.Order).FirstOrDefault();
         foreach (var cursor in enabledCursors.Where(c => c != lowestGrade))
         {
+            // Thin vertical line spanning both Dot and Cursor areas (draw in DotY axis which spans more of the plot)
             var line = new LineAnnotation
             {
                 Type = LineAnnotationType.Vertical,
                 X = cursor.Score,
-                Color = OxyColor.FromRgb(255, 255, 255),
-                LineStyle = LineStyle.Dash,
-                StrokeThickness = 2,
+                Color = OxyColors.White,
+                LineStyle = LineStyle.Solid,
+                StrokeThickness = 1,
                 XAxisKey = "SharedX",
-                YAxisKey = "CursorY",
-                MinimumY = 0,
-                MaximumY = 1
+                YAxisKey = "DotY",
+                MinimumY = dotYAxis.Minimum,
+                MaximumY = dotYAxis.Maximum
             };
             DotplotModel.Annotations.Add(line);
+
+            // Square handle at bottom of cursor area using PointAnnotation (fixed screen-space size)
+            var handle = new PointAnnotation
+            {
+                X = cursor.Score,
+                Y = 0.5, // Center of cursor area
+                Size = 4, // Screen pixels (half of original 8)
+                Shape = MarkerType.Square,
+                Fill = OxyColors.White,
+                Stroke = OxyColors.White,
+                StrokeThickness = 1,
+                XAxisKey = "SharedX",
+                YAxisKey = "CursorY"
+            };
+            DotplotModel.Annotations.Add(handle);
         }
 
         // ===== Grade Labels Below Cursors =====
@@ -982,8 +947,8 @@ public partial class MainWindowViewModel : ViewModelBase
             var newCutoffs = _initialCutoffCalculator.Calculate(ClassAssessment.Assessments, enabledCurve);
 
             // Get valid drag bounds to ensure cursors are placed within draggable range
-            var minBound = ClassAssessment.Assessments.Min(a => a.AggregateGrade) - 1;
-            var maxBound = ClassAssessment.Assessments.Max(a => a.AggregateGrade) + 1;
+            var minBound = ClassAssessment.Assessments.Min(a => a.AggregateGrade) - 20;
+            var maxBound = ClassAssessment.Assessments.Max(a => a.AggregateGrade) + 20;
 
             // Update all enabled cursor positions, clamped to valid range
             foreach (var cutoff in newCutoffs)
@@ -1206,9 +1171,9 @@ public partial class MainWindowViewModel : ViewModelBase
 
         var newScore = (int)Math.Round(pos.X);
 
-        // Limit cursor movement to within 1 of actual student scores
-        var minBound = ClassAssessment.Assessments.Min(a => a.AggregateGrade) - 1;
-        var maxBound = ClassAssessment.Assessments.Max(a => a.AggregateGrade) + 1;
+        // Allow cursor movement beyond actual student scores
+        var minBound = ClassAssessment.Assessments.Min(a => a.AggregateGrade) - 20;
+        var maxBound = ClassAssessment.Assessments.Max(a => a.AggregateGrade) + 20;
 
         // Validate cursor movement (include ALL enabled cursors for proper ordering constraints)
         var allCutoffs = Cursors

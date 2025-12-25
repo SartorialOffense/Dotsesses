@@ -253,7 +253,7 @@
                     <!-- Expanded State: Full Panel -->
                     <Border IsVisible="{Binding IsCompliancePaneOpen}"
                            Padding="3,6,10,10"
-                           MinWidth="250">
+                           Width="90">
                         <Grid RowDefinitions="Auto,*">
                             <!-- Header with hamburger -->
                             <Grid Grid.Row="0" ColumnDefinitions="Auto,*" Margin="0,0,0,8">
@@ -280,70 +280,28 @@
                                          VerticalAlignment="Center"/>
                             </Grid>
 
-                            <!-- Compliance Grid -->
-                            <ScrollViewer Grid.Row="1" Padding="0">
-                            <ItemsControl ItemsSource="{Binding ComplianceRows}">
+                            <!-- Compact Compliance Grid with WrapPanel -->
+                            <ItemsControl Grid.Row="1" ItemsSource="{Binding ComplianceRows}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel Orientation="Horizontal"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Padding="2,0" Margin="0,0.5">
-                                            <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto">
-                                                <!-- Checkbox -->
-                                                <CheckBox Grid.Column="0"
-                                                         IsChecked="{Binding IsEnabled}"
-                                                         Margin="0,0,8,0"
-                                                         VerticalAlignment="Center"/>
-
-                                                <!-- Grade with DisplayName -->
-                                                <TextBlock Grid.Column="1"
-                                                          Text="{Binding Grade.DisplayName}"
-                                                          Foreground="White"
-                                                          VerticalAlignment="Center"
-                                                          FontWeight="Medium"/>
-
-                                                <!-- Target Range -->
-                                                <TextBlock Grid.Column="2"
-                                                          Text="{Binding TargetRange}"
-                                                          Foreground="#CCCCCC"
-                                                          Margin="5,0"
-                                                          VerticalAlignment="Center"
-                                                          TextAlignment="Right"/>
-
-                                                <!-- Current Count -->
-                                                <TextBlock Grid.Column="3"
-                                                          Text="{Binding CurrentCount}"
-                                                          Foreground="White"
-                                                          Margin="5,0"
-                                                          VerticalAlignment="Center"
-                                                          TextAlignment="Right"
-                                                          FontWeight="SemiBold"/>
-
-                                                <!-- Deviation with color coding -->
-                                                <TextBlock Grid.Column="4"
-                                                          Margin="5,0,0,0"
-                                                          VerticalAlignment="Center"
-                                                          TextAlignment="Right"
-                                                          IsVisible="{Binding HasDeviation}"
-                                                          FontWeight="Bold">
-                                                    <TextBlock.Text>
-                                                        <MultiBinding StringFormat="{}{0:+0;-0;0}">
-                                                            <Binding Path="SignedDeviation"/>
-                                                        </MultiBinding>
-                                                    </TextBlock.Text>
-                                                    <TextBlock.Foreground>
-                                                        <MultiBinding>
-                                                            <MultiBinding.Converter>
-                                                                <local:DeviationColorConverter/>
-                                                            </MultiBinding.Converter>
-                                                            <Binding Path="SignedDeviation"/>
-                                                        </MultiBinding>
-                                                    </TextBlock.Foreground>
-                                                </TextBlock>
-                                            </Grid>
-                                        </Border>
+                                        <StackPanel Orientation="Horizontal" Margin="0,2,12,2">
+                                            <CheckBox IsChecked="{Binding IsEnabled}"
+                                                     Margin="0,0,4,0"
+                                                     VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Grade.DisplayName}"
+                                                      Foreground="White"
+                                                      VerticalAlignment="Center"
+                                                      FontWeight="Medium"
+                                                      FontSize="12"/>
+                                        </StackPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                        </ScrollViewer>
                         </Grid>
                     </Border>
                 </Grid>
@@ -371,7 +329,7 @@
                                    HorizontalContentAlignment="Stretch">
                         <ContentControl.ContentTemplate>
                             <DataTemplate x:DataType="vm:StudentCardViewModel">
-                                <Border Background="#1A1A1A"
+                                <Border Background="Transparent"
                                        BorderBrush="#007ACC"
                                        BorderThickness="2"
                                        CornerRadius="4"
@@ -455,7 +413,7 @@
                                                                           FontWeight="SemiBold"
                                                                           Margin="0,4,0,4"/>
 
-                                                                <Border Background="#1E1E1E"
+                                                                <Border Background="Transparent"
                                                                        BorderBrush="#3F3F46"
                                                                        BorderThickness="1"
                                                                        CornerRadius="3"
