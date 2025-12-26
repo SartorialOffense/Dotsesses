@@ -1,17 +1,24 @@
 namespace Dotsesses.Tests.ViewModels;
 
 using CommunityToolkit.Mvvm.Messaging;
+using Dotsesses.Services;
 using Dotsesses.UI;
 using Dotsesses.Models;
 using OxyPlot;
 
 public class MainWindowViewModelTests
 {
+    private static MainWindowViewModel CreateViewModel()
+    {
+        var hoverDelayService = new HoverDelayService();
+        return new MainWindowViewModel(WeakReferenceMessenger.Default, null!, hoverDelayService);
+    }
+
     [Fact]
     public void Constructor_InitializesPlotModel()
     {
         // Act
-        var viewModel = new MainWindowViewModel(WeakReferenceMessenger.Default, null!);
+        var viewModel = CreateViewModel();
 
         // Assert
         Assert.NotNull(viewModel.DotplotModel);
@@ -22,7 +29,7 @@ public class MainWindowViewModelTests
     public void Constructor_LoadsSyntheticData()
     {
         // Act
-        var viewModel = new MainWindowViewModel(WeakReferenceMessenger.Default, null!);
+        var viewModel = CreateViewModel();
 
         // Assert
         Assert.NotNull(viewModel.ClassAssessment);
@@ -33,7 +40,7 @@ public class MainWindowViewModelTests
     public void PlotModel_HasAxes()
     {
         // Act
-        var viewModel = new MainWindowViewModel(WeakReferenceMessenger.Default, null!);
+        var viewModel = CreateViewModel();
 
         // Assert - Now has 4 axes: SharedX, StatsY, DotY, CursorY
         Assert.Equal(4, viewModel.DotplotModel.Axes.Count);
@@ -45,7 +52,7 @@ public class MainWindowViewModelTests
     public void PlotModel_HasScatterSeries()
     {
         // Act
-        var viewModel = new MainWindowViewModel(WeakReferenceMessenger.Default, null!);
+        var viewModel = CreateViewModel();
 
         // Assert - now has 2 series (unselected and selected)
         Assert.Equal(2, viewModel.DotplotModel.Series.Count);
@@ -57,7 +64,7 @@ public class MainWindowViewModelTests
     public void ScatterSeries_Has100Students()
     {
         // Act
-        var viewModel = new MainWindowViewModel(WeakReferenceMessenger.Default, null!);
+        var viewModel = CreateViewModel();
         var series = viewModel.DotplotModel.Series[0] as OxyPlot.Series.ScatterSeries;
 
         Assert.NotNull(series);
@@ -68,7 +75,7 @@ public class MainWindowViewModelTests
     public void PlotModel_UsesDarkTheme()
     {
         // Act
-        var viewModel = new MainWindowViewModel(WeakReferenceMessenger.Default, null!);
+        var viewModel = CreateViewModel();
 
         // Assert
         Assert.Equal(OxyColor.FromRgb(0, 0, 0), viewModel.DotplotModel.Background);
@@ -79,7 +86,7 @@ public class MainWindowViewModelTests
     public void Constructor_InitializesCursors()
     {
         // Act
-        var viewModel = new MainWindowViewModel(WeakReferenceMessenger.Default, null!);
+        var viewModel = CreateViewModel();
 
         // Assert
         Assert.NotNull(viewModel.Cursors);
@@ -90,7 +97,7 @@ public class MainWindowViewModelTests
     public void Constructor_InitializesComplianceGrid()
     {
         // Act
-        var viewModel = new MainWindowViewModel(WeakReferenceMessenger.Default, null!);
+        var viewModel = CreateViewModel();
 
         // Assert
         Assert.NotNull(viewModel.ComplianceRows);
@@ -101,7 +108,7 @@ public class MainWindowViewModelTests
     public void AddingCursor_ClampsPositionToValidDraggingBounds()
     {
         // Arrange
-        var viewModel = new MainWindowViewModel(WeakReferenceMessenger.Default, null!);
+        var viewModel = CreateViewModel();
         var minScore = viewModel.ClassAssessment.Assessments.Min(a => a.AggregateGrade);
         var maxScore = viewModel.ClassAssessment.Assessments.Max(a => a.AggregateGrade);
         var minBound = minScore - 1;

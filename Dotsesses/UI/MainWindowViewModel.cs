@@ -36,6 +36,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly InitialCutoffCalculator _initialCutoffCalculator = null!;
     private readonly CursorValidation _cursorValidation = null!;
     private readonly IMessenger _messenger = null!;
+    private readonly HoverDelayService _hoverDelayService = null!;
 
     private GradeAssigner _gradeAssigner = null!;
     private CursorViewModel? _draggingCursor;
@@ -96,17 +97,23 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public List<string> AvailableColorAttributes { get; private set; } = new();
 
+    /// <summary>
+    /// Exposes the hover delay service for debug display and clear command binding.
+    /// </summary>
+    public HoverDelayService HoverDelayService => _hoverDelayService;
+
     public MainWindowViewModel()
     {
         
     }
     
-    public MainWindowViewModel(IMessenger messenger, ViolinPlotViewModel violinPlotViewModel)
+    public MainWindowViewModel(IMessenger messenger, ViolinPlotViewModel violinPlotViewModel, HoverDelayService hoverDelayService)
     {
         Log("MainWindowViewModel: Constructor started");
 
         _messenger = messenger;
         _violinPlotViewModel = violinPlotViewModel;
+        _hoverDelayService = hoverDelayService;
 
         Log("MainWindowViewModel: Creating calculators");
         _cutoffCountCalculator = new CutoffCountCalculator();
@@ -117,7 +124,10 @@ public partial class MainWindowViewModel : ViewModelBase
         _complianceRows = new ObservableCollection<ComplianceRowViewModel>();
 
         Log("MainWindowViewModel: Registering message handlers");
-        // Register for hover messages from violin plot
+        // Subscribe to hover activation from delay service
+        _hoverDelayService.OnHoverActivated += OnHoverActivated;
+
+        // Register for hover messages from violin plot (for cross-view sync)
         _messenger.Register<StudentHoverMessage>(this, (r, m) =>
         {
             if (m.Source != "dotplot") // Only respond to violin messages
@@ -1067,6 +1077,20 @@ public partial class MainWindowViewModel : ViewModelBase
         return grade.DisplayName;
     }
 
+    /// <summary>
+    /// Called by HoverDelayService when a hover is activated (after delay and stability check).
+    /// </summary>
+    private void OnHoverActivated(int? studentId)
+    {
+        HoveredStudentId = studentId;
+
+        // Broadcast to violin plot for cross-view sync
+        _messenger.Send(new StudentHoverMessage(
+            studentId,
+            "dotplot",
+            null));
+    }
+
     partial void OnHoveredStudentIdChanged(int? value)
     {
         if (value.HasValue)
@@ -1075,7 +1099,7 @@ public partial class MainWindowViewModel : ViewModelBase
             if (student != null)
             {
                 var grade = GetGradeForStudent(student);
-                HoveredStudent = new StudentCardViewModel(student, grade);
+                HoveredStudent = new StudentCardViewModel(student, grade, () => _hoverDelayService.ClearHover());
             }
             else
             {
@@ -1193,20 +1217,17 @@ public partial class MainWindowViewModel : ViewModelBase
                 IsResizeCursor = false;
             }
 
-            // Check for student hover
+            // Check for student hover - report candidate to delay service
             var student = FindNearestStudent(e.Position);
-            int? newHoveredId = student?.Id;
+            int? candidateId = student?.Id;
 
-            if (newHoveredId != HoveredStudentId)
+            // Report hover candidate to delay service (it handles timing)
+            // Note: we pass the OxyPlot screen position for stability check
+            if (candidateId != null)
             {
-                HoveredStudentId = newHoveredId;
-
-                // Broadcast hover message to violin plot
-                _messenger.Send(new StudentHoverMessage(
-                    HoveredStudentId,
-                    "dotplot",
-                    null));
+                _hoverDelayService.ReportHoverCandidate(candidateId, new Avalonia.Point(e.Position.X, e.Position.Y));
             }
+            // Don't clear on null - require explicit clear
 
             e.Handled = true;
             return;

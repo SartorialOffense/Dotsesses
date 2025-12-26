@@ -243,6 +243,7 @@ public partial class App : Application
 
         // Register services
         services.AddSingleton<ViolinPlotService>();
+        services.AddSingleton<HoverDelayService>();
 
         // Register ViewModels
         services.AddTransient<MainWindowViewModel>();

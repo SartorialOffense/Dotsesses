@@ -8,22 +8,28 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Data.Converters;
+using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.Messaging;
 using Dotsesses.Messages;
+using Dotsesses.Services;
 using Dotsesses.UI;
+using Microsoft.Extensions.DependencyInjection;
 using OxyPlot;
 
 namespace Dotsesses.UI;
 
 public partial class MainWindow : Window
 {
+    private HoverDelayService? _hoverDelayService;
+
     public MainWindow()
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
         Loaded += OnWindowLoaded;
+        PointerMoved += OnGlobalPointerMoved;
 
         // Subscribe to edit student messages
         WeakReferenceMessenger.Default.Register<EditStudentMessage>(this, async (r, m) =>
@@ -32,9 +38,26 @@ public partial class MainWindow : Window
         });
     }
 
+    private void OnGlobalPointerMoved(object? sender, PointerEventArgs e)
+    {
+        // Get service if not already cached
+        _hoverDelayService ??= App.Services?.GetService<HoverDelayService>();
+
+        if (_hoverDelayService != null)
+        {
+            var position = e.GetPosition(this);
+            _hoverDelayService.ReportMousePosition(position);
+        }
+    }
+
     private void OnWindowLoaded(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] MainWindow: Loaded event fired");
+
+        // Add PointerMoved handler to DotPlotView to capture mouse movement
+        // (OxyPlot captures events, so we need handledEventsToo=true)
+        DotPlotView.AddHandler(PointerMovedEvent, OnDotPlotPointerMoved, Avalonia.Interactivity.RoutingStrategies.Tunnel | Avalonia.Interactivity.RoutingStrategies.Bubble, handledEventsToo: true);
+
         // Initialize violin plot asynchronously after window is displayed
         if (DataContext is MainWindowViewModel vm)
         {
@@ -44,6 +67,19 @@ public partial class MainWindow : Window
         else
         {
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] MainWindow: DataContext is not MainWindowViewModel!");
+        }
+    }
+
+    private void OnDotPlotPointerMoved(object? sender, PointerEventArgs e)
+    {
+        // Get service if not already cached
+        _hoverDelayService ??= App.Services?.GetService<HoverDelayService>();
+
+        if (_hoverDelayService != null)
+        {
+            // Convert to window coordinates for consistent velocity tracking
+            var position = e.GetPosition(this);
+            _hoverDelayService.ReportMousePosition(position);
         }
     }
 

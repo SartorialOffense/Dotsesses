@@ -18,6 +18,7 @@ public partial class ViolinPlotViewModel : ViewModelBase
 {
     private readonly ViolinPlotService _violinService;
     private readonly IMessenger _messenger;
+    private readonly HoverDelayService _hoverDelayService;
     private List<ViolinDataPoint> _dataPoints = new();
     private double _svgWidth;
     private double _svgHeight;
@@ -51,7 +52,7 @@ public partial class ViolinPlotViewModel : ViewModelBase
     private int _maxScore;
 
 
-    public ViolinPlotViewModel(ViolinPlotService violinService, IMessenger messenger)
+    public ViolinPlotViewModel(ViolinPlotService violinService, IMessenger messenger, HoverDelayService hoverDelayService)
     {
         try
         {
@@ -62,8 +63,12 @@ public partial class ViolinPlotViewModel : ViewModelBase
 
         _violinService = violinService;
         _messenger = messenger;
+        _hoverDelayService = hoverDelayService;
 
-        // Register for hover messages from dotplot
+        // Subscribe to hover activation from delay service
+        _hoverDelayService.OnHoverActivated += OnHoverActivated;
+
+        // Register for hover messages from dotplot (for cross-view sync)
         _messenger.Register<StudentHoverMessage>(this, (r, m) =>
         {
             if (m.Source != "violin") // Only respond to dotplot messages
@@ -78,6 +83,20 @@ public partial class ViolinPlotViewModel : ViewModelBase
             System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}] ViolinPlotViewModel: Constructor completed\n");
         }
         catch { }
+    }
+
+    /// <summary>
+    /// Called by HoverDelayService when a hover is activated (after delay and stability check).
+    /// </summary>
+    private void OnHoverActivated(int? studentId)
+    {
+        HoveredStudentId = studentId;
+
+        // Broadcast to dotplot for cross-view sync
+        _messenger.Send(new StudentHoverMessage(
+            studentId,
+            "violin",
+            null));
     }
 
     /// <summary>
@@ -179,18 +198,14 @@ public partial class ViolinPlotViewModel : ViewModelBase
             .OrderBy(x => x.Dist)
             .FirstOrDefault();
 
-        int? newHoveredId = hit != null && hit.Dist < 15 ? hit.Point.StudentId : null;
+        int? candidateId = hit != null && hit.Dist < 15 ? hit.Point.StudentId : null;
 
-        if (newHoveredId != HoveredStudentId)
+        // Report hover candidate to delay service (it handles timing)
+        if (candidateId != null)
         {
-            HoveredStudentId = newHoveredId;
-
-            // Broadcast hover message to dotplot
-            _messenger.Send(new StudentHoverMessage(
-                HoveredStudentId,
-                "violin",
-                HoveredStudentId.HasValue ? (position.X, position.Y) : null));
+            _hoverDelayService.ReportHoverCandidate(candidateId, position);
         }
+        // Don't clear on null - require explicit clear
     }
 
     /// <summary>

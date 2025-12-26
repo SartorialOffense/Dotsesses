@@ -17,9 +17,18 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-    <Grid RowDefinitions="175,5,*">
+    <Grid RowDefinitions="Auto,175,5,*">
+        <!-- Debug Row: Velocity Display -->
+        <Border Grid.Row="0" Background="#1E1E1E" Padding="4" HorizontalAlignment="Right">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Velocity:" Foreground="#888888" FontSize="10" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding HoverDelayService.CurrentVelocity, StringFormat='{}{0:F0} px/s'}"
+                          Foreground="#00FF00" FontSize="10" FontFamily="Consolas" VerticalAlignment="Center" MinWidth="60"/>
+            </StackPanel>
+        </Border>
+
         <!-- Top Row: Color Panel, Size Panel, and Dotplot (fixed 175px height) -->
-        <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*">
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*">
 
             <!-- Color Selection Panel -->
             <Border Grid.Column="0"
@@ -216,13 +225,13 @@
         </Grid>
 
         <!-- Splitter -->
-        <GridSplitter Grid.Row="1"
+        <GridSplitter Grid.Row="2"
                       Background="#3F3F46"
                       ResizeDirection="Rows"
                       HorizontalAlignment="Stretch"/>
 
         <!-- Bottom Row: Drill-Down and Violin Plot with Horizontal Expanders -->
-        <Border Grid.Row="2" Background="#000000" BorderBrush="#3F3F46" BorderThickness="0,1,0,0">
+        <Border Grid.Row="3" Background="#000000" BorderBrush="#3F3F46" BorderThickness="0,1,0,0">
             <Grid ColumnDefinitions="300,5,*">
 
                 <!-- Left: Drill-Down Panel -->
@@ -243,8 +252,8 @@
                                        Padding="15"
                                        HorizontalAlignment="Stretch">
                                                         <Grid RowDefinitions="Auto,Auto">
-                                                            <!-- Header: Name and Grade -->
-                                                            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+                                                            <!-- Header: Name, Grade, and Clear button -->
+                                                            <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,10">
                                                                 <TextBlock Grid.Column="0"
                                                                          Text="{Binding Assessment.MuppetName}"
                                                                          Foreground="White"
@@ -261,6 +270,17 @@
                                                                              FontWeight="Bold"
                                                                              FontSize="14"/>
                                                                 </Border>
+                                                                <Button Grid.Column="2"
+                                                                       Content="X"
+                                                                       Command="{Binding ClearCommand}"
+                                                                       Background="Transparent"
+                                                                       Foreground="#888888"
+                                                                       BorderThickness="0"
+                                                                       FontSize="12"
+                                                                       Padding="6,2"
+                                                                       Margin="8,0,0,0"
+                                                                       VerticalAlignment="Center"
+                                                                       ToolTip.Tip="Clear selection"/>
                                                             </Grid>
 
                                                             <!-- Single merged table: Scores first, then Attributes -->
