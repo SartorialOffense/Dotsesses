@@ -8,6 +8,9 @@ using Dotsesses.Models;
 /// </summary>
 public class InitialCutoffCalculator
 {
+    // Default spacing between cursor positions (matches barbell handle size * 2 in score units)
+    private const int DefaultCursorSpacing = 12;
+
     /// <summary>
     /// Places cutoffs to match target counts from default curve.
     /// </summary>
@@ -30,14 +33,18 @@ public class InitialCutoffCalculator
         var cutoffs = new List<GradeCutoff>();
 
         int currentIndex = 0;
+        int? lastCutoffScore = null;
 
         // Process each grade from highest to lowest
         foreach (var curveEntry in sortedCurve)
         {
             if (currentIndex >= sortedStudents.Count)
             {
-                // No more students - place cutoff at 0
-                cutoffs.Add(new GradeCutoff(curveEntry.Grade, 0));
+                // No more students - place cutoff below the previous grade's cutoff
+                // Use standard cursor spacing to match dynamic cursor positioning
+                var catchAllScore = lastCutoffScore.HasValue ? lastCutoffScore.Value - DefaultCursorSpacing : 0;
+                cutoffs.Add(new GradeCutoff(curveEntry.Grade, catchAllScore));
+                lastCutoffScore = catchAllScore;
                 continue;
             }
 
@@ -58,6 +65,7 @@ public class InitialCutoffCalculator
             // Cutoff is the minimum score for students who received this grade (accounting for ties)
             int cutoffScore = sortedStudents[endIndex - 1].AggregateGrade;
             cutoffs.Add(new GradeCutoff(curveEntry.Grade, cutoffScore));
+            lastCutoffScore = cutoffScore;
 
             currentIndex = endIndex;
         }

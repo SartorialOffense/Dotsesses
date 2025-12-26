@@ -914,51 +914,94 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void UpdateCursorsFromComplianceGrid()
     {
-        // Track if any cursors were enabled/disabled
-        bool cursorsChanged = false;
+        // Track which grades were newly enabled (before changing IsEnabled)
+        var newlyEnabledGrades = new List<Grade>();
 
+        // First pass: identify what changed without modifying state
+        foreach (var row in ComplianceRows)
+        {
+            var cursor = Cursors.FirstOrDefault(c => c.Grade.Equals(row.Grade));
+            if (cursor != null && row.IsEnabled && !cursor.IsEnabled)
+            {
+                newlyEnabledGrades.Add(cursor.Grade);
+            }
+        }
+
+        // Capture the currently positioned grades BEFORE enabling new ones
+        var positionedGrades = new HashSet<Grade>(
+            Cursors.Where(c => c.IsEnabled).Select(c => c.Grade));
+
+        // Second pass: update IsEnabled state
         foreach (var row in ComplianceRows)
         {
             var cursor = Cursors.FirstOrDefault(c => c.Grade.Equals(row.Grade));
             if (cursor != null && cursor.IsEnabled != row.IsEnabled)
             {
                 cursor.IsEnabled = row.IsEnabled;
-                cursorsChanged = true;
             }
         }
 
-        // If cursors changed, recalculate ALL cursor positions from scratch
-        if (cursorsChanged)
+        // If grades were enabled, position them relative to existing cursors
+        if (newlyEnabledGrades.Any())
         {
-            var enabledGrades = Cursors.Where(c => c.IsEnabled).Select(c => c.Grade).ToList();
-            var totalStudents = ClassAssessment.Assessments.Count;
-            var studentsPerGrade = totalStudents / Math.Max(1, enabledGrades.Count);
-            
-            // Build curve: use DefaultCurve midpoints where available, otherwise distribute evenly
-            var enabledCurve = new List<CutoffCount>();
-            foreach (var grade in enabledGrades.OrderBy(g => g.Order))
+            // Calculate cursor spacing: 2x barbell handle size (8px * 2 = 16px) converted to score units
+            const double barbellHandlePixels = 8.0;
+            const double spacingPixels = barbellHandlePixels * 2;
+            var scoreRange = ViolinPlotViewModel?.MaxScore - ViolinPlotViewModel?.MinScore ?? 100;
+            var plotAreaFraction = (ViolinPlotViewModel?.GetPlotAreaBottomFraction() ?? 0.9) -
+                                   (ViolinPlotViewModel?.GetPlotAreaTopFraction() ?? 0.1);
+            var estimatedPlotHeight = 400.0 * plotAreaFraction;
+            var cursorSpacing = (int)Math.Ceiling(spacingPixels * scoreRange / Math.Max(1, estimatedPlotHeight));
+
+            // Process new grades in order (top grades first)
+            foreach (var newGrade in newlyEnabledGrades.OrderBy(g => g.Order))
             {
-                var defaultEntry = ClassAssessment.DefaultCurve.FirstOrDefault(cc => cc.Grade.Equals(grade));
-                var count = defaultEntry?.Midpoint ?? studentsPerGrade;
-                enabledCurve.Add(new CutoffCount(grade, count));
-            }
+                var newCursor = Cursors.First(c => c.Grade.Equals(newGrade));
 
-            // Recalculate all cutoff positions
-            var newCutoffs = _initialCutoffCalculator.Calculate(ClassAssessment.Assessments, enabledCurve);
+                // Find adjacent positioned cursors
+                var higherCursor = Cursors
+                    .Where(c => positionedGrades.Contains(c.Grade) && c.Grade.Order < newGrade.Order)
+                    .OrderByDescending(c => c.Grade.Order)
+                    .FirstOrDefault();
 
-            // Get valid drag bounds to ensure cursors are placed within draggable range
-            var minBound = ClassAssessment.Assessments.Min(a => a.AggregateGrade) - 20;
-            var maxBound = ClassAssessment.Assessments.Max(a => a.AggregateGrade) + 20;
+                var lowerCursor = Cursors
+                    .Where(c => positionedGrades.Contains(c.Grade) && c.Grade.Order > newGrade.Order)
+                    .OrderBy(c => c.Grade.Order)
+                    .FirstOrDefault();
 
-            // Update all enabled cursor positions, clamped to valid range
-            foreach (var cutoff in newCutoffs)
-            {
-                var cursor = Cursors.FirstOrDefault(c => c.Grade.Equals(cutoff.Grade));
-                if (cursor != null)
+                if (higherCursor != null)
                 {
-                    // Clamp score to valid dragging bounds
-                    cursor.Score = Math.Clamp(cutoff.Score, minBound, maxBound);
+                    // Place new cursor one spacing below the higher cursor
+                    newCursor.Score = higherCursor.Score - cursorSpacing;
+
+                    // Reposition all cursors below the new one to be evenly spaced
+                    var currentScore = newCursor.Score;
+                    foreach (var cursor in Cursors
+                        .Where(c => c.IsEnabled && c.Grade.Order > newGrade.Order)
+                        .OrderBy(c => c.Grade.Order))
+                    {
+                        currentScore -= cursorSpacing;
+                        cursor.Score = currentScore;
+                    }
                 }
+                else if (lowerCursor != null)
+                {
+                    // Adding at top - place above the highest positioned cursor
+                    var highestScore = Cursors
+                        .Where(c => positionedGrades.Contains(c.Grade))
+                        .Max(c => c.Score);
+                    newCursor.Score = highestScore + cursorSpacing;
+                }
+                else
+                {
+                    // First cursor - use middle of score range
+                    var minScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade);
+                    var maxScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade);
+                    newCursor.Score = (minScore + maxScore) / 2;
+                }
+
+                // Mark this grade as positioned for subsequent iterations
+                positionedGrades.Add(newGrade);
             }
         }
 
