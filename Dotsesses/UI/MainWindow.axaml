@@ -18,8 +18,8 @@
     </Design.DataContext>
 
     <Grid RowDefinitions="Auto,175,5,*">
-        <!-- Debug Row: Velocity Display -->
-        <Border Grid.Row="0" Background="#1E1E1E" Padding="4" HorizontalAlignment="Right">
+        <!-- Debug Row: Velocity Display (hidden) -->
+        <Border Grid.Row="0" Background="#1E1E1E" Padding="4" HorizontalAlignment="Right" IsVisible="False">
             <StackPanel Orientation="Horizontal" Spacing="8">
                 <TextBlock Text="Velocity:" Foreground="#888888" FontSize="10" VerticalAlignment="Center"/>
                 <TextBlock Text="{Binding HoverDelayService.CurrentVelocity, StringFormat='{}{0:F0} px/s'}"
