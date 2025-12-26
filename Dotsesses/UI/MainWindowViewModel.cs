@@ -155,6 +155,9 @@ public partial class MainWindowViewModel : ViewModelBase
         Log("MainWindowViewModel: Initializing compliance grid");
         InitializeComplianceGrid();
 
+        Log("MainWindowViewModel: Recalculating grade counts for all enabled grades");
+        RecalculateGradeCounts();
+
         Log("MainWindowViewModel: Initializing dotplot");
         InitializeDotplot();
 
@@ -861,25 +864,64 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void InitializeCursors()
     {
-        // Create cursors for ALL grades, enabled based on DefaultCurve
+        // Create cursors for ALL grades, all enabled at startup
         var allGrades = new DefaultCurveGenerator().GetAllGrades();
         var defaultGrades = ClassAssessment.DefaultCurve.Select(cc => cc.Grade).ToHashSet();
 
+        // First pass: create all cursors, initially enabled
+        // Note: Don't subscribe to PropertyChanged yet - DotplotModel isn't created yet
         foreach (var grade in allGrades)
         {
             var cutoff = ClassAssessment.CurrentCutoffs.FirstOrDefault(c => c.Grade.Equals(grade));
-            bool isEnabled = defaultGrades.Contains(grade);
-            int score = cutoff?.Score ?? 0; // Will be calculated when enabled
+            int score = cutoff?.Score ?? 0; // Will be calculated for non-default grades below
 
-            var cursor = new CursorViewModel(grade, score, isEnabled);
-            cursor.PropertyChanged += OnCursorPropertyChanged;
+            var cursor = new CursorViewModel(grade, score, isEnabled: true);
             Cursors.Add(cursor);
+        }
+
+        // Second pass: position grades without defined percentages (D, D-, F)
+        // Place them 2 barbell heights below the previous grade
+        var gradesWithoutDefault = allGrades.Where(g => !defaultGrades.Contains(g)).OrderBy(g => g.Order);
+
+        if (gradesWithoutDefault.Any())
+        {
+            // Calculate cursor spacing: 2x barbell handle size (8px * 2 = 16px) converted to score units
+            const double barbellHandlePixels = 8.0;
+            const double spacingPixels = barbellHandlePixels * 2;
+            var scoreRange = ClassAssessment.Assessments.Max(a => a.AggregateGrade) -
+                            ClassAssessment.Assessments.Min(a => a.AggregateGrade);
+            // Use a reasonable default plot height estimate
+            const double estimatedPlotHeight = 400.0 * 0.8; // 80% of 400px
+            var cursorSpacing = (int)Math.Ceiling(spacingPixels * scoreRange / Math.Max(1, estimatedPlotHeight));
+
+            foreach (var grade in gradesWithoutDefault)
+            {
+                var cursor = Cursors.First(c => c.Grade.Equals(grade));
+
+                // Find the cursor immediately above this one (lower Order = higher grade)
+                var higherCursor = Cursors
+                    .Where(c => c.Grade.Order < grade.Order)
+                    .OrderByDescending(c => c.Grade.Order)
+                    .FirstOrDefault();
+
+                if (higherCursor != null)
+                {
+                    cursor.Score = higherCursor.Score - cursorSpacing;
+                }
+            }
+        }
+
+        // Subscribe to property changes after all positioning is done
+        foreach (var cursor in Cursors)
+        {
+            cursor.PropertyChanged += OnCursorPropertyChanged;
         }
     }
 
     private void OnCursorPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (_isUpdatingCursorsFromSubscription) return; // Prevent re-entrancy
+        if (DotplotModel == null) return; // Not yet initialized
 
         if (e.PropertyName == nameof(CursorViewModel.Score))
         {
@@ -919,7 +961,8 @@ public partial class MainWindowViewModel : ViewModelBase
             int lowerTarget = defaultEntry?.LowerBound ?? 0;
             int upperTarget = defaultEntry?.UpperBound ?? 0;
             int currentCount = currentEntry?.Count ?? 0;
-            bool isEnabled = defaultEntry != null;
+            // All grades enabled at startup
+            bool isEnabled = true;
 
             ComplianceRows.Add(new ComplianceRowViewModel(
                 grade,

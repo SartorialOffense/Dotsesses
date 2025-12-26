@@ -8,7 +8,7 @@
              x:DataType="vm:ViolinPlotViewModel"
              Background="#000000">
 
-    <Grid ColumnDefinitions="*,66,Auto">
+    <Grid ColumnDefinitions="*,66">
         <!-- Violin plot area - left column -->
         <Grid x:Name="ViolinPlotArea" Grid.Column="0" PointerMoved="OnPointerMoved" Background="Transparent">
             <!-- SVG Background -->
@@ -28,7 +28,7 @@
             <Canvas x:Name="TooltipsOverlay" />
         </Grid>
 
-        <!-- Cursor column (Canvas-based) - middle column -->
+        <!-- Cursor column (Canvas-based) - right column -->
         <Border Grid.Column="1" Background="Transparent">
             <Canvas x:Name="CursorColumnCanvas"
                     PointerPressed="OnCursorColumnPointerPressed"
@@ -36,27 +36,5 @@
                     PointerReleased="OnCursorColumnPointerReleased"
                     Background="Transparent" />
         </Border>
-
-        <!-- Grade checkboxes - right column -->
-        <ItemsControl Grid.Column="2"
-                      ItemsSource="{Binding ComplianceRows}"
-                      VerticalAlignment="Top"
-                      Margin="4,0,4,0">
-            <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,0">
-                        <CheckBox IsChecked="{Binding IsEnabled}"
-                                  Margin="0,0,2,0"
-                                  VerticalAlignment="Center"
-                                  MinWidth="0"
-                                  Padding="0"/>
-                        <TextBlock Text="{Binding Grade.DisplayName}"
-                                   Foreground="White"
-                                   VerticalAlignment="Center"
-                                   FontSize="11"/>
-                    </StackPanel>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
     </Grid>
 </UserControl>
