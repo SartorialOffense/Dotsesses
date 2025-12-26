@@ -302,7 +302,7 @@ public partial class ViolinPlotControl : UserControl
                     Width = 5,
                     Height = 5,
                     Fill = new SolidColorBrush(Color.Parse(point.Color)),
-                    Opacity = 0.8,
+                    Opacity = 1.0,
                     Tag = (i, point.StudentId)
                 };
                 shape = ellipse;

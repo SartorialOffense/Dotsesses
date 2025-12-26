@@ -9,6 +9,15 @@ import time
 from collections import defaultdict
 import io
 from typing import Tuple, List, Dict, Optional
+from colorsys import rgb_to_hls, hls_to_rgb
+
+
+def saturate_color(rgb):
+    """Convert RGB tuple (0-1 range) to fully saturated version."""
+    r, g, b = rgb[:3]  # Handle RGBA tuples
+    h, l, s = rgb_to_hls(r, g, b)
+    # Set saturation to maximum (1.0)
+    return hls_to_rgb(h, l, 1.0)
 
 # Apply dark theme
 plt.style.use('dark_background')
@@ -68,16 +77,33 @@ def create_violin_swarm_plot(
     # Create the plot
     fig, ax = plt.subplots(figsize=fig_size)
 
-    # Use provided colors or default palette
+    # Use provided colors or explicit fully saturated colors
     if colors is None:
-        colors = sns.color_palette("bright", len(series))
+        # Cycling palette for non-Total series (excludes red, which is reserved for Total)
+        cycling_palette = [
+            '#0066FF',  # Bright blue
+            '#FF6600',  # Bright orange
+            '#00CC00',  # Bright green
+            '#FF00FF',  # Bright magenta
+            '#9933FF',  # Bright purple
+            '#00CCCC',  # Bright cyan
+            '#FFCC00',  # Bright yellow
+        ]
+        total_color = '#FF3333'  # Bright red - reserved for Total (last series)
+
+        # Build color list: cycle through palette for all but last, red for last (Total)
+        num_series = len(series)
+        colors = []
+        for i in range(num_series - 1):
+            colors.append(cycling_palette[i % len(cycling_palette)])
+        colors.append(total_color)  # Last series (Total) is always red
 
     # Sort data by ID for consistent ordering
     plot_data = plot_data.sort_values(['Series', 'id']).reset_index(drop=True)
 
-    # Create violin plot
+    # Create violin plot (alpha=0.4 for more transparency, making dots more visible)
     sns.violinplot(data=plot_data, x='Series', y='Normalized Value',
-                   hue='Series', palette=colors, alpha=0.5, inner=None,
+                   hue='Series', palette=colors, alpha=0.4, inner=None,
                    legend=False, ax=ax)
 
     # Reset seed right before stripplot for consistent jitter
@@ -93,7 +119,10 @@ def create_violin_swarm_plot(
         ax.set_title(title, fontsize=16, fontweight='bold', pad=20, color='white')
     ax.set_xlabel(xlabel, fontsize=12, fontweight='bold')
     ax.set_ylabel(ylabel, fontsize=12, fontweight='bold')
-    ax.grid(axis='y', alpha=0.2, linestyle='--', color='gray')
+    # Grid removed for cleaner appearance
+    # Simplify y-axis to show key reference points
+    ax.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
+    ax.set_yticklabels(['0', '0.25', '0.5', '0.75', '1.0'])
     plt.xticks(rotation=15, ha='right')
     plt.tight_layout()
 
