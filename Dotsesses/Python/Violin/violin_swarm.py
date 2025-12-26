@@ -30,7 +30,8 @@ def create_violin_swarm_plot(
     title: str = '',
     xlabel: str = 'Series',
     ylabel: str = 'Normalized Score (0-1)',
-    dot_size: float = 5.0
+    dot_size: float = 5.0,
+    swarm_spread: float = 1.0
 ) -> Tuple[Dict[str, int], str, List[Dict]]:
     """
     Create a violin + swarm plot with embedded metadata.
@@ -43,6 +44,7 @@ def create_violin_swarm_plot(
     - xlabel: x-axis label (default: 'Series')
     - ylabel: y-axis label (default: 'Normalized Score (0-1)')
     - dot_size: size for dots (default: 5.0)
+    - swarm_spread: multiplier for horizontal spread of swarm dots (default: 1.0, use 4.0 for 4x spread)
 
     Returns:
     - tuple of (timing_dict, svg_string, point_data_list)
@@ -106,13 +108,13 @@ def create_violin_swarm_plot(
                    hue='Series', palette=colors, alpha=0.4, inner=None,
                    legend=False, ax=ax)
 
-    # Reset seed right before stripplot for consistent jitter
+    # Reset seed right before swarmplot for consistent positioning
     np.random.seed(42)
 
-    # Add strip plot with fixed random state for consistent jitter
-    swarm = sns.stripplot(data=plot_data, x='Series', y='Normalized Value',
-                          hue='Series', palette=colors, size=dot_size, alpha=0.9,
-                          jitter=0.14, dodge=False, legend=False, ax=ax)
+    # Add swarm plot - beeswarm algorithm avoids overlap for easier selection
+    swarm = sns.swarmplot(data=plot_data, x='Series', y='Normalized Value',
+                          hue='Series', palette=colors, size=dot_size,
+                          dodge=False, legend=False, ax=ax)
 
     # Customize plot
     if title:
@@ -173,6 +175,16 @@ def create_violin_swarm_plot(
     for series_name in points_by_series:
         points_by_series[series_name].sort(key=lambda p: p['y'])
 
+    # Calculate overall plot bounds to determine series width
+    all_x_coords = [p['x'] for p in svg_points]
+    if all_x_coords:
+        plot_x_min = min(all_x_coords)
+        plot_x_max = max(all_x_coords)
+        plot_width = plot_x_max - plot_x_min
+        num_series = len(series_list)
+        # Estimate series width (with some padding factor)
+        series_width = (plot_width / num_series) * swarm_spread if num_series > 0 else plot_width
+
     # Match with data (also sorted by normalized value)
     matched_count = 0
     point_data_list = []  # Collect point data for C# rendering
@@ -196,25 +208,81 @@ def create_violin_swarm_plot(
                 int(color_rgb[2] * 255)
             )
 
-        for idx, (svg_point, row) in enumerate(zip(svg_pts, series_data.iterrows())):
-            _, row_data = row
-            elem = svg_point['element']
+        # Calculate center X for this series
+        if svg_pts:
+            center_x = sum(p['x'] for p in svg_pts) / len(svg_pts)
+        else:
+            center_x = 0
 
-            # Add generic data attributes to SVG element
-            elem.set('data-id', row_data['id'])
-            elem.set('data-series', series_name)
+        # Group points by similar Y values (bin them) to spread horizontally
+        # Use a small tolerance to group points at "same" Y level
+        y_tolerance = 2.0  # SVG units - points within this range are considered same row
 
-            # Collect point data for C# rendering
-            point_data_list.append({
-                'x': svg_point['x'],
-                'y': svg_point['y'],
-                'id': row_data['id'],
-                'series': series_name,
-                'color': color_hex,
-                'value': float(row_data['Value'])
-            })
+        # Build Y-bins: group points that are close in Y
+        y_bins = []
+        current_bin = []
+        sorted_pts_with_data = list(zip(svg_pts, series_data.iterrows()))
 
-            matched_count += 1
+        for svg_point, row in sorted_pts_with_data:
+            if not current_bin:
+                current_bin.append((svg_point, row))
+            else:
+                # Check if this point is close to the last one in Y
+                last_y = current_bin[-1][0]['y']
+                if abs(svg_point['y'] - last_y) <= y_tolerance:
+                    current_bin.append((svg_point, row))
+                else:
+                    y_bins.append(current_bin)
+                    current_bin = [(svg_point, row)]
+
+        if current_bin:
+            y_bins.append(current_bin)
+
+        # Now spread each bin evenly across the series width
+        # Zigzag offset alternates between rows to prevent vertical stacking
+        zigzag_offset = dot_size * 0.6  # Offset based on dot size
+        max_row_width = series_width * 0.8  # Maximum 80% of series width
+
+        for bin_idx, y_bin in enumerate(y_bins):
+            n_points = len(y_bin)
+
+            # Alternate zigzag direction: even rows shift left, odd rows shift right
+            row_offset = zigzag_offset if (bin_idx % 2 == 1) else -zigzag_offset
+
+            # Calculate row width: ideal is 3 dot-widths per point, but cap at max
+            if n_points <= 1:
+                row_width = 0
+            else:
+                ideal_width = (n_points - 1) * (dot_size * 3)  # 3 dot-widths between each point
+                row_width = min(ideal_width, max_row_width)
+
+            for i, (svg_point, row) in enumerate(y_bin):
+                _, row_data = row
+                elem = svg_point['element']
+
+                # Add generic data attributes to SVG element
+                elem.set('data-id', row_data['id'])
+                elem.set('data-series', series_name)
+
+                # Calculate spread X position
+                if n_points == 1:
+                    spread_x = center_x + row_offset
+                else:
+                    # Spread evenly across row_width
+                    spread_fraction = (i / (n_points - 1)) - 0.5  # -0.5 to +0.5
+                    spread_x = center_x + spread_fraction * row_width + row_offset
+
+                # Collect point data for C# rendering
+                point_data_list.append({
+                    'x': spread_x,
+                    'y': svg_point['y'],
+                    'id': row_data['id'],
+                    'series': series_name,
+                    'color': color_hex,
+                    'value': float(row_data['Value'])
+                })
+
+                matched_count += 1
 
     # Validate all points were matched
     expected_count = len(plot_data)

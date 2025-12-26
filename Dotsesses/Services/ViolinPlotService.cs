@@ -23,12 +23,14 @@ public class ViolinPlotService
     /// <param name="seriesData">List of (series name, student ID to score mapping)</param>
     /// <param name="commentMap">Map of student IDs to their comments</param>
     /// <param name="dotSize">Size of swarm dots</param>
+    /// <param name="swarmSpread">Multiplier for horizontal spread of swarm dots (default 1.0, increase to spread wider)</param>
     /// <returns>Tuple of (SVG content string, list of data points for rendering)</returns>
     public (string SvgContent, List<ViolinDataPoint> DataPoints) GeneratePlot(
         (double Width, double Height) figSize,
         List<(string SeriesName, Dictionary<string, double> Scores)> seriesData,
         Dictionary<int, string> commentMap,
-        double dotSize = 5.0)
+        double dotSize = 5.0,
+        double swarmSpread = 1.0)
     {
         // Convert to format expected by Python module
         var pySeriesList = seriesData
@@ -43,7 +45,8 @@ public class ViolinPlotService
             "", // title
             "", // xlabel (empty - just show series names)
             "Normalized Score (0-1)",
-            dotSize
+            dotSize,
+            swarmSpread
         );
 
         // Extract SVG string and point data
