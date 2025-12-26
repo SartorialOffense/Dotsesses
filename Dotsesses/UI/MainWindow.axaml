@@ -340,32 +340,18 @@
                                                                           FontWeight="SemiBold"
                                                                           Margin="0,4,0,4"/>
 
-                                                                <Border Background="Transparent"
-                                                                       BorderBrush="#3F3F46"
-                                                                       BorderThickness="1"
-                                                                       CornerRadius="3"
-                                                                       Padding="6"
-                                                                       MinHeight="60">
-                                                                    <TextBlock TextWrapping="Wrap"
-                                                                              Foreground="#CCCCCC"
-                                                                              FontSize="11"
-                                                                              FontStyle="Italic">
-                                                                        <TextBlock.Text>
-                                                                            <MultiBinding>
-                                                                                <MultiBinding.Converter>
-                                                                                    <x:Static Member="local:CommentDisplayConverter.Instance"/>
-                                                                                </MultiBinding.Converter>
-                                                                                <Binding Path="Assessment.Comment"/>
-                                                                            </MultiBinding>
-                                                                        </TextBlock.Text>
-                                                                    </TextBlock>
-                                                                </Border>
-
-                                                                <TextBlock Text="(Double-click or right-click a dot to edit comment)"
-                                                                          Foreground="#666666"
-                                                                          FontSize="10"
-                                                                          FontStyle="Italic"
-                                                                          Margin="0,4,0,0"/>
+                                                                <TextBox Text="{Binding Assessment.Comment, Mode=TwoWay}"
+                                                                        TextWrapping="Wrap"
+                                                                        AcceptsReturn="True"
+                                                                        Background="#1E1E1E"
+                                                                        Foreground="#CCCCCC"
+                                                                        BorderBrush="#3F3F46"
+                                                                        BorderThickness="1"
+                                                                        FontSize="11"
+                                                                        Padding="6"
+                                                                        MinHeight="60"
+                                                                        Watermark="Add comment..."
+                                                                        UseFloatingWatermark="False"/>
                                                             </StackPanel>
                                     </Grid>
                                 </Border>
