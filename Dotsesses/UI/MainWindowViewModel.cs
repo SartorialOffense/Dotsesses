@@ -509,13 +509,14 @@ public partial class MainWindowViewModel : ViewModelBase
         }
         else
         {
-            // Original white dots behavior - separate series for circles and squares
+            // Red dots to match violin plot Total series - separate series for circles and squares
+            var totalRed = OxyColor.Parse("#FF3333"); // Match violin plot Total series color
             var dotSeriesCircle = new ScatterSeries
             {
                 MarkerType = MarkerType.Circle,
                 MarkerSize = markerSize,
-                MarkerFill = OxyColors.White,
-                MarkerStroke = OxyColors.White,
+                MarkerFill = totalRed,
+                MarkerStroke = totalRed,
                 MarkerStrokeThickness = 0.5,
                 XAxisKey = "SharedX",
                 YAxisKey = "DotY",
@@ -527,7 +528,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 MarkerType = MarkerType.Square,
                 MarkerSize = markerSize,
                 MarkerFill = OxyColors.Transparent,
-                MarkerStroke = OxyColors.White,
+                MarkerStroke = totalRed,
                 MarkerStrokeThickness = 1.5,
                 XAxisKey = "SharedX",
                 YAxisKey = "DotY",
@@ -613,31 +614,47 @@ public partial class MainWindowViewModel : ViewModelBase
         var lowestGrade = enabledCursors.OrderByDescending(c => c.Grade.Order).FirstOrDefault();
         foreach (var cursor in enabledCursors.Where(c => c != lowestGrade))
         {
-            // Thin vertical line spanning both Dot and Cursor areas (draw in DotY axis which spans more of the plot)
+            // Thin vertical line in the Dot area (behind dots)
             var line = new LineAnnotation
             {
                 Type = LineAnnotationType.Vertical,
                 X = cursor.Score,
-                Color = OxyColors.White,
+                Color = OxyColor.FromAColor(128, OxyColors.White), // 50% transparency
                 LineStyle = LineStyle.Solid,
                 StrokeThickness = 1,
                 XAxisKey = "SharedX",
                 YAxisKey = "DotY",
                 MinimumY = dotYAxis.Minimum,
-                MaximumY = dotYAxis.Maximum
+                MaximumY = dotYAxis.Maximum,
+                Layer = AnnotationLayer.BelowSeries
             };
             DotplotModel.Annotations.Add(line);
 
-            // Square handle at bottom of cursor area using PointAnnotation (fixed screen-space size)
+            // Extend line into cursor area (from top of cursor area down to handle)
+            var cursorLine = new LineAnnotation
+            {
+                Type = LineAnnotationType.Vertical,
+                X = cursor.Score,
+                Color = OxyColor.FromAColor(128, OxyColors.White), // 50% transparency
+                LineStyle = LineStyle.Solid,
+                StrokeThickness = 1,
+                XAxisKey = "SharedX",
+                YAxisKey = "CursorY",
+                MinimumY = 0.5, // Stop at handle center
+                MaximumY = cursorYAxis.Maximum
+            };
+            DotplotModel.Annotations.Add(cursorLine);
+
+            // Square handle at bottom of cursor area using PointAnnotation (fixed screen-space size), hollow
             var handle = new PointAnnotation
             {
                 X = cursor.Score,
                 Y = 0.5, // Center of cursor area
                 Size = 4, // Screen pixels (half of original 8)
                 Shape = MarkerType.Square,
-                Fill = OxyColors.White,
+                Fill = OxyColors.Black,
                 Stroke = OxyColors.White,
-                StrokeThickness = 1,
+                StrokeThickness = 2,
                 XAxisKey = "SharedX",
                 YAxisKey = "CursorY"
             };
@@ -1158,6 +1175,16 @@ public partial class MainWindowViewModel : ViewModelBase
                     // Single click - record for potential double-click
                     _lastClickTime = now;
                     _lastClickedStudentId = nearestPoint.Id;
+                    e.Handled = true;
+                    return;
+                }
+            }
+            else
+            {
+                // Clicked on empty space in Dot Display area - clear hover
+                if (e.ChangedButton == OxyMouseButton.Left)
+                {
+                    _hoverDelayService.ClearHover();
                     e.Handled = true;
                     return;
                 }

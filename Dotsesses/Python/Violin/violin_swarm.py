@@ -126,6 +126,8 @@ def create_violin_swarm_plot(
     ax.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
     ax.set_yticklabels(['0', '0.25', '0.5', '0.75', '1.0'])
     plt.xticks(rotation=15, ha='right')
+    # Add padding on left and right to prevent violin plots from being cut off
+    plt.subplots_adjust(left=0.08, right=0.92)
     plt.tight_layout()
 
     t_rendering = time.perf_counter()

@@ -246,8 +246,8 @@
                         <ContentControl.ContentTemplate>
                             <DataTemplate x:DataType="vm:StudentCardViewModel">
                                 <Border Background="Transparent"
-                                       BorderBrush="#007ACC"
-                                       BorderThickness="2"
+                                       BorderBrush="Transparent"
+                                       BorderThickness="0"
                                        CornerRadius="4"
                                        Padding="15"
                                        HorizontalAlignment="Stretch">

@@ -563,6 +563,15 @@ public partial class ViolinPlotControl : UserControl
                 e.Handled = true;
             }
         }
+        else
+        {
+            // Clicked on empty space - clear hover
+            if (position.Properties.IsLeftButtonPressed)
+            {
+                WeakReferenceMessenger.Default.Send(new StudentHoverMessage(null, "violin"));
+                e.Handled = true;
+            }
+        }
     }
 
     // Barbell cursor state
@@ -594,14 +603,15 @@ public partial class ViolinPlotControl : UserControl
 
         if (!cursorsWithLines.Any()) return;
 
-        var lineBrush = Brushes.White;
+        var lineBrush = new SolidColorBrush(Color.FromArgb(128, 255, 255, 255)); // 50% transparent white
+        var handleBrush = Brushes.White; // Handles stay fully opaque
 
         // Draw barbell cursors at each grade boundary
         foreach (var cursor in cursorsWithLines)
         {
             var y = vm.ScoreToDisplayY(cursor.Score, height);
 
-            // Draw the horizontal line (bar)
+            // Draw the horizontal line (bar) - 50% transparent
             var line = new Line
             {
                 StartPoint = new Point(bandLeft, y),
@@ -613,29 +623,33 @@ public partial class ViolinPlotControl : UserControl
             };
             RegionBandsOverlay.Children.Add(line);
 
-            // Left handle (square) - right edge touches line
+            // Left handle (square) - moved inward towards series center, hollow
             var leftHandle = new Rectangle
             {
                 Width = BarbellHandleSize,
                 Height = BarbellHandleSize,
-                Fill = lineBrush,
+                Fill = Brushes.Black,
+                Stroke = handleBrush,
+                StrokeThickness = 2,
                 Tag = cursor,
                 Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.SizeNorthSouth)
             };
-            Canvas.SetLeft(leftHandle, bandLeft - BarbellHandleSize);
+            Canvas.SetLeft(leftHandle, bandLeft); // Inward from left edge
             Canvas.SetTop(leftHandle, y - BarbellHandleSize / 2);
             RegionBandsOverlay.Children.Add(leftHandle);
 
-            // Right handle (square) - left edge touches line
+            // Right handle (square) - moved inward towards series center, hollow
             var rightHandle = new Rectangle
             {
                 Width = BarbellHandleSize,
                 Height = BarbellHandleSize,
-                Fill = lineBrush,
+                Fill = Brushes.Black,
+                Stroke = handleBrush,
+                StrokeThickness = 2,
                 Tag = cursor,
                 Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.SizeNorthSouth)
             };
-            Canvas.SetLeft(rightHandle, bandRight);
+            Canvas.SetLeft(rightHandle, bandRight - BarbellHandleSize); // Inward from right edge
             Canvas.SetTop(rightHandle, y - BarbellHandleSize / 2);
             RegionBandsOverlay.Children.Add(rightHandle);
         }
@@ -655,6 +669,12 @@ public partial class ViolinPlotControl : UserControl
             _draggingBarbellCursor = cursor;
             _isDraggingBarbell = true;
             e.Pointer.Capture(RegionBandsOverlay);
+            e.Handled = true;
+        }
+        else
+        {
+            // Clicked on empty space - clear hover
+            WeakReferenceMessenger.Default.Send(new StudentHoverMessage(null, "violin"));
             e.Handled = true;
         }
     }
