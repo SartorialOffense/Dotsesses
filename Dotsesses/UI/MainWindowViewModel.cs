@@ -72,30 +72,13 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool _isResizeCursor;
 
     [ObservableProperty]
-    private bool _isColorSelectionPaneOpen = false;
-
-    [ObservableProperty]
-    private bool _isSizePaneOpen = false;
-
-    [ObservableProperty]
     private bool _isDrillDownPaneOpen = true;
 
     [ObservableProperty]
     private bool _isViolinPaneOpen = true;
 
     [ObservableProperty]
-    private string? _selectedColorAttribute;
-
-    [ObservableProperty]
     private ViolinPlotViewModel? _violinPlotViewModel;
-
-    [ObservableProperty]
-    private ObservableCollection<ColorLegendItem> _colorLegend = new();
-
-    [ObservableProperty]
-    private double _dotSize = 2.0;
-
-    public List<string> AvailableColorAttributes { get; private set; } = new();
 
     /// <summary>
     /// Exposes the hover delay service for debug display and clear command binding.
@@ -254,18 +237,6 @@ public partial class MainWindowViewModel : ViewModelBase
         );
 
         _gradeAssigner = new GradeAssigner(initialCutoffs);
-        
-        // Initialize available color attributes
-        AvailableColorAttributes = new List<string> { "[None]" };
-        var attributeNames = ClassAssessment.Assessments
-            .SelectMany(a => a.Attributes)
-            .Select(attr => attr.Name)
-            .Distinct()
-            .OrderBy(name => name);
-        AvailableColorAttributes.AddRange(attributeNames);
-        
-        // Set default to [None]
-        SelectedColorAttribute = "[None]";
     }
 
     private void InitializeDotplot()
@@ -446,129 +417,64 @@ public partial class MainWindowViewModel : ViewModelBase
             .GroupBy(a => a.AggregateGrade)
             .OrderBy(g => g.Key);
 
-        // Use dynamic dot size from slider
-        var markerSize = DotSize;
+        // Fixed dot size
+        const double markerSize = 2.0;
 
-        // Check if we're coloring by attribute
-        bool colorByAttribute = !string.IsNullOrEmpty(SelectedColorAttribute) && SelectedColorAttribute != "[None]";
-
-        if (colorByAttribute)
+        // Red dots to match violin plot Total series - separate series for circles and squares
+        var totalRed = OxyColor.Parse("#FF3333"); // Match violin plot Total series color
+        var dotSeriesCircle = new ScatterSeries
         {
-            // Create separate series for each attribute value, split by marker type
-            var seriesByValueCircle = new Dictionary<string, ScatterSeries>();
-            var seriesByValueSquare = new Dictionary<string, ScatterSeries>();
+            MarkerType = MarkerType.Circle,
+            MarkerSize = markerSize,
+            MarkerFill = totalRed,
+            MarkerStroke = totalRed,
+            MarkerStrokeThickness = 0.5,
+            XAxisKey = "SharedX",
+            YAxisKey = "DotY",
+            TrackerFormatString = ""
+        };
 
-            foreach (var group in scoreGroups)
+        var dotSeriesSquare = new ScatterSeries
+        {
+            MarkerType = MarkerType.Square,
+            MarkerSize = markerSize,
+            MarkerFill = OxyColors.Transparent,
+            MarkerStroke = totalRed,
+            MarkerStrokeThickness = 1.5,
+            XAxisKey = "SharedX",
+            YAxisKey = "DotY",
+            TrackerFormatString = ""
+        };
+
+        foreach (var group in scoreGroups)
+        {
+            var studentsAtScore = group.OrderBy(s => s.Id).ToList();
+            var binOffset = group.Key % 2 == 1 ? 0.1 : 0.0;
+
+            for (int i = 0; i < studentsAtScore.Count; i++)
             {
-                var studentsAtScore = group.OrderBy(s => s.Id).ToList();
-                var binOffset = group.Key % 2 == 1 ? 0.1 : 0.0;
+                double yPos = i * 2 + binOffset;
+                var student = studentsAtScore[i];
+                var muppetName = ClassAssessment.MuppetNameMap.TryGetValue(student.Id, out var info) ? info.Name : "Unknown";
 
-                for (int i = 0; i < studentsAtScore.Count; i++)
+                var point = new ScatterPoint(group.Key, yPos, tag: $"{muppetName}\nScore: {student.AggregateGrade}");
+
+                // Add to appropriate series based on whether student has a comment
+                bool hasComment = !string.IsNullOrEmpty(student.Comment);
+                if (hasComment)
                 {
-                    double yPos = i * 2 + binOffset;
-                    var student = studentsAtScore[i];
-                    var muppetName = ClassAssessment.MuppetNameMap.TryGetValue(student.Id, out var info) ? info.Name : "Unknown";
-
-                    var point = new ScatterPoint(group.Key, yPos, tag: $"{muppetName}\nScore: {student.AggregateGrade}");
-
-                    // Get the attribute value for this student
-                    var attributeValue = student.Attributes
-                        .FirstOrDefault(attr => attr.Name == SelectedColorAttribute)?.Value ?? "Unknown";
-
-                    // Determine if student has a comment
-                    bool hasComment = !string.IsNullOrEmpty(student.Comment);
-                    var seriesByValue = hasComment ? seriesByValueSquare : seriesByValueCircle;
-                    var markerType = hasComment ? MarkerType.Square : MarkerType.Circle;
-
-                    // Get or create series for this value and marker type
-                    if (!seriesByValue.ContainsKey(attributeValue))
-                    {
-                        var color = GetOxyColorForValue(attributeValue);
-                        seriesByValue[attributeValue] = new ScatterSeries
-                        {
-                            MarkerType = markerType,
-                            MarkerSize = markerSize,
-                            MarkerFill = hasComment ? OxyColors.Transparent : color,
-                            MarkerStroke = color,
-                            MarkerStrokeThickness = hasComment ? 1.5 : 0.5,
-                            XAxisKey = "SharedX",
-                            YAxisKey = "DotY",
-                            TrackerFormatString = ""
-                        };
-                    }
-
-                    seriesByValue[attributeValue].Points.Add(point);
+                    dotSeriesSquare.Points.Add(point);
+                }
+                else
+                {
+                    dotSeriesCircle.Points.Add(point);
                 }
             }
-
-            // Add colored series (circles then squares)
-            foreach (var series in seriesByValueCircle.Values)
-            {
-                DotplotModel.Series.Add(series);
-            }
-            foreach (var series in seriesByValueSquare.Values)
-            {
-                DotplotModel.Series.Add(series);
-            }
         }
-        else
-        {
-            // Red dots to match violin plot Total series - separate series for circles and squares
-            var totalRed = OxyColor.Parse("#FF3333"); // Match violin plot Total series color
-            var dotSeriesCircle = new ScatterSeries
-            {
-                MarkerType = MarkerType.Circle,
-                MarkerSize = markerSize,
-                MarkerFill = totalRed,
-                MarkerStroke = totalRed,
-                MarkerStrokeThickness = 0.5,
-                XAxisKey = "SharedX",
-                YAxisKey = "DotY",
-                TrackerFormatString = ""
-            };
 
-            var dotSeriesSquare = new ScatterSeries
-            {
-                MarkerType = MarkerType.Square,
-                MarkerSize = markerSize,
-                MarkerFill = OxyColors.Transparent,
-                MarkerStroke = totalRed,
-                MarkerStrokeThickness = 1.5,
-                XAxisKey = "SharedX",
-                YAxisKey = "DotY",
-                TrackerFormatString = ""
-            };
-
-            foreach (var group in scoreGroups)
-            {
-                var studentsAtScore = group.OrderBy(s => s.Id).ToList();
-                var binOffset = group.Key % 2 == 1 ? 0.1 : 0.0;
-
-                for (int i = 0; i < studentsAtScore.Count; i++)
-                {
-                    double yPos = i * 2 + binOffset;
-                    var student = studentsAtScore[i];
-                    var muppetName = ClassAssessment.MuppetNameMap.TryGetValue(student.Id, out var info) ? info.Name : "Unknown";
-
-                    var point = new ScatterPoint(group.Key, yPos, tag: $"{muppetName}\nScore: {student.AggregateGrade}");
-
-                    // Add to appropriate series based on whether student has a comment
-                    bool hasComment = !string.IsNullOrEmpty(student.Comment);
-                    if (hasComment)
-                    {
-                        dotSeriesSquare.Points.Add(point);
-                    }
-                    else
-                    {
-                        dotSeriesCircle.Points.Add(point);
-                    }
-                }
-            }
-
-            // Add main dots (circles then squares)
-            DotplotModel.Series.Add(dotSeriesCircle);
-            DotplotModel.Series.Add(dotSeriesSquare);
-        }
+        // Add main dots (circles then squares)
+        DotplotModel.Series.Add(dotSeriesCircle);
+        DotplotModel.Series.Add(dotSeriesSquare);
 
         DotplotModel.InvalidatePlot(true);
     }
@@ -1106,20 +1012,6 @@ public partial class MainWindowViewModel : ViewModelBase
         IsCompliancePaneOpen = !IsCompliancePaneOpen;
     }
 
-
-    [RelayCommand]
-    private void ToggleColorSelectionPane()
-    {
-        IsColorSelectionPaneOpen = !IsColorSelectionPaneOpen;
-    }
-
-    [RelayCommand]
-    private void ToggleSizePane()
-    {
-        IsSizePaneOpen = !IsSizePaneOpen;
-    }
-
-
     [RelayCommand]
     private void ToggleDrillDownPane()
     {
@@ -1428,76 +1320,4 @@ public partial class MainWindowViewModel : ViewModelBase
 
         return nearest;
     }
-
-
-    partial void OnSelectedColorAttributeChanged(string? value)
-    {
-        UpdateColorLegend();
-        
-        // Only update dotplot if it's been initialized
-        if (DotplotModel != null)
-        {
-            UpdateDotplotPoints();
-        }
-    }
-
-    partial void OnDotSizeChanged(double value)
-    {
-        // Only update dotplot if it's been initialized
-        if (DotplotModel != null)
-        {
-            UpdateDotplotPoints();
-        }
-    }
-
-    private void UpdateColorLegend()
-    {
-        ColorLegend.Clear();
-
-        if (string.IsNullOrEmpty(SelectedColorAttribute) || SelectedColorAttribute == "[None]")
-        {
-            return;
-        }
-
-        // Get all distinct values for the selected attribute
-        var distinctValues = ClassAssessment.Assessments
-            .SelectMany(a => a.Attributes)
-            .Where(attr => attr.Name == SelectedColorAttribute)
-            .Select(attr => attr.Value)
-            .Distinct()
-            .OrderBy(v => v)
-            .ToList();
-
-        foreach (var value in distinctValues)
-        {
-            var color = GetColorForValue(value);
-            ColorLegend.Add(new ColorLegendItem(value, color));
-        }
-    }
-
-    private string GetColorForValue(string value)
-    {
-        return value switch
-        {
-            "Yes" => "#00FF00",      // Green
-            "No" => "#FF0000",       // Red
-            "✓✓+" => "#BB66FF",      // Bright Purple (was too dark)
-            "✓+" => "#00FF00",       // Green
-            "✓" => "#FFFF00",        // Yellow
-            "✓-" => "#FF0000",       // Red
-            _ => "#FFFFFF"           // White (default)
-        };
-    }
-
-    public OxyColor GetOxyColorForValue(string value)
-    {
-        var hexColor = GetColorForValue(value);
-        // Remove # and parse
-        var hex = hexColor.TrimStart('#');
-        var r = Convert.ToByte(hex.Substring(0, 2), 16);
-        var g = Convert.ToByte(hex.Substring(2, 2), 16);
-        var b = Convert.ToByte(hex.Substring(4, 2), 16);
-        return OxyColor.FromRgb(r, g, b);
-    }
-
 }

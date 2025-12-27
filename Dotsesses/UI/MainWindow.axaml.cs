@@ -134,25 +134,11 @@ public partial class MainWindow : Window
         if (double.IsNaN(screenPoint.Y))
             return;
 
-        // Get the actual dot color (same alpha as main dots)
-        Color dotColor;
-        bool colorByAttribute = !string.IsNullOrEmpty(vm.SelectedColorAttribute) && vm.SelectedColorAttribute != "[None]";
-
-        if (colorByAttribute)
-        {
-            var attributeValue = student.Attributes
-                .FirstOrDefault(attr => attr.Name == vm.SelectedColorAttribute)?.Value ?? "Unknown";
-            var oxyColor = vm.GetOxyColorForValue(attributeValue);
-            dotColor = Color.FromArgb(255, oxyColor.R, oxyColor.G, oxyColor.B);
-        }
-        else
-        {
-            dotColor = Color.FromArgb(255, 255, 255, 255); // White
-        }
-
         // Draw hover marker as annulus/ring in screen coordinates (6x normal size)
-        double markerSize = vm.DotSize * 6;
-        double ringThickness = vm.DotSize * 1.0;
+        const double dotSize = 2.0;
+        double markerSize = dotSize * 6;
+        double ringThickness = dotSize * 1.0;
+        Color dotColor = Color.FromArgb(255, 255, 255, 255); // White
         var hoverMarker = new Ellipse
         {
             Width = markerSize,
