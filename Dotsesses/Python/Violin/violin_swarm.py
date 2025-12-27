@@ -10,6 +10,115 @@ from collections import defaultdict
 import io
 from typing import Tuple, List, Dict, Optional
 from colorsys import rgb_to_hls, hls_to_rgb
+import math
+
+
+def compact_swarm_layout(y_values: np.ndarray, x_size: float, y_size: float,
+                          side: int = 0) -> np.ndarray:
+    """
+    Compact swarm algorithm for optimal dot placement.
+
+    Places points one at a time, always choosing the unplaced point that can be
+    positioned closest to the center axis (x=0). This produces tighter, more
+    symmetric layouts than the standard sequential swarm algorithm.
+
+    Based on the R beeswarm package's compactSwarm algorithm.
+
+    Parameters:
+    - y_values: array of Y positions (data axis values)
+    - x_size: horizontal size of each point (for collision detection)
+    - y_size: vertical size of each point (for collision detection)
+    - side: -1 (left only), 0 (both sides), 1 (right only)
+
+    Returns:
+    - x_offsets: array of X offsets from center for each point
+    """
+    n = len(y_values)
+    if n == 0:
+        return np.array([])
+
+    # Normalize sizes so we work in "radius = 1" space
+    # Two points collide if their distance < 2 (each has radius 1)
+    y_scaled = y_values / y_size if y_size > 0 else y_values
+    x_scale = x_size / y_size if y_size > 0 else 1.0
+
+    # Track placement state
+    placed = np.zeros(n, dtype=bool)
+    x_offsets = np.zeros(n)
+
+    # For each unplaced point, track the best (closest to 0) valid X position
+    x_low = np.zeros(n)   # Best negative X position
+    x_high = np.zeros(n)  # Best positive X position
+    x_best = np.zeros(n)  # Current best X (whichever is closer to 0)
+
+    for iteration in range(n):
+        # Find unplaced point with x_best closest to 0
+        best_idx = -1
+        best_abs = float('inf')
+        for i in range(n):
+            if not placed[i]:
+                if abs(x_best[i]) < best_abs:
+                    best_abs = abs(x_best[i])
+                    best_idx = i
+
+        if best_idx < 0:
+            break
+
+        # Place this point
+        i = best_idx
+        xi = x_best[i]
+        yi = y_scaled[i]
+        x_offsets[i] = xi
+        placed[i] = True
+
+        # Update constraints for all remaining unplaced points
+        for j in range(n):
+            if placed[j]:
+                continue
+
+            # Check if point j is close enough in Y to potentially collide
+            y_diff = abs(yi - y_scaled[j])
+            if y_diff >= 2.0:  # Too far apart in Y, no collision possible
+                continue
+
+            # Calculate minimum X separation needed to avoid collision
+            # Two circles of radius 1 collide if distance < 2
+            # distance = sqrt(dx^2 + dy^2) >= 2
+            # dx >= sqrt(4 - dy^2)
+            x_separation = math.sqrt(4.0 - y_diff * y_diff)
+
+            # Update the valid X ranges for point j
+            # Point j cannot be placed within x_separation of xi
+            new_high = xi + x_separation
+            new_low = xi - x_separation
+
+            if new_high > x_high[j]:
+                x_high[j] = new_high
+            if new_low < x_low[j]:
+                x_low[j] = new_low
+
+            # Update best X for point j
+            if side == 0:
+                # Both sides allowed - pick whichever is closer to 0
+                if -x_low[j] < x_high[j]:
+                    x_best[j] = x_low[j]
+                else:
+                    x_best[j] = x_high[j]
+            elif side == 1:
+                # Right side only
+                x_best[j] = x_high[j]
+            else:
+                # Left side only
+                x_best[j] = x_low[j]
+
+    # Scale back to original units
+    x_offsets = x_offsets * x_scale * y_size
+
+    # If side == -1, we computed right-side and need to flip
+    if side == -1:
+        x_offsets = -x_offsets
+
+    return x_offsets
 
 
 def saturate_color(rgb):
@@ -241,13 +350,12 @@ def create_violin_swarm_plot(
         svg_y_min = 0
         svg_y_max = 100
 
-    # Match with data (also sorted by normalized value)
-    matched_count = 0
-    point_data_list = []  # Collect point data for C# rendering
+    # Generate point data using compact swarm algorithm
+    point_data_list = []
 
     for series_name in series_list:
         mask = plot_data['Series'] == series_name
-        series_data = plot_data[mask].sort_values('Normalized Value', ascending=False).reset_index(drop=True)
+        series_data = plot_data[mask].reset_index(drop=True)
         svg_pts = points_by_series.get(series_name, [])
 
         # Get color for this series (from palette)
@@ -264,104 +372,62 @@ def create_violin_swarm_plot(
                 int(color_rgb[2] * 255)
             )
 
-        # Calculate center X for this series
+        # Calculate center X for this series from SVG points
         if svg_pts:
             center_x = sum(p['x'] for p in svg_pts) / len(svg_pts)
         else:
             center_x = 0
 
-        # Group points by normalized value (bin them) to spread horizontally
-        # Use a small tolerance for floating point comparison
-        value_tolerance = 0.001  # Points within this normalized value range are same row
+        # Get normalized values for swarm algorithm
+        y_values = series_data['Normalized Value'].values
 
-        # Build value-bins: group points that have the same normalized value
-        value_bins = []
-        current_bin = []
-        sorted_pts_with_data = list(zip(svg_pts, series_data.iterrows()))
+        # Run compact swarm algorithm
+        # y_size controls collision detection threshold in normalized units
+        # x_size controls horizontal spacing in SVG units
+        y_size = 0.02  # Normalized units - points within this Y distance can collide
+        x_size = dot_size * 1.5  # SVG units for horizontal collision
 
-        for svg_point, row in sorted_pts_with_data:
-            _, row_data = row
+        x_offsets = compact_swarm_layout(y_values, x_size, y_size, side=0)
+
+        # Scale X offsets to fit within series width
+        if len(x_offsets) > 0 and np.max(np.abs(x_offsets)) > 0:
+            max_offset = np.max(np.abs(x_offsets))
+            max_allowed = series_width * 0.4  # Use 40% of series width on each side
+            if max_offset > max_allowed:
+                scale_factor = max_allowed / max_offset
+                x_offsets = x_offsets * scale_factor
+
+        # Generate point data
+        for i, (_, row_data) in enumerate(series_data.iterrows()):
             norm_val = row_data['Normalized Value']
-            if not current_bin:
-                current_bin.append((svg_point, row, norm_val))
-            else:
-                # Check if this point has the same normalized value as the last one
-                last_norm_val = current_bin[-1][2]
-                if abs(norm_val - last_norm_val) <= value_tolerance:
-                    current_bin.append((svg_point, row, norm_val))
-                else:
-                    value_bins.append(current_bin)
-                    current_bin = [(svg_point, row, norm_val)]
 
-        if current_bin:
-            value_bins.append(current_bin)
+            # X position = center + swarm offset
+            spread_x = center_x + x_offsets[i]
 
-        # Now spread each bin evenly across the series width
-        # Calculate max row width first (needed for zigzag offset calculation)
-        max_row_width = series_width * 0.8  # Maximum 80% of series width
+            # Calculate Y directly from normalized value using matplotlib's exact transform
+            # Linear interpolation between svg_y_max (norm=0) and svg_y_min (norm=1)
+            correct_y = svg_y_max - norm_val * (svg_y_max - svg_y_min)
 
-        # Zigzag offset should be large enough to prevent overlap with adjacent rows
-        # Use half the typical spacing between points in a multi-point row
-        base_zigzag = dot_size * 1.5  # Base offset for small rows
-
-        for bin_idx, value_bin in enumerate(value_bins):
-            n_points = len(value_bin)
-
-            # Calculate row width: ideal is 3 dot-widths per point, but cap at max
-            if n_points <= 1:
-                row_width = 0
-            else:
-                ideal_width = (n_points - 1) * (dot_size * 3)  # 3 dot-widths between each point
-                row_width = min(ideal_width, max_row_width)
-
-            # Zigzag offset alternates between rows to prevent vertical stacking
-            # For single-point rows, offset by half the typical multi-point row width
-            # This ensures single points don't sit directly above/below the center of multi-point rows
-            if n_points == 1:
-                # Single point: offset more aggressively based on typical row spread
-                zigzag_offset = max(base_zigzag, max_row_width * 0.25)
-            else:
-                # Multi-point row: smaller offset since points are already spread
-                zigzag_offset = base_zigzag
-
-            row_offset = zigzag_offset if (bin_idx % 2 == 1) else -zigzag_offset
-
-            for i, (svg_point, row, norm_val) in enumerate(value_bin):
-                _, row_data = row
-                elem = svg_point['element']
-
-                # Add generic data attributes to SVG element
+            # Mark SVG element for removal (if we have corresponding SVG point)
+            if i < len(svg_pts):
+                elem = svg_pts[i]['element']
                 elem.set('data-id', row_data['id'])
                 elem.set('data-series', series_name)
 
-                # Calculate spread X position
-                if n_points == 1:
-                    spread_x = center_x + row_offset
-                else:
-                    # Spread evenly across row_width
-                    spread_fraction = (i / (n_points - 1)) - 0.5  # -0.5 to +0.5
-                    spread_x = center_x + spread_fraction * row_width + row_offset
+            # Collect point data for C# rendering
+            point_data_list.append({
+                'x': spread_x,
+                'y': correct_y,
+                'id': row_data['id'],
+                'series': series_name,
+                'color': color_hex,
+                'value': float(row_data['Value'])
+            })
 
-                # Calculate correct Y from normalized value (not Seaborn's jittered Y)
-                # SVG Y is inverted: low Y = top = high normalized value (1.0)
-                correct_y = svg_y_max - norm_val * (svg_y_max - svg_y_min)
-
-                # Collect point data for C# rendering
-                point_data_list.append({
-                    'x': spread_x,
-                    'y': correct_y,
-                    'id': row_data['id'],
-                    'series': series_name,
-                    'color': color_hex,
-                    'value': float(row_data['Value'])
-                })
-
-                matched_count += 1
-
-    # Validate all points were matched
+    # Validate all points were generated
     expected_count = len(plot_data)
-    if matched_count != expected_count:
-        raise ValueError(f"Point matching failed: matched {matched_count} points but expected {expected_count}")
+    if len(point_data_list) != expected_count:
+        raise ValueError(f"Point generation failed: generated {len(point_data_list)} points but expected {expected_count}")
 
     # Remove swarm points from SVG (they will be rendered dynamically in C#)
     for elem in root.iter():
