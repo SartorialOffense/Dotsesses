@@ -226,8 +226,8 @@ public partial class ViolinPlotViewModel : ViewModelBase
 
     /// <summary>
     /// Gets the X bounds (in display coordinates) for the "Total" series.
-    /// Left edge is midpoint between rightmost dot of adjacent series and leftmost Total dot.
-    /// Right edge uses symmetric spacing from rightmost Total dot, with margin from plot edge.
+    /// Calculates series width based on plot width divided by number of series,
+    /// accounting for extra right-side padding in the plot.
     /// Returns null if no Total series found.
     /// </summary>
     public (double Left, double Right)? GetTotalSeriesDisplayBounds(double displayWidth, double displayHeight)
@@ -239,53 +239,30 @@ public partial class ViolinPlotViewModel : ViewModelBase
         if (!totalPoints.Any())
             return null;
 
-        // Get leftmost and rightmost Total point X in SVG coordinates
-        var totalLeftSvgX = totalPoints.Min(p => p.X);
-        var totalRightSvgX = totalPoints.Max(p => p.X);
+        // Get the number of unique series
+        var seriesNames = _dataPoints.Select(p => p.Series).Distinct().ToList();
+        var numSeries = seriesNames.Count;
+        if (numSeries == 0) return null;
 
-        // Find the series directly to the left of Total (has the highest X that's less than Total's min X)
-        var adjacentSeriesPoints = _dataPoints
-            .Where(p => !p.Series.Equals("Total", StringComparison.OrdinalIgnoreCase))
-            .GroupBy(p => p.Series)
-            .Select(g => new { Series = g.Key, MaxX = g.Max(p => p.X) })
-            .Where(s => s.MaxX < totalLeftSvgX)
-            .OrderByDescending(s => s.MaxX)
-            .FirstOrDefault();
-
-        double leftBoundSvgX;
-        double halfGap;
-        if (adjacentSeriesPoints != null)
-        {
-            // Midpoint between rightmost dot of adjacent series and leftmost Total dot
-            halfGap = (totalLeftSvgX - adjacentSeriesPoints.MaxX) / 2.0;
-            leftBoundSvgX = adjacentSeriesPoints.MaxX + halfGap;
-        }
-        else
-        {
-            // Fallback: use Total's left edge with some padding
-            halfGap = 10;
-            leftBoundSvgX = totalLeftSvgX - halfGap;
-        }
-
-        // Right edge: symmetric spacing from rightmost Total dot
-        var rightBoundSvgX = totalRightSvgX + halfGap;
+        // Calculate the center X of the Total series in SVG coordinates
+        var totalCenterSvgX = totalPoints.Average(p => p.X);
 
         // Convert to display coordinates
-        var (left, _) = SvgToDisplayWithSize(leftBoundSvgX, 0, displayWidth, displayHeight);
-        var (right, _) = SvgToDisplayWithSize(rightBoundSvgX, 0, displayWidth, displayHeight);
+        var (centerDisplay, _) = SvgToDisplayWithSize(totalCenterSvgX, 0, displayWidth, displayHeight);
 
-        // Ensure right edge doesn't exceed display width minus margin
-        const double rightMargin = 20;
-        if (right > displayWidth - rightMargin)
-        {
-            // Clamp right edge and adjust left to maintain symmetry around Total center
-            var totalCenterSvgX = (totalLeftSvgX + totalRightSvgX) / 2.0;
-            var (centerDisplay, _) = SvgToDisplayWithSize(totalCenterSvgX, 0, displayWidth, displayHeight);
+        // The plot has extra padding on the right for statistics labels (approximately 0.25 units in matplotlib)
+        // We need to subtract this from the effective plot width before dividing by series count
+        // The padding takes up roughly the equivalent of 0.25/numSeries of the total width
+        const double rightPaddingFraction = 0.25;  // matches xlim adjustment in Python
+        var effectivePlotWidth = displayWidth * (numSeries / (numSeries + rightPaddingFraction));
 
-            right = displayWidth - rightMargin;
-            var halfWidth = right - centerDisplay;
-            left = centerDisplay - halfWidth;
-        }
+        // Calculate estimated series width
+        var seriesWidth = effectivePlotWidth / numSeries;
+
+        // Center the barbell bounds around the Total series center
+        var halfWidth = seriesWidth / 2.0;
+        var left = centerDisplay - halfWidth;
+        var right = centerDisplay + halfWidth;
 
         return (left, right);
     }

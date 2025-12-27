@@ -758,7 +758,7 @@ public partial class ViolinPlotControl : UserControl
         var plotTop = vm.GetPlotAreaTopFraction() * height;
         var plotBottom = vm.GetPlotAreaBottomFraction() * height;
 
-        const double labelOffset = 4; // pixels from cursor line
+        const double labelOffset = 0; // pixels from cursor line
         const double gradeColWidth = 18; // fixed width for grade column
         const double countColWidth = 16; // fixed width for count column
         const double deviationColWidth = 26; // fixed width for deviation column

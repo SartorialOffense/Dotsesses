@@ -126,15 +126,59 @@ def create_violin_swarm_plot(
     ax.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
     ax.set_yticklabels(['0', '0.25', '0.5', '0.75', '1.0'])
     plt.xticks(rotation=15, ha='right')
+
+    # ===== Add Statistics Tick Marks on Right Side =====
+    # Calculate mean and std dev from the Total series (last series)
+    total_series_name = series[-1][0]
+    total_data = plot_data[plot_data['Series'] == total_series_name]['Normalized Value']
+
+    if len(total_data) > 0:
+        mean_val = total_data.mean()
+        std_val = total_data.std()
+
+        # Create secondary y-axis on the right for statistics ticks
+        ax2 = ax.twinx()
+        ax2.set_ylim(ax.get_ylim())  # Match the primary y-axis limits
+
+        # Build tick positions and labels
+        stat_ticks = [mean_val]
+        stat_labels = ['μ']
+
+        # Add positive standard deviations
+        for i in range(1, 6):
+            pos = mean_val + i * std_val
+            if pos <= 1.0:
+                stat_ticks.append(pos)
+                stat_labels.append(f'+{i}σ')
+
+        # Add negative standard deviations
+        for i in range(1, 6):
+            pos = mean_val - i * std_val
+            if pos >= 0.0:
+                stat_ticks.append(pos)
+                stat_labels.append(f'-{i}σ')
+
+        ax2.set_yticks(stat_ticks)
+        ax2.set_yticklabels(stat_labels, fontsize=10, color='#B4B4B4')
+        ax2.tick_params(axis='y', length=0, pad=2)  # No tick marks, just labels
+        # Hide all spines on secondary axis
+        for spine in ax2.spines.values():
+            spine.set_visible(False)
+
+    # Add internal padding on the right side of the plot (inside the plot area)
+    # This creates space between the last series and the right edge/statistics labels
+    xlim = ax.get_xlim()
+    ax.set_xlim(xlim[0], xlim[1] + 0.25)  # Add padding on the right for statistics
+
     # Add padding on left and right to prevent violin plots from being cut off
-    plt.subplots_adjust(left=0.08, right=0.92)
     plt.tight_layout()
 
     t_rendering = time.perf_counter()
 
     # Save as SVG to in-memory buffer
+    # Note: Don't use bbox_inches='tight' as it overrides subplots_adjust padding
     svg_buffer = io.BytesIO()
-    plt.savefig(svg_buffer, format='svg', dpi=300, bbox_inches='tight')
+    plt.savefig(svg_buffer, format='svg', dpi=300)
     svg_buffer.seek(0)
     svg_content = svg_buffer.read().decode('utf-8')
     svg_buffer.close()
