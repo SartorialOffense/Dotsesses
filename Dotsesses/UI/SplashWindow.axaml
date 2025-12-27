@@ -11,7 +11,7 @@
     <Border Background="#1E1E2E" CornerRadius="12" BorderBrush="#9B59B6" BorderThickness="2">
         <Grid>
             <!-- Background dots spread over entire window -->
-            <Canvas>
+            <Canvas HorizontalAlignment="Center" Width="600">
                 <!-- More dots spread across entire window (600x400) -->
                 <!-- Top left area -->
                 <Ellipse Width="45" Height="45" Fill="#3498DB" Canvas.Left="30" Canvas.Top="25" Opacity="0.7" />
