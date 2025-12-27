@@ -654,7 +654,7 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 X = cursor.Score,
                 Y = 0.5, // Center of cursor area
-                Size = 4, // Screen pixels (half of original 8)
+                Size = 3, // Screen pixels
                 Shape = MarkerType.Square,
                 Fill = OxyColors.Black,
                 Stroke = OxyColors.White,
