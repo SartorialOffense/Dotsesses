@@ -1215,6 +1215,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             _draggingCursor.Score = validatedScore;
             UpdateCursors();
+            RecalculateGradeCounts(); // Update counts during drag
         }
         finally
         {

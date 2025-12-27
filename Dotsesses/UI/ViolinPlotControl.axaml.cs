@@ -149,12 +149,20 @@ public partial class ViolinPlotControl : UserControl
             // Subscribe to cursor changes
             SubscribeToCursors(vm);
 
+            // Subscribe to compliance row changes
+            SubscribeToComplianceRows(vm);
+
             vm.PropertyChanged += (s, args) =>
             {
                 if (args.PropertyName == nameof(ViolinPlotViewModel.Cursors))
                 {
                     SubscribeToCursors(vm);
                     RenderRegionBands();
+                }
+                else if (args.PropertyName == nameof(ViolinPlotViewModel.ComplianceRows))
+                {
+                    SubscribeToComplianceRows(vm);
+                    RenderCursorColumn();
                 }
             };
         }
@@ -170,6 +178,16 @@ public partial class ViolinPlotControl : UserControl
         }
     }
 
+    private void SubscribeToComplianceRows(ViolinPlotViewModel vm)
+    {
+        if (vm.ComplianceRows == null) return;
+
+        foreach (var row in vm.ComplianceRows)
+        {
+            row.PropertyChanged += OnComplianceRowPropertyChanged;
+        }
+    }
+
     private void OnCursorPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(CursorViewModel.Score) ||
@@ -177,6 +195,15 @@ public partial class ViolinPlotControl : UserControl
         {
             RenderRegionBands();    // Update Canvas bands
             RenderCursorColumn();   // Update Canvas cursor column
+        }
+    }
+
+    private void OnComplianceRowPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ComplianceRowViewModel.CurrentCount) ||
+            e.PropertyName == nameof(ComplianceRowViewModel.SignedDeviation))
+        {
+            RenderCursorColumn();   // Update Canvas cursor column with new counts
         }
     }
 
