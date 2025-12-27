@@ -221,8 +221,9 @@ def create_violin_swarm_plot(
     for series_name in points_by_series:
         points_by_series[series_name].sort(key=lambda p: p['y'])
 
-    # Calculate overall plot bounds to determine series width
+    # Calculate overall plot bounds to determine series width and Y mapping
     all_x_coords = [p['x'] for p in svg_points]
+    all_y_coords = [p['y'] for p in svg_points]
     if all_x_coords:
         plot_x_min = min(all_x_coords)
         plot_x_max = max(all_x_coords)
@@ -230,6 +231,15 @@ def create_violin_swarm_plot(
         num_series = len(series_list)
         # Estimate series width (with some padding factor)
         series_width = (plot_width / num_series) * swarm_spread if num_series > 0 else plot_width
+
+    # Calculate Y bounds for mapping normalized values to SVG Y coordinates
+    # In SVG, Y increases downward, so min Y = top (normalized 1.0), max Y = bottom (normalized 0.0)
+    if all_y_coords:
+        svg_y_min = min(all_y_coords)  # Top of plot (high values)
+        svg_y_max = max(all_y_coords)  # Bottom of plot (low values)
+    else:
+        svg_y_min = 0
+        svg_y_max = 100
 
     # Match with data (also sorted by normalized value)
     matched_count = 0
@@ -260,40 +270,42 @@ def create_violin_swarm_plot(
         else:
             center_x = 0
 
-        # Group points by similar Y values (bin them) to spread horizontally
-        # Use a small tolerance to group points at "same" Y level
-        y_tolerance = 2.0  # SVG units - points within this range are considered same row
+        # Group points by normalized value (bin them) to spread horizontally
+        # Use a small tolerance for floating point comparison
+        value_tolerance = 0.001  # Points within this normalized value range are same row
 
-        # Build Y-bins: group points that are close in Y
-        y_bins = []
+        # Build value-bins: group points that have the same normalized value
+        value_bins = []
         current_bin = []
         sorted_pts_with_data = list(zip(svg_pts, series_data.iterrows()))
 
         for svg_point, row in sorted_pts_with_data:
+            _, row_data = row
+            norm_val = row_data['Normalized Value']
             if not current_bin:
-                current_bin.append((svg_point, row))
+                current_bin.append((svg_point, row, norm_val))
             else:
-                # Check if this point is close to the last one in Y
-                last_y = current_bin[-1][0]['y']
-                if abs(svg_point['y'] - last_y) <= y_tolerance:
-                    current_bin.append((svg_point, row))
+                # Check if this point has the same normalized value as the last one
+                last_norm_val = current_bin[-1][2]
+                if abs(norm_val - last_norm_val) <= value_tolerance:
+                    current_bin.append((svg_point, row, norm_val))
                 else:
-                    y_bins.append(current_bin)
-                    current_bin = [(svg_point, row)]
+                    value_bins.append(current_bin)
+                    current_bin = [(svg_point, row, norm_val)]
 
         if current_bin:
-            y_bins.append(current_bin)
+            value_bins.append(current_bin)
 
         # Now spread each bin evenly across the series width
-        # Zigzag offset alternates between rows to prevent vertical stacking
-        zigzag_offset = dot_size * 0.6  # Offset based on dot size
+        # Calculate max row width first (needed for zigzag offset calculation)
         max_row_width = series_width * 0.8  # Maximum 80% of series width
 
-        for bin_idx, y_bin in enumerate(y_bins):
-            n_points = len(y_bin)
+        # Zigzag offset should be large enough to prevent overlap with adjacent rows
+        # Use half the typical spacing between points in a multi-point row
+        base_zigzag = dot_size * 1.5  # Base offset for small rows
 
-            # Alternate zigzag direction: even rows shift left, odd rows shift right
-            row_offset = zigzag_offset if (bin_idx % 2 == 1) else -zigzag_offset
+        for bin_idx, value_bin in enumerate(value_bins):
+            n_points = len(value_bin)
 
             # Calculate row width: ideal is 3 dot-widths per point, but cap at max
             if n_points <= 1:
@@ -302,7 +314,19 @@ def create_violin_swarm_plot(
                 ideal_width = (n_points - 1) * (dot_size * 3)  # 3 dot-widths between each point
                 row_width = min(ideal_width, max_row_width)
 
-            for i, (svg_point, row) in enumerate(y_bin):
+            # Zigzag offset alternates between rows to prevent vertical stacking
+            # For single-point rows, offset by half the typical multi-point row width
+            # This ensures single points don't sit directly above/below the center of multi-point rows
+            if n_points == 1:
+                # Single point: offset more aggressively based on typical row spread
+                zigzag_offset = max(base_zigzag, max_row_width * 0.25)
+            else:
+                # Multi-point row: smaller offset since points are already spread
+                zigzag_offset = base_zigzag
+
+            row_offset = zigzag_offset if (bin_idx % 2 == 1) else -zigzag_offset
+
+            for i, (svg_point, row, norm_val) in enumerate(value_bin):
                 _, row_data = row
                 elem = svg_point['element']
 
@@ -318,10 +342,14 @@ def create_violin_swarm_plot(
                     spread_fraction = (i / (n_points - 1)) - 0.5  # -0.5 to +0.5
                     spread_x = center_x + spread_fraction * row_width + row_offset
 
+                # Calculate correct Y from normalized value (not Seaborn's jittered Y)
+                # SVG Y is inverted: low Y = top = high normalized value (1.0)
+                correct_y = svg_y_max - norm_val * (svg_y_max - svg_y_min)
+
                 # Collect point data for C# rendering
                 point_data_list.append({
                     'x': spread_x,
-                    'y': svg_point['y'],
+                    'y': correct_y,
                     'id': row_data['id'],
                     'series': series_name,
                     'color': color_hex,
