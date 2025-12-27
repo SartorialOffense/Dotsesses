@@ -130,7 +130,8 @@ public partial class MainWindowViewModel : ViewModelBase
         // Register for hover messages from violin plot (for cross-view sync)
         _messenger.Register<StudentHoverMessage>(this, (r, m) =>
         {
-            if (m.Source != "dotplot") // Only respond to violin messages
+            // Always respond to clear messages (null), only filter non-self sources for hover
+            if (m.StudentId == null || m.Source != "dotplot")
             {
                 HoveredStudentId = m.StudentId;
             }
