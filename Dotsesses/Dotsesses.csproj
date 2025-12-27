@@ -9,6 +9,17 @@
         <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
     </PropertyGroup>
 
+    <!-- macOS App Bundle Configuration -->
+    <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+        <RuntimeIdentifier>osx-arm64</RuntimeIdentifier>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)' == 'Release' And $([MSBuild]::IsOSPlatform('OSX'))">
+        <PublishSingleFile>true</PublishSingleFile>
+        <SelfContained>true</SelfContained>
+        <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    </PropertyGroup>
+
     <ItemGroup>
         <Folder Include="Models\" />
         <AvaloniaResource Include="Assets\**" />

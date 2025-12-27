@@ -10,3 +10,4 @@ riderModule.iml
 */.venv/
 *.pyc
 __pycache__/
+publish/Dotsesses.app/Contents
