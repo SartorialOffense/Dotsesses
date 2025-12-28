@@ -1,16 +1,25 @@
 namespace Dotsesses.Services;
 
+using System.Data;
 using System.IO;
+using System.Text;
 using Dotsesses.Models;
+using ExcelDataReader;
 
 /// <summary>
-/// Reads student assessment data from a CSV file.
+/// Reads student assessment data from an Excel file (.xlsx).
 /// First column is student ID, subsequent columns are named scores.
-/// Blank lines are skipped.
+/// Blank rows are skipped.
 /// </summary>
 public class ScoreReader
 {
     private readonly MuppetNameGenerator _nameGenerator;
+
+    static ScoreReader()
+    {
+        // Required for ExcelDataReader to work on non-Windows platforms
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+    }
 
     public ScoreReader()
     {
@@ -18,11 +27,12 @@ public class ScoreReader
     }
 
     /// <summary>
-    /// Reads student assessments from a CSV file.
+    /// Reads student assessments from an Excel file.
     /// </summary>
-    /// <param name="filePath">Path to the CSV file</param>
+    /// <param name="filePath">Path to the Excel file (.xlsx)</param>
+    /// <param name="sheetName">Optional sheet name. If null, uses the first sheet.</param>
     /// <returns>Collection of StudentAssessments parsed from the file</returns>
-    public IReadOnlyCollection<StudentAssessment> Read(string filePath)
+    public IReadOnlyCollection<StudentAssessment> Read(string filePath, string? sheetName = null)
     {
         ArgumentNullException.ThrowIfNull(filePath);
 
@@ -31,42 +41,67 @@ public class ScoreReader
             throw new FileNotFoundException($"Score file not found: {filePath}");
         }
 
-        var lines = File.ReadAllLines(filePath);
-        if (lines.Length == 0)
+        using var stream = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        using var reader = ExcelReaderFactory.CreateReader(stream);
+
+        var dataSet = reader.AsDataSet(new ExcelDataSetConfiguration
         {
-            throw new InvalidOperationException("Score file is empty");
+            ConfigureDataTable = _ => new ExcelDataTableConfiguration
+            {
+                UseHeaderRow = true
+            }
+        });
+
+        if (dataSet.Tables.Count == 0)
+        {
+            throw new InvalidOperationException("Excel file contains no sheets");
         }
 
-        // Parse header line to get score names
-        var headerLine = lines[0].TrimStart('\uFEFF'); // Remove BOM if present
-        var headers = ParseCsvLine(headerLine);
-
-        if (headers.Count < 2)
+        // Get the target sheet
+        DataTable table;
+        if (sheetName != null)
         {
-            throw new InvalidOperationException("CSV must have at least ID column and one score column");
+            table = dataSet.Tables[sheetName]
+                ?? throw new InvalidOperationException($"Sheet '{sheetName}' not found in Excel file");
+        }
+        else
+        {
+            table = dataSet.Tables[0];
+        }
+
+        if (table.Columns.Count < 2)
+        {
+            throw new InvalidOperationException("Excel sheet must have at least ID column and one score column");
         }
 
         // First column is ID, rest are score names
-        var scoreNames = headers.Skip(1).ToList();
+        var scoreNames = new List<string>();
+        for (int i = 1; i < table.Columns.Count; i++)
+        {
+            scoreNames.Add(table.Columns[i].ColumnName);
+        }
 
         var students = new List<StudentAssessment>();
         var studentIds = new List<int>();
 
         // Parse data rows
-        for (int lineIndex = 1; lineIndex < lines.Length; lineIndex++)
+        foreach (DataRow row in table.Rows)
         {
-            var line = lines[lineIndex].Trim();
-
-            // Skip blank lines
-            if (string.IsNullOrWhiteSpace(line) || IsBlankDataRow(line))
+            // Skip blank rows
+            if (IsBlankRow(row))
             {
                 continue;
             }
 
-            var values = ParseCsvLine(line);
+            // Parse student ID from first column
+            var idValue = row[0];
+            int studentId;
 
-            // Parse student ID
-            if (!int.TryParse(values[0], out int studentId))
+            if (idValue is double d)
+            {
+                studentId = (int)d;
+            }
+            else if (!int.TryParse(idValue?.ToString(), out studentId))
             {
                 // Skip rows without valid student ID
                 continue;
@@ -79,12 +114,23 @@ public class ScoreReader
             for (int i = 0; i < scoreNames.Count; i++)
             {
                 var scoreName = scoreNames[i];
-                var valueStr = i + 1 < values.Count ? values[i + 1] : "";
+                var cellValue = row[i + 1];
 
-                if (double.TryParse(valueStr, out double scoreValue))
+                double scoreValue;
+                if (cellValue is double dVal)
                 {
-                    scores.Add(new Score(scoreName, null, scoreValue));
+                    scoreValue = dVal;
                 }
+                else if (double.TryParse(cellValue?.ToString(), out double parsed))
+                {
+                    scoreValue = parsed;
+                }
+                else
+                {
+                    continue; // Skip non-numeric values
+                }
+
+                scores.Add(new Score(scoreName, null, scoreValue));
             }
 
             // Calculate total if not present
@@ -97,7 +143,7 @@ public class ScoreReader
             students.Add(new StudentAssessment(
                 studentId,
                 scores,
-                new List<StudentAttribute>(), // No attributes from CSV for now
+                new List<StudentAttribute>(),
                 "" // MuppetName will be assigned after all IDs are collected
             ));
         }
@@ -124,36 +170,15 @@ public class ScoreReader
         return result;
     }
 
-    private static List<string> ParseCsvLine(string line)
+    private static bool IsBlankRow(DataRow row)
     {
-        var values = new List<string>();
-        var current = new System.Text.StringBuilder();
-        bool inQuotes = false;
-
-        foreach (char c in line)
+        foreach (var item in row.ItemArray)
         {
-            if (c == '"')
+            if (item != null && item != DBNull.Value && !string.IsNullOrWhiteSpace(item.ToString()))
             {
-                inQuotes = !inQuotes;
-            }
-            else if (c == ',' && !inQuotes)
-            {
-                values.Add(current.ToString().Trim());
-                current.Clear();
-            }
-            else
-            {
-                current.Append(c);
+                return false;
             }
         }
-
-        values.Add(current.ToString().Trim());
-        return values;
-    }
-
-    private static bool IsBlankDataRow(string line)
-    {
-        // A row of just commas (e.g., ",,,,,,,") is considered blank
-        return line.Replace(",", "").Trim().Length == 0;
+        return true;
     }
 }

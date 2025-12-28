@@ -207,8 +207,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void InitializeWithSyntheticData()
     {
-        // Read real scores from CSV file
-        const string scoresFilePath = "/Users/trumbjd/Dev/Dotsesses/Dotsesses/2024 Final Scores.csv";
+        // Read real scores from Excel file
+        const string scoresFilePath = "/Users/trumbjd/Dev/Dotsesses/Dotsesses/2024 Final Scores.xlsx";
         var scoreReader = new ScoreReader();
         var students = scoreReader.Read(scoresFilePath);
 

@@ -38,6 +38,8 @@
         </PackageReference>
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.1" />
         <PackageReference Include="CSnakes.Runtime" Version="1.2.1" />
+        <PackageReference Include="ExcelDataReader" Version="3.8.0" />
+        <PackageReference Include="ExcelDataReader.DataSet" Version="3.8.0" />
         <PackageReference Include="OxyPlot.Avalonia" Version="2.1.0-Avalonia11" />
     </ItemGroup>
 
