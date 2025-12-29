@@ -246,10 +246,10 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             Background = OxyColors.Transparent,
             PlotAreaBackground = OxyColors.Transparent,
-            PlotAreaBorderThickness = new OxyThickness(1), // Full outline
-            PlotAreaBorderColor = OxyColor.FromRgb(60, 60, 60), // Thin gray
-            Padding = new OxyThickness(0), // Remove padding around plot area
-            PlotMargins = new OxyThickness(0) // Remove margins around plot area
+            PlotAreaBorderThickness = new OxyThickness(0, 1, 0, 1), // Top and bottom only
+            PlotAreaBorderColor = OxyColor.FromRgb(60, 60, 60),
+            Padding = new OxyThickness(0),
+            PlotMargins = new OxyThickness(0)
         };
 
         // Enable mouse events for point selection and cursor dragging
@@ -278,8 +278,8 @@ public partial class MainWindowViewModel : ViewModelBase
         double cursorStart = 0.0;
         double cursorEnd = 0.25;
         double dotStart = 0.25;
-        double dotEnd = 0.85;
-        double statsStart = 0.85;
+        double dotEnd = 0.80;
+        double statsStart = 0.80;
         double statsEnd = 1.0;
 
         // ===== Shared X-Axis (hidden, spans all three areas) =====
@@ -306,8 +306,8 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             Position = AxisPosition.Left,
             Key = "StatsY",
-            Minimum = 0,
-            Maximum = 1,
+            Minimum = -0.35,
+            Maximum = 1.35,
             AxislineStyle = LineStyle.None,
             TickStyle = TickStyle.None,
             MajorGridlineStyle = LineStyle.None,
@@ -502,21 +502,36 @@ public partial class MainWindowViewModel : ViewModelBase
 
         if (dotYAxis == null || cursorYAxis == null) return;
 
-        // ===== Thin Rectangle Around Cursor Area =====
-        var cursorRect = new RectangleAnnotation
+        // ===== Top and bottom borders for Cursor Area =====
+        var cursorTopLine = new LineAnnotation
         {
+            Type = LineAnnotationType.Horizontal,
+            Y = 1,
             MinimumX = minScore,
             MaximumX = maxScore,
-            MinimumY = 0,
-            MaximumY = 1,
-            Fill = OxyColors.Transparent,
-            Stroke = OxyColor.FromRgb(60, 60, 60), // Thin gray border
+            Color = OxyColor.FromRgb(60, 60, 60),
+            LineStyle = LineStyle.Solid,
             StrokeThickness = 1,
             XAxisKey = "SharedX",
             YAxisKey = "CursorY",
             Layer = AnnotationLayer.BelowSeries
         };
-        DotplotModel.Annotations.Add(cursorRect);
+        DotplotModel.Annotations.Add(cursorTopLine);
+
+        var cursorBottomLine = new LineAnnotation
+        {
+            Type = LineAnnotationType.Horizontal,
+            Y = 0,
+            MinimumX = minScore,
+            MaximumX = maxScore,
+            Color = OxyColor.FromRgb(60, 60, 60),
+            LineStyle = LineStyle.Solid,
+            StrokeThickness = 1,
+            XAxisKey = "SharedX",
+            YAxisKey = "CursorY",
+            Layer = AnnotationLayer.BelowSeries
+        };
+        DotplotModel.Annotations.Add(cursorBottomLine);
 
         // ===== Vertical Cursor Lines with Square Handles =====
         // Skip the lowest grade (highest Order) - it has no cursor, just a label
@@ -646,21 +661,37 @@ public partial class MainWindowViewModel : ViewModelBase
 
         var lightGray = OxyColor.FromRgb(180, 180, 180);
 
-        // ===== Thin Rectangle Around Stats Area =====
-        var statsRect = new RectangleAnnotation
+        // ===== Top/Bottom borders for Stats Area (no left/right) =====
+        // Lines at edges of expanded axis range (-0.2 to 1.2) for padding around stats text
+        var statsTopLine = new LineAnnotation
         {
+            Type = LineAnnotationType.Horizontal,
+            Y = 1.30,
             MinimumX = minScore,
             MaximumX = maxScore,
-            MinimumY = 0,
-            MaximumY = 1,
-            Fill = OxyColors.Transparent,
-            Stroke = OxyColor.FromRgb(60, 60, 60), // Thin gray border
+            Color = OxyColor.FromRgb(60, 60, 60),
+            LineStyle = LineStyle.Solid,
             StrokeThickness = 1,
             XAxisKey = "SharedX",
             YAxisKey = "StatsY",
-            Layer = AnnotationLayer.BelowSeries
+            Layer = AnnotationLayer.AboveSeries
         };
-        DotplotModel.Annotations.Add(statsRect);
+        DotplotModel.Annotations.Add(statsTopLine);
+
+        var statsBottomLine = new LineAnnotation
+        {
+            Type = LineAnnotationType.Horizontal,
+            Y = -0.30,
+            MinimumX = minScore,
+            MaximumX = maxScore,
+            Color = OxyColor.FromRgb(60, 60, 60),
+            LineStyle = LineStyle.Solid,
+            StrokeThickness = 1,
+            XAxisKey = "SharedX",
+            YAxisKey = "StatsY",
+            Layer = AnnotationLayer.AboveSeries
+        };
+        DotplotModel.Annotations.Add(statsBottomLine);
 
         // ===== Mean Label =====
         var meanLabel = new TextAnnotation
