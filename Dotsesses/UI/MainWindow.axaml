@@ -30,7 +30,7 @@
         <!-- Top Row: Dotplot -->
         <Border Grid.Row="1">
                 <Grid>
-                    <oxy:PlotView x:Name="DotPlotView" Model="{Binding DotplotModel}">
+                    <oxy:PlotView x:Name="DotPlotView" Model="{Binding DotplotModel}" Background="Transparent">
                         <oxy:PlotView.Cursor>
                             <MultiBinding>
                                 <MultiBinding.Converter>

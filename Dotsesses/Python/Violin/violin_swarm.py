@@ -286,8 +286,9 @@ def create_violin_swarm_plot(
 
     # Save as SVG to in-memory buffer
     # Note: Don't use bbox_inches='tight' as it overrides subplots_adjust padding
+    # Use transparent=True so Avalonia's theme background shows through
     svg_buffer = io.BytesIO()
-    plt.savefig(svg_buffer, format='svg', dpi=300)
+    plt.savefig(svg_buffer, format='svg', dpi=300, transparent=True)
     svg_buffer.seek(0)
     svg_content = svg_buffer.read().decode('utf-8')
     svg_buffer.close()

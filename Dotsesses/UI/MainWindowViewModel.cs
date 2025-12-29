@@ -241,12 +241,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void InitializeDotplot()
     {
-        var backgroundColor = OxyColor.FromRgb(0, 0, 0);
-
+        // Use transparent background so Avalonia's theme RegionColor shows through
         DotplotModel = new PlotModel
         {
-            Background = backgroundColor,
-            PlotAreaBackground = backgroundColor,
+            Background = OxyColors.Transparent,
+            PlotAreaBackground = OxyColors.Transparent,
             PlotAreaBorderThickness = new OxyThickness(1), // Full outline
             PlotAreaBorderColor = OxyColor.FromRgb(60, 60, 60), // Thin gray
             Padding = new OxyThickness(0), // Remove padding around plot area
