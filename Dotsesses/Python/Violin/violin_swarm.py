@@ -229,7 +229,7 @@ def create_violin_swarm_plot(
     if title:
         ax.set_title(title, fontsize=16, fontweight='bold', pad=20, color='white')
     ax.set_xlabel(xlabel, fontsize=12, fontweight='bold')
-    ax.set_ylabel(ylabel, fontsize=12, fontweight='bold')
+    ax.set_ylabel('')  # Remove Y-axis label
     # Grid removed for cleaner appearance
     # Simplify y-axis to show key reference points
     ax.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
