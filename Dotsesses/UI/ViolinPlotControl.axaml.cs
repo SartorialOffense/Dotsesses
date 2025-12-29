@@ -93,6 +93,12 @@ public partial class ViolinPlotControl : UserControl
             {
                 UpdateDotPositions(plotBounds.Width, plotBounds.Height);
             }
+
+            // Re-render hover visualization if a student is hovered
+            if (vm.HoveredStudentId.HasValue)
+            {
+                UpdateHoverVisualization(vm);
+            }
         }
 
         // Re-render region bands and cursor column on resize
