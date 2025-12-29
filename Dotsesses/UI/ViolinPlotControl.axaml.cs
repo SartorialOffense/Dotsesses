@@ -870,16 +870,26 @@ public partial class ViolinPlotControl : UserControl
 
             if (i == 0)
             {
-                // Top grade (A): position ABOVE its cursor line
+                // Top grade (A): centered between its cursor line and the top of the plot
+                // Unless cursor is above max value, then just use cursor position
                 var cursor = enabledCursors.FirstOrDefault(c => c.Grade.Order == grade.Order);
                 if (cursor != null)
                 {
                     var cursorY = vm.ScoreToDisplayY(cursor.Score, height);
-                    labelY = cursorY - containerHeight - labelOffset; // Above the cursor line
+                    if (cursorY < plotTop)
+                    {
+                        // Cursor is above plot top (score > max), just position below cursor
+                        labelY = cursorY;
+                    }
+                    else
+                    {
+                        // Center between cursor and top of plot
+                        labelY = (plotTop + cursorY) / 2.0 - containerHeight / 2.0;
+                    }
                 }
                 else
                 {
-                    labelY = plotTop + labelOffset;
+                    labelY = plotTop;
                 }
             }
             else if (i == enabledGrades.Count - 1)
