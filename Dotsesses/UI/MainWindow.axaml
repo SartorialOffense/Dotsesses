@@ -28,7 +28,7 @@
         </Border>
 
         <!-- Top Row: Dotplot -->
-        <Border Grid.Row="1" Background="#000000">
+        <Border Grid.Row="1">
                 <Grid>
                     <oxy:PlotView x:Name="DotPlotView" Model="{Binding DotplotModel}">
                         <oxy:PlotView.Cursor>
@@ -47,18 +47,15 @@
 
         <!-- Splitter -->
         <GridSplitter Grid.Row="2"
-                      Background="#3F3F46"
                       ResizeDirection="Rows"
                       HorizontalAlignment="Stretch"/>
 
         <!-- Bottom Row: Drill-Down and Violin Plot with Horizontal Expanders -->
-        <Border Grid.Row="3" Background="#000000" BorderBrush="#3F3F46" BorderThickness="0,1,0,0">
+        <Border Grid.Row="3" BorderThickness="0,1,0,0">
             <Grid ColumnDefinitions="300,5,*">
 
                 <!-- Left: Drill-Down Panel -->
                 <Border Grid.Column="0"
-                       Background="#000000"
-                       BorderBrush="#3F3F46"
                        BorderThickness="0,0,1,0"
                        Padding="3,6,3,6">
                     <ContentControl Content="{Binding HoveredStudent}"
@@ -66,9 +63,7 @@
                                    HorizontalContentAlignment="Stretch">
                         <ContentControl.ContentTemplate>
                             <DataTemplate x:DataType="vm:StudentCardViewModel">
-                                <Border Background="Transparent"
-                                       BorderBrush="Transparent"
-                                       BorderThickness="0"
+                                <Border                                        BorderThickness="0"
                                        CornerRadius="4"
                                        Padding="15"
                                        HorizontalAlignment="Stretch">
@@ -94,7 +89,6 @@
                                                                 <Button Grid.Column="2"
                                                                        Content="X"
                                                                        Command="{Binding ClearCommand}"
-                                                                       Background="Transparent"
                                                                        Foreground="#888888"
                                                                        BorderThickness="0"
                                                                        FontSize="12"
@@ -127,7 +121,6 @@
 
                                                                 <!-- Separator line -->
                                                                 <Border Height="1"
-                                                                       Background="#666666"
                                                                        Margin="0,8"
                                                                        HorizontalAlignment="Stretch"/>
 
@@ -151,7 +144,6 @@
 
                                                                 <!-- Comment Section -->
                                                                 <Border Height="1"
-                                                                       Background="#666666"
                                                                        Margin="0,8"
                                                                        HorizontalAlignment="Stretch"/>
 
@@ -164,7 +156,6 @@
                                                                 <TextBox Text="{Binding Assessment.Comment, Mode=TwoWay}"
                                                                         TextWrapping="Wrap"
                                                                         AcceptsReturn="True"
-                                                                        Background="#1E1E1E"
                                                                         Foreground="#CCCCCC"
                                                                         BorderBrush="#3F3F46"
                                                                         BorderThickness="1"
@@ -183,14 +174,13 @@
 
                 <!-- Vertical Splitter -->
                 <GridSplitter Grid.Column="1"
-                              Background="#3F3F46"
+                    
                               ResizeDirection="Columns"
                               VerticalAlignment="Stretch"/>
 
                 <!-- Right: Violin Plot Panel -->
                 <Border Grid.Column="2"
-                       Background="#000000"
-                       BorderBrush="#3F3F46"
+
                        BorderThickness="1,0,0,0"
                        Padding="3,6,10,10">
                     <local:ViolinPlotControl DataContext="{Binding ViolinPlotViewModel}" />

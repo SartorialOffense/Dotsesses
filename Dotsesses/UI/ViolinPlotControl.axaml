@@ -6,11 +6,11 @@
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="400"
              x:Class="Dotsesses.UI.ViolinPlotControl"
              x:DataType="vm:ViolinPlotViewModel"
-             Background="#000000">
+             >
 
     <Grid ColumnDefinitions="*,70">
         <!-- Violin plot area - left column -->
-        <Grid x:Name="ViolinPlotArea" Grid.Column="0" PointerMoved="OnPointerMoved" Background="Transparent">
+        <Grid x:Name="ViolinPlotArea" Grid.Column="0" PointerMoved="OnPointerMoved" >
             <!-- SVG Background -->
             <Image x:Name="SvgView" Stretch="Fill" />
 
@@ -19,7 +19,7 @@
                     PointerPressed="OnBarbellPointerPressed"
                     PointerMoved="OnBarbellPointerMoved"
                     PointerReleased="OnBarbellPointerReleased"
-                    Background="Transparent" />
+                    />
 
             <!-- Canvas for swarm point overlays -->
             <Canvas x:Name="PointsOverlay" />
@@ -29,7 +29,7 @@
         </Grid>
 
         <!-- Cursor column (Canvas-based) - right column -->
-        <Border Grid.Column="1" Background="Transparent">
+        <Border Grid.Column="1">
             <Canvas x:Name="CursorColumnCanvas"
                     PointerPressed="OnCursorColumnPointerPressed"
                     PointerMoved="OnCursorColumnPointerMoved"

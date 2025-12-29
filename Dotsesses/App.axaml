@@ -8,9 +8,13 @@
     <Application.DataTemplates>
         <local:ViewLocator/>
     </Application.DataTemplates>
-  
-    <Application.Styles>
-        <FluentTheme />
-        <StyleInclude Source="avares://OxyPlot.Avalonia/Themes/Default.axaml"/>
-    </Application.Styles>
+             <Application.Styles>
+                 <FluentTheme DensityStyle="Compact">
+                     <FluentTheme.Palettes>
+                         <!-- Palette for Dark theme variant -->
+                         <ColorPaletteResources x:Key="Dark" Accent="DarkGreen" RegionColor="#FF101010" ErrorText="Yellow" />
+                     </FluentTheme.Palettes>
+                 </FluentTheme>
+                 <StyleInclude Source="avares://OxyPlot.Avalonia/Themes/Default.axaml"/>
+             </Application.Styles>
 </Application>
