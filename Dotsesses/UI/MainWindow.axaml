@@ -17,7 +17,7 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-    <Grid RowDefinitions="Auto,100,5,*">
+    <Grid RowDefinitions="Auto,100,2,*">
         <!-- Debug Row: Velocity Display (hidden) -->
         <Border Grid.Row="0" Background="#1E1E1E" Padding="4" HorizontalAlignment="Right" IsVisible="False">
             <StackPanel Orientation="Horizontal" Spacing="8">
@@ -48,11 +48,12 @@
         <!-- Splitter -->
         <GridSplitter Grid.Row="2"
                       ResizeDirection="Rows"
-                      HorizontalAlignment="Stretch"/>
+                      HorizontalAlignment="Stretch"
+                      Background="#202020"/>
 
         <!-- Bottom Row: Drill-Down and Violin Plot with Horizontal Expanders -->
         <Border Grid.Row="3" BorderThickness="0,1,0,0">
-            <Grid ColumnDefinitions="300,5,*">
+            <Grid ColumnDefinitions="300,2,*">
 
                 <!-- Left: Drill-Down Panel -->
                 <Border Grid.Column="0"
@@ -174,9 +175,9 @@
 
                 <!-- Vertical Splitter -->
                 <GridSplitter Grid.Column="1"
-                    
                               ResizeDirection="Columns"
-                              VerticalAlignment="Stretch"/>
+                              VerticalAlignment="Stretch"
+                              Background="#202020"/>
 
                 <!-- Right: Violin Plot Panel -->
                 <Border Grid.Column="2"
