@@ -17,6 +17,8 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
+    <!-- Outer container for splitter-colored background -->
+    <Border BorderThickness="0" Background="#202020">
     <Grid RowDefinitions="Auto,100,2,*">
         <!-- Debug Row: Velocity Display (hidden) -->
         <Border Grid.Row="0" Background="#1E1E1E" Padding="4" HorizontalAlignment="Right" IsVisible="False">
@@ -28,7 +30,7 @@
         </Border>
 
         <!-- Top Row: Dotplot -->
-        <Border Grid.Row="1">
+        <Border Grid.Row="1" Background="#101010" CornerRadius="8">
                 <Grid>
                     <oxy:PlotView x:Name="DotPlotView" Model="{Binding DotplotModel}" Background="Transparent">
                         <oxy:PlotView.Cursor>
@@ -52,13 +54,11 @@
                       Background="#202020"/>
 
         <!-- Bottom Row: Drill-Down and Violin Plot with Horizontal Expanders -->
-        <Border Grid.Row="3" BorderThickness="0,1,0,0">
+        <Border Grid.Row="3">
             <Grid ColumnDefinitions="300,2,*">
 
-                <!-- Left: Drill-Down Panel -->
-                <Border Grid.Column="0"
-                       BorderThickness="0,0,1,0"
-                       Padding="3,6,3,6">
+                <!-- Left: Drill-Down Panel (Student Card) -->
+                <Border Grid.Column="0" Background="#101010" CornerRadius="8">
                     <ContentControl Content="{Binding HoveredStudent}"
                                    HorizontalAlignment="Stretch"
                                    HorizontalContentAlignment="Stretch">
@@ -180,13 +180,11 @@
                               Background="#202020"/>
 
                 <!-- Right: Violin Plot Panel -->
-                <Border Grid.Column="2"
-
-                       BorderThickness="1,0,0,0"
-                       Padding="3,6,10,10">
+                <Border Grid.Column="2" Background="#101010" CornerRadius="8">
                     <local:ViolinPlotControl DataContext="{Binding ViolinPlotViewModel}" />
                 </Border>
             </Grid>
         </Border>
     </Grid>
+    </Border>
 </Window>
