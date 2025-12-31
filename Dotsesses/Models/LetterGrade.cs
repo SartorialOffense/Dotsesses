@@ -12,7 +12,8 @@ public enum LetterGrade
     BMinus,
     CPlus,
     C,
+    CMinus,
+    DPlus,
     D,
-    DMinus,
     F
 }

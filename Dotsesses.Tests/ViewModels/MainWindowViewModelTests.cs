@@ -105,7 +105,7 @@ public class MainWindowViewModelTests
 
         // Assert
         Assert.NotNull(viewModel.ComplianceRows);
-        Assert.Equal(10, viewModel.ComplianceRows.Count); // All grades A through F
+        Assert.Equal(11, viewModel.ComplianceRows.Count); // All grades A through F (including C-, D+)
     }
 
     [Fact]

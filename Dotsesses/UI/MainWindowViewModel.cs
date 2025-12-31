@@ -227,10 +227,11 @@ public partial class MainWindowViewModel : ViewModelBase
         var students = scoreReader.Read(scoresFilePath);
 
         var curveGenerator = new DefaultCurveGenerator();
-        var defaultCurve = curveGenerator.GenerateRanges();
+        var defaultCurve = curveGenerator.GenerateRanges(students.Count);
 
-        // Use midpoints for initial cursor placement
+        // Use midpoints for initial cursor placement (only for grades with ranges)
         var midpointCurve = defaultCurve
+            .Where(r => r.LowerBound > 0 || r.UpperBound > 0)
             .Select(r => new CutoffCount(r.Grade, r.Midpoint))
             .ToList();
 
@@ -831,7 +832,12 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         // Create cursors for ALL grades, all enabled at startup
         var allGrades = new DefaultCurveGenerator().GetAllGrades();
-        var defaultGrades = ClassAssessment.DefaultCurve.Select(cc => cc.Grade).ToHashSet();
+
+        // Grades with defined percentage ranges have non-zero bounds
+        var gradesWithRanges = ClassAssessment.DefaultCurve
+            .Where(cc => cc.LowerBound > 0 || cc.UpperBound > 0)
+            .Select(cc => cc.Grade)
+            .ToHashSet();
 
         // First pass: create all cursors, initially enabled
         // Note: Don't subscribe to PropertyChanged yet - DotplotModel isn't created yet
@@ -844,11 +850,11 @@ public partial class MainWindowViewModel : ViewModelBase
             Cursors.Add(cursor);
         }
 
-        // Second pass: position grades without defined percentages (D, D-, F)
+        // Second pass: position grades without defined percentages (C-, D+, D, F)
         // Place them 2 barbell heights below the previous grade
-        var gradesWithoutDefault = allGrades.Where(g => !defaultGrades.Contains(g)).OrderBy(g => g.Order);
+        var gradesWithoutRanges = allGrades.Where(g => !gradesWithRanges.Contains(g)).OrderBy(g => g.Order);
 
-        if (gradesWithoutDefault.Any())
+        if (gradesWithoutRanges.Any())
         {
             // Calculate cursor spacing: 2x barbell handle size (8px * 2 = 16px) converted to score units
             const double barbellHandlePixels = 8.0;
@@ -859,7 +865,7 @@ public partial class MainWindowViewModel : ViewModelBase
             const double estimatedPlotHeight = 400.0 * 0.8; // 80% of 400px
             var cursorSpacing = (int)Math.Ceiling(spacingPixels * scoreRange / Math.Max(1, estimatedPlotHeight));
 
-            foreach (var grade in gradesWithoutDefault)
+            foreach (var grade in gradesWithoutRanges)
             {
                 var cursor = Cursors.First(c => c.Grade.Equals(grade));
 

@@ -19,8 +19,9 @@ public record Grade(LetterGrade LetterGrade, int Order)
         Models.LetterGrade.BMinus => "B-",
         Models.LetterGrade.CPlus => "C+",
         Models.LetterGrade.C => "C",
+        Models.LetterGrade.CMinus => "C-",
+        Models.LetterGrade.DPlus => "D+",
         Models.LetterGrade.D => "D",
-        Models.LetterGrade.DMinus => "D-",
         Models.LetterGrade.F => "F",
         _ => LetterGrade.ToString()
     };
