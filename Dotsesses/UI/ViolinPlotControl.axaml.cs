@@ -459,16 +459,15 @@ public partial class ViolinPlotControl : UserControl
     {
         var tooltipBorder = new Border
         {
-            Background = new SolidColorBrush(Colors.Black),
+            Background = new SolidColorBrush(Color.FromArgb(128, 0, 0, 0)), // 50% alpha black
             BorderBrush = new SolidColorBrush(Colors.White),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(3),
             Padding = new Thickness(4, 2)
         };
 
-        // Score value only
+        // Score color (lightened if too dark)
         var scoreColor = Color.Parse(point.Color);
-        // Lighten if too dark
         double luminance = 0.2126 * scoreColor.R + 0.7152 * scoreColor.G + 0.0722 * scoreColor.B;
         if (luminance < 128)
         {
@@ -479,14 +478,53 @@ public partial class ViolinPlotControl : UserControl
                 (byte)(scoreColor.B + (255 - scoreColor.B) * factor));
         }
 
+        // Build tooltip: score (colored, bold), student ID (white, bold), comments (white, bulleted)
+        var tooltipPanel = new StackPanel { Spacing = 2 };
+
+        // Score value - colored and bold, larger font
         var scoreText = new TextBlock
         {
             Text = Math.Round(point.Value).ToString(),
-            FontSize = 11,
+            FontSize = 14,
+            FontWeight = FontWeight.Bold,
             Foreground = new SolidColorBrush(scoreColor)
         };
+        tooltipPanel.Children.Add(scoreText);
 
-        tooltipBorder.Child = scoreText;
+        // Student ID and muppet name - white and bold
+        var idDisplayText = string.IsNullOrEmpty(point.MuppetName)
+            ? point.StudentId.ToString()
+            : $"{point.StudentId} - {point.MuppetName}";
+        var idText = new TextBlock
+        {
+            Text = idDisplayText,
+            FontSize = 11,
+            FontWeight = FontWeight.Bold,
+            Foreground = Brushes.White
+        };
+        tooltipPanel.Children.Add(idText);
+
+        // Comments if present - white, bulleted, trimmed
+        if (!string.IsNullOrEmpty(point.Comment))
+        {
+            var commentLines = point.Comment.Split('\n')
+                .Select(line => line.Trim())
+                .Where(line => !string.IsNullOrEmpty(line));
+
+            foreach (var line in commentLines)
+            {
+                var commentText = new TextBlock
+                {
+                    Text = $"● {line}",
+                    FontSize = 10,
+                    Foreground = Brushes.White,
+                    TextWrapping = TextWrapping.NoWrap
+                };
+                tooltipPanel.Children.Add(commentText);
+            }
+        }
+
+        tooltipBorder.Child = tooltipPanel;
 
         // Measure tooltip to determine positioning
         tooltipBorder.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));

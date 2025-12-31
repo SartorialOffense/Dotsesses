@@ -191,14 +191,28 @@ public partial class MainWindowViewModel : ViewModelBase
                 seriesData.Add((seriesName, seriesScores));
             }
 
-            var commentMap = ClassAssessment.Assessments.ToDictionary(
-                a => a.Id,
-                a => a.Comment ?? "");
+            // Build comment map: (student ID, series name) -> score comment
+            var commentMap = new Dictionary<(int StudentId, string SeriesName), string>();
+            foreach (var assessment in ClassAssessment.Assessments)
+            {
+                foreach (var score in assessment.Scores)
+                {
+                    var seriesName = score.Index.HasValue ? $"{score.Name} {score.Index}" : score.Name;
+                    if (!string.IsNullOrEmpty(score.Comment))
+                    {
+                        commentMap[(assessment.Id, seriesName)] = score.Comment;
+                    }
+                }
+            }
+
+            // Build muppet name map: student ID -> muppet name
+            var muppetNameMap = ClassAssessment.MuppetNameMap
+                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Name);
 
             // Now update the ViewModel on the UI thread
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
-                ViolinPlotViewModel.UpdateDataAndRegenerate(seriesData, commentMap, 3.0);
+                ViolinPlotViewModel.UpdateDataAndRegenerate(seriesData, commentMap, muppetNameMap, 3.0);
             });
 
             Log("MainWindowViewModel: Violin plot initialization completed");
@@ -208,7 +222,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private void InitializeWithSyntheticData()
     {
         // Read real scores from Excel file
-        const string scoresFilePath = "/Users/trumbjd/Dev/Dotsesses/Dotsesses/2024 Final Scores.xlsx";
+        const string scoresFilePath = "/Users/trumbjd/Dev/Dotsesses/Dotsesses/2025 IP Final Scores.xlsx";
         var scoreReader = new ScoreReader();
         var students = scoreReader.Read(scoresFilePath);
 
@@ -397,13 +411,26 @@ public partial class MainWindowViewModel : ViewModelBase
             seriesData.Add((seriesName, seriesScores));
         }
 
-        // Create comment map
-        var commentMap = ClassAssessment.Assessments.ToDictionary(
-            a => a.Id,
-            a => a.Comment ?? "");
+        // Build comment map: (student ID, series name) -> score comment
+        var commentMap = new Dictionary<(int StudentId, string SeriesName), string>();
+        foreach (var assessment in ClassAssessment.Assessments)
+        {
+            foreach (var score in assessment.Scores)
+            {
+                var seriesName = score.Index.HasValue ? $"{score.Name} {score.Index}" : score.Name;
+                if (!string.IsNullOrEmpty(score.Comment))
+                {
+                    commentMap[(assessment.Id, seriesName)] = score.Comment;
+                }
+            }
+        }
+
+        // Build muppet name map: student ID -> muppet name
+        var muppetNameMap = ClassAssessment.MuppetNameMap
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Name);
 
         // Update data and regenerate with stored display dimensions
-        ViolinPlotViewModel.UpdateDataAndRegenerate(seriesData, commentMap, 3.0);
+        ViolinPlotViewModel.UpdateDataAndRegenerate(seriesData, commentMap, muppetNameMap, 3.0);
     }
 
     public void UpdateDotplotPoints()
@@ -458,8 +485,9 @@ public partial class MainWindowViewModel : ViewModelBase
 
                 var point = new ScatterPoint(group.Key, yPos, tag: $"{muppetName}\nScore: {student.AggregateGrade}");
 
-                // Add to appropriate series based on whether student has a comment
-                bool hasComment = !string.IsNullOrEmpty(student.Comment);
+                // Add to appropriate series based on whether the Total score has a comment
+                var totalScore = student.Scores.FirstOrDefault(s => s.Name.Equals("Total", StringComparison.OrdinalIgnoreCase));
+                bool hasComment = totalScore != null && !string.IsNullOrEmpty(totalScore.Comment);
                 if (hasComment)
                 {
                     dotSeriesSquare.Points.Add(point);

@@ -9,10 +9,12 @@ using ExcelDataReader;
 /// <summary>
 /// Reads student assessment data from an Excel file (.xlsx).
 /// First column is student ID, subsequent columns are named scores.
+/// Columns ending with "(Notes)" contain comments for the corresponding score.
 /// Blank rows are skipped.
 /// </summary>
 public class ScoreReader
 {
+    private const string NotesSuffix = "(Notes)";
     private readonly MuppetNameGenerator _nameGenerator;
 
     static ScoreReader()
@@ -74,11 +76,26 @@ public class ScoreReader
             throw new InvalidOperationException("Excel sheet must have at least ID column and one score column");
         }
 
-        // First column is ID, rest are score names
-        var scoreNames = new List<string>();
+        // Build column info: separate score columns from notes columns
+        // Key: column index, Value: column name
+        var scoreColumns = new Dictionary<int, string>();
+        var notesColumns = new Dictionary<string, int>(); // Key: score name, Value: column index
+
         for (int i = 1; i < table.Columns.Count; i++)
         {
-            scoreNames.Add(table.Columns[i].ColumnName);
+            var columnName = table.Columns[i].ColumnName;
+
+            if (columnName.EndsWith(NotesSuffix, StringComparison.OrdinalIgnoreCase))
+            {
+                // This is a notes column - extract the score name it belongs to
+                var scoreName = columnName[..^NotesSuffix.Length];
+                notesColumns[scoreName] = i;
+            }
+            else
+            {
+                // This is a score column
+                scoreColumns[i] = columnName;
+            }
         }
 
         var students = new List<StudentAssessment>();
@@ -109,12 +126,11 @@ public class ScoreReader
 
             studentIds.Add(studentId);
 
-            // Parse scores
+            // Parse scores with their comments
             var scores = new List<Score>();
-            for (int i = 0; i < scoreNames.Count; i++)
+            foreach (var (columnIndex, scoreName) in scoreColumns)
             {
-                var scoreName = scoreNames[i];
-                var cellValue = row[i + 1];
+                var cellValue = row[columnIndex];
 
                 double scoreValue;
                 if (cellValue is double dVal)
@@ -130,7 +146,31 @@ public class ScoreReader
                     continue; // Skip non-numeric values
                 }
 
-                scores.Add(new Score(scoreName, null, scoreValue));
+                // Check for corresponding notes column
+                string? comment = null;
+                if (notesColumns.TryGetValue(scoreName, out var notesColumnIndex))
+                {
+                    var notesValue = row[notesColumnIndex];
+                    if (notesValue != null && notesValue != DBNull.Value)
+                    {
+                        var notesText = notesValue.ToString()?.Trim();
+                        // Treat "0" as blank (no comment)
+                        if (!string.IsNullOrEmpty(notesText) && notesText != "0")
+                        {
+                            // Replace semicolons with newlines and trim each line
+                            var lines = notesText.Split(';')
+                                .Select(line => line.Trim())
+                                .Where(line => !string.IsNullOrEmpty(line));
+                            comment = string.Join("\n", lines);
+                            if (string.IsNullOrEmpty(comment))
+                            {
+                                comment = null;
+                            }
+                        }
+                    }
+                }
+
+                scores.Add(new Score(scoreName, null, scoreValue, comment));
             }
 
             // Calculate total if not present

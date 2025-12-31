@@ -216,14 +216,19 @@ public partial class MainWindow : Window
             return;
 
         var muppetName = vm.ClassAssessment.MuppetNameMap.TryGetValue(student.Id, out var info) ? info.Name : "Unknown";
-        var editor = new CommentEditorWindow(muppetName, student.Comment);
+
+        // Get the Total score's comment (or empty if none)
+        var totalScore = student.Scores.FirstOrDefault(s => s.Name.Equals("Total", StringComparison.OrdinalIgnoreCase));
+        var currentComment = totalScore?.Comment ?? "";
+
+        var editor = new CommentEditorWindow(muppetName, currentComment);
 
         await editor.ShowDialog(this);
 
-        if (editor.WasOkClicked)
+        if (editor.WasOkClicked && totalScore != null)
         {
             var newComment = editor.GetComment();
-            student.Comment = newComment;
+            totalScore.Comment = newComment;
 
             // Broadcast that the student was edited
             WeakReferenceMessenger.Default.Send(new StudentEditedMessage(message.StudentId));

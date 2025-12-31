@@ -10,4 +10,5 @@ public record ViolinDataPoint(
     string Series,
     string Color,
     double Value,
-    string Comment = "");
+    string Comment = "",
+    string MuppetName = "");

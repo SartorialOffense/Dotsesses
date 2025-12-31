@@ -25,7 +25,8 @@ public partial class ViolinPlotViewModel : ViewModelBase
     private double _displayWidth;
     private double _displayHeight;
     private List<(string SeriesName, Dictionary<string, double> Scores)> _seriesData = new();
-    private Dictionary<int, string> _commentMap = new();
+    private Dictionary<(int StudentId, string SeriesName), string> _commentMap = new();
+    private Dictionary<int, string> _muppetNameMap = new();
     private double _dotSize = 3.0;
 
     // Plot area bounds in SVG coordinates (extracted from data points)
@@ -106,12 +107,14 @@ public partial class ViolinPlotViewModel : ViewModelBase
     public void GeneratePlot(
         (double Width, double Height) displaySize,
         List<(string SeriesName, Dictionary<string, double> Scores)> seriesData,
-        Dictionary<int, string> commentMap,
+        Dictionary<(int StudentId, string SeriesName), string> commentMap,
+        Dictionary<int, string> muppetNameMap,
         double dotSize = 5.0)
     {
         // Store data for later regeneration
         _seriesData = seriesData;
         _commentMap = commentMap;
+        _muppetNameMap = muppetNameMap;
         _dotSize = dotSize;
         _displayWidth = displaySize.Width;
         _displayHeight = displaySize.Height;
@@ -126,6 +129,7 @@ public partial class ViolinPlotViewModel : ViewModelBase
             (widthInches, heightInches),
             seriesData,
             commentMap,
+            muppetNameMap,
             dotSize);
 
         SvgContent = svgContent;
@@ -151,7 +155,7 @@ public partial class ViolinPlotViewModel : ViewModelBase
             return;
         }
 
-        GeneratePlot((displayWidth, displayHeight), _seriesData, _commentMap, _dotSize);
+        GeneratePlot((displayWidth, displayHeight), _seriesData, _commentMap, _muppetNameMap, _dotSize);
     }
 
     /// <summary>
@@ -159,19 +163,21 @@ public partial class ViolinPlotViewModel : ViewModelBase
     /// </summary>
     public void UpdateDataAndRegenerate(
         List<(string SeriesName, Dictionary<string, double> Scores)> seriesData,
-        Dictionary<int, string> commentMap,
+        Dictionary<(int StudentId, string SeriesName), string> commentMap,
+        Dictionary<int, string> muppetNameMap,
         double dotSize)
     {
         // Store new data
         _seriesData = seriesData;
         _commentMap = commentMap;
+        _muppetNameMap = muppetNameMap;
         _dotSize = dotSize;
 
         // Regenerate with stored display dimensions (or defaults if not yet set)
         var displayWidth = _displayWidth > 0 ? _displayWidth : 800;
         var displayHeight = _displayHeight > 0 ? _displayHeight : 400;
 
-        GeneratePlot((displayWidth, displayHeight), _seriesData, _commentMap, _dotSize);
+        GeneratePlot((displayWidth, displayHeight), _seriesData, _commentMap, _muppetNameMap, _dotSize);
     }
 
     /// <summary>

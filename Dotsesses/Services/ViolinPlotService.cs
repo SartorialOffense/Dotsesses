@@ -21,14 +21,16 @@ public class ViolinPlotService
     /// </summary>
     /// <param name="figSize">Figure size in inches (width, height)</param>
     /// <param name="seriesData">List of (series name, student ID to score mapping)</param>
-    /// <param name="commentMap">Map of student IDs to their comments</param>
+    /// <param name="commentMap">Map of (student ID, series name) to score comment</param>
+    /// <param name="muppetNameMap">Map of student ID to muppet name</param>
     /// <param name="dotSize">Size of swarm dots</param>
     /// <param name="swarmSpread">Multiplier for horizontal spread of swarm dots (default 1.0, increase to spread wider)</param>
     /// <returns>Tuple of (SVG content string, list of data points for rendering)</returns>
     public (string SvgContent, List<ViolinDataPoint> DataPoints) GeneratePlot(
         (double Width, double Height) figSize,
         List<(string SeriesName, Dictionary<string, double> Scores)> seriesData,
-        Dictionary<int, string> commentMap,
+        Dictionary<(int StudentId, string SeriesName), string> commentMap,
+        Dictionary<int, string> muppetNameMap,
         double dotSize = 5.0,
         double swarmSpread = 1.0)
     {
@@ -69,10 +71,13 @@ public class ViolinPlotService
             // Parse student ID from string format "S001" -> 1
             int studentId = int.Parse(idStr.TrimStart('S'));
 
-            // Get comment for this student
-            string comment = commentMap.TryGetValue(studentId, out string? commentValue) ? commentValue : "";
+            // Get comment for this specific score (student + series)
+            string comment = commentMap.TryGetValue((studentId, series), out string? commentValue) ? commentValue : "";
 
-            dataPoints.Add(new ViolinDataPoint(x, y, studentId, series, color, value, comment));
+            // Get muppet name for this student
+            string muppetName = muppetNameMap.TryGetValue(studentId, out string? name) ? name : "";
+
+            dataPoints.Add(new ViolinDataPoint(x, y, studentId, series, color, value, comment, muppetName));
         }
 
         return (svgContent, dataPoints);
