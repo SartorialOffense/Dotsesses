@@ -928,7 +928,6 @@ public partial class ViolinPlotControl : UserControl
         var plotBottom = vm.GetPlotAreaBottomFraction() * height;
 
         const double labelOffset = 28; // pixels from cursor line (3x original spacing)
-        const double gradeColWidth = 18; // fixed width for grade column
         const double countColWidth = 16; // fixed width for count column
         const double deviationColWidth = 26; // fixed width for deviation column
         const double colSpacing = 2;
@@ -949,15 +948,17 @@ public partial class ViolinPlotControl : UserControl
                 Spacing = colSpacing
             };
 
-            // Grade column: inverted colors (white bg/black text in dark mode, black bg/white text in light mode)
+            // Grade column: white text with tight white border box
             var gradeBox = new Border
             {
-                Background = ThemeColors.ForegroundBrush(_currentTheme),
-                Width = gradeColWidth,
+                Background = Brushes.Transparent,
+                BorderBrush = ThemeColors.ForegroundBrush(_currentTheme),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(2, 0),
                 Child = new TextBlock
                 {
                     Text = grade.DisplayName,
-                    Foreground = ThemeColors.BackgroundBrush(_currentTheme),
+                    Foreground = ThemeColors.ForegroundBrush(_currentTheme),
                     FontSize = 11,
                     FontWeight = FontWeight.Bold,
                     TextAlignment = TextAlignment.Center,
