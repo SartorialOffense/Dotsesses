@@ -2,9 +2,7 @@ namespace Dotsesses.UI;
 
 using System;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.IO;
-using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -56,10 +54,6 @@ public partial class MainWindowViewModel : ViewModelBase
     private DateTime _lastClickTime;
     private int? _lastClickedStudentId;
     private const int DoubleClickThresholdMs = 500;
-
-    // Comment change tracking for violin plot sync
-    private StudentAssessment? _subscribedStudent;
-    private CancellationTokenSource? _commentDebounce;
 
     [ObservableProperty]
     private int? _hoveredStudentId;
@@ -1272,9 +1266,6 @@ public partial class MainWindowViewModel : ViewModelBase
 
     partial void OnHoveredStudentIdChanged(int? value)
     {
-        // Unsubscribe from previous student's score changes
-        UnsubscribeFromScoreChanges();
-
         if (value.HasValue)
         {
             var student = ClassAssessment.Assessments.FirstOrDefault(s => s.Id == value.Value);
@@ -1282,9 +1273,6 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 var grade = GetGradeForStudent(student);
                 HoveredStudent = new StudentCardViewModel(student, grade, () => _hoverDelayService.ClearHover());
-
-                // Subscribe to score changes for violin plot sync
-                SubscribeToScoreChanges(student);
             }
             else
             {
@@ -1295,58 +1283,6 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             HoveredStudent = null;
         }
-    }
-
-    private void SubscribeToScoreChanges(StudentAssessment student)
-    {
-        _subscribedStudent = student;
-        foreach (var score in student.Scores)
-        {
-            score.PropertyChanged += OnScorePropertyChanged;
-        }
-    }
-
-    private void UnsubscribeFromScoreChanges()
-    {
-        if (_subscribedStudent != null)
-        {
-            foreach (var score in _subscribedStudent.Scores)
-            {
-                score.PropertyChanged -= OnScorePropertyChanged;
-            }
-            _subscribedStudent = null;
-        }
-    }
-
-    private void OnScorePropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName != nameof(Score.Comment) || sender is not Score score)
-            return;
-
-        // Debounce comment updates (300ms delay)
-        _commentDebounce?.Cancel();
-        _commentDebounce = new CancellationTokenSource();
-        var token = _commentDebounce.Token;
-
-        Task.Delay(300, token).ContinueWith(t =>
-        {
-            if (!t.IsCanceled && _subscribedStudent != null && ViolinPlotViewModel != null)
-            {
-                // All UI updates must happen on the dispatcher thread
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    if (_subscribedStudent != null && ViolinPlotViewModel != null)
-                    {
-                        // Update the violin plot's comment data without full regeneration
-                        ViolinPlotViewModel.UpdateComment(_subscribedStudent.Id, score.Name, score.Comment);
-
-                        // Also update the dotplot to refresh comment indicators
-                        UpdateDotplotPoints();
-                        HasUnsavedChanges = true;
-                    }
-                });
-            }
-        }, token);
     }
 
     private void OnDotplotMouseDown(object? sender, OxyMouseDownEventArgs e)

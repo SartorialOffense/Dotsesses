@@ -232,40 +232,6 @@ public partial class ViolinPlotViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Updates a comment for a specific student and series.
-    /// This is an efficient update that doesn't regenerate the entire plot.
-    /// </summary>
-    public void UpdateComment(int studentId, string seriesName, string? comment)
-    {
-        var key = (studentId, seriesName);
-        var normalizedComment = comment ?? "";
-
-        // Update the comment map
-        _commentMap[key] = normalizedComment;
-
-        // Find and replace the data point with the updated comment
-        for (int i = 0; i < _dataPoints.Count; i++)
-        {
-            var point = _dataPoints[i];
-            if (point.StudentId == studentId && point.Series == seriesName)
-            {
-                // Create new record with updated comment
-                _dataPoints[i] = point with { Comment = normalizedComment };
-                break;
-            }
-        }
-
-        // Trigger re-render of hover visualization if this student is currently hovered
-        if (HoveredStudentId == studentId)
-        {
-            // Force property change notification by toggling the value
-            var temp = HoveredStudentId;
-            HoveredStudentId = null;
-            HoveredStudentId = temp;
-        }
-    }
-
-    /// <summary>
     /// Gets the X bounds (in display coordinates) for the "Total" series.
     /// Calculates series width based on plot width divided by number of series,
     /// accounting for extra right-side padding in the plot.
