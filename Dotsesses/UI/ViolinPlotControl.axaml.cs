@@ -501,7 +501,7 @@ public partial class ViolinPlotControl : UserControl
         };
         commentBlock.Children.Add(seriesHeader);
 
-        // Comment lines
+        // Comment lines with bullets
         var commentLines = point.Comment.Split('\n')
             .Select(line => line.Trim())
             .Where(line => !string.IsNullOrEmpty(line));
@@ -510,7 +510,7 @@ public partial class ViolinPlotControl : UserControl
         {
             var lineText = new TextBlock
             {
-                Text = line,
+                Text = $"● {line}",
                 FontSize = 10,
                 Foreground = Brushes.White,
                 TextWrapping = TextWrapping.NoWrap
@@ -568,10 +568,7 @@ public partial class ViolinPlotControl : UserControl
                 (byte)(scoreColor.B + (255 - scoreColor.B) * factor));
         }
 
-        // Build tooltip: score with sigma (colored, bold), student ID (white, bold), comments (white, bulleted)
-        var tooltipPanel = new StackPanel { Spacing = 2 };
-
-        // Score value with sigma - colored and bold, larger font
+        // Build tooltip: score with sigma only (colored, bold)
         var sigmaSign = point.SigmaValue >= 0 ? "+" : "";
         var scoreText = new TextBlock
         {
@@ -580,19 +577,8 @@ public partial class ViolinPlotControl : UserControl
             FontWeight = FontWeight.Bold,
             Foreground = new SolidColorBrush(scoreColor)
         };
-        tooltipPanel.Children.Add(scoreText);
 
-        // Student ID - white and bold
-        var idText = new TextBlock
-        {
-            Text = point.StudentId.ToString(),
-            FontSize = 11,
-            FontWeight = FontWeight.Bold,
-            Foreground = Brushes.White
-        };
-        tooltipPanel.Children.Add(idText);
-
-        tooltipBorder.Child = tooltipPanel;
+        tooltipBorder.Child = scoreText;
 
         // Measure tooltip to determine positioning
         tooltipBorder.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
