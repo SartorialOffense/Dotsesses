@@ -85,6 +85,9 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private bool _hasUnsavedChanges;
 
+    [ObservableProperty]
+    private string? _currentSaveFilePath;
+
     /// <summary>
     /// Exposes the hover delay service for debug display and clear command binding.
     /// </summary>
@@ -1118,6 +1121,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 Cursors,
                 _currentSourceFile);
 
+            CurrentSaveFilePath = filePath;
             HasUnsavedChanges = false;
             Log($"State saved to: {filePath}");
         }
@@ -1164,6 +1168,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 muppetMap);
 
             _currentSourceFile = state.SourceFile;
+            CurrentSaveFilePath = filePath;
 
             // Apply saved cursor positions
             _stateService.ApplyCursors(state, Cursors);

@@ -118,9 +118,16 @@ public partial class MainWindow : Window
         await LoadWithDialog();
     }
 
-    private async Task SaveWithDialog()
+    private async Task SaveWithDialog(bool forceDialog = false)
     {
         if (DataContext is not MainWindowViewModel vm) return;
+
+        // If we have a current file path and not forcing dialog, save directly
+        if (!forceDialog && !string.IsNullOrEmpty(vm.CurrentSaveFilePath))
+        {
+            await vm.SaveStateCommand.ExecuteAsync(vm.CurrentSaveFilePath);
+            return;
+        }
 
         var storageProvider = StorageProvider;
 
