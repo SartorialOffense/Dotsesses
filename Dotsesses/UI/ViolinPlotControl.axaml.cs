@@ -562,7 +562,7 @@ public partial class ViolinPlotControl : UserControl
         var sigmaSign = point.SigmaValue >= 0 ? "+" : "";
         var scoreText = new TextBlock
         {
-            Text = $"{Math.Round(point.Value)} {sigmaSign}{point.SigmaValue:F1}σ",
+            Text = $"{Math.Round(point.Value)} | {sigmaSign}{point.SigmaValue:F1}σ",
             FontSize = 14,
             FontWeight = FontWeight.Bold,
             Foreground = new SolidColorBrush(scoreColor)
