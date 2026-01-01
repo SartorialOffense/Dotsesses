@@ -6,7 +6,9 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using CSnakes.Runtime;
 using CommunityToolkit.Mvvm.Messaging;
@@ -59,9 +61,21 @@ public partial class App : Application
                 ConfigureServices(services);
                 Services = services.BuildServiceProvider();
 
+                var viewModel = Services.GetRequiredService<MainWindowViewModel>();
+
+                // For snapshot mode, require source file path via StartupConfig
+                if (string.IsNullOrEmpty(StartupConfig.SourceFilePath))
+                {
+                    Console.Error.WriteLine("Error: Source file path required for snapshot mode. Use --source <path>");
+                    desktop.Shutdown(1);
+                    return;
+                }
+
+                viewModel.LoadFromExcelFile(StartupConfig.SourceFilePath);
+
                 _mainWindow = new MainWindow
                 {
-                    DataContext = Services.GetRequiredService<MainWindowViewModel>(),
+                    DataContext = viewModel,
                 };
 
                 desktop.MainWindow = _mainWindow;
@@ -165,20 +179,44 @@ public partial class App : Application
                             Log("Startup: ViolinPlotService initialized");
                         });
 
-                        await Dispatcher.UIThread.InvokeAsync(() => splashWindow.UpdateStatus("Creating main window..."));
+                        await Dispatcher.UIThread.InvokeAsync(() => splashWindow.UpdateStatus("Select Excel source file..."));
 
                         // Small delay to show the status
                         await Task.Delay(200);
 
-                        Log("Startup: Creating MainWindow");
+                        Log("Startup: Prompting for Excel file");
+
+                        // Prompt for Excel file on UI thread
+                        string? excelFilePath = null;
+                        await Dispatcher.UIThread.InvokeAsync(async () =>
+                        {
+                            excelFilePath = await PromptForExcelFile(splashWindow);
+                        });
+
+                        if (string.IsNullOrEmpty(excelFilePath))
+                        {
+                            Log("Startup: No file selected, shutting down");
+                            await Dispatcher.UIThread.InvokeAsync(() =>
+                            {
+                                splashWindow.Close();
+                                desktop.Shutdown();
+                            });
+                            return;
+                        }
+
+                        Log($"Startup: Excel file selected: {excelFilePath}");
+                        await Dispatcher.UIThread.InvokeAsync(() => splashWindow.UpdateStatus("Creating main window..."));
 
                         // Switch to main window on UI thread
                         await Dispatcher.UIThread.InvokeAsync(() =>
                         {
                             Log("Startup: Instantiating MainWindow");
+                            var viewModel = Services.GetRequiredService<MainWindowViewModel>();
+                            viewModel.LoadFromExcelFile(excelFilePath);
+
                             _mainWindow = new MainWindow
                             {
-                                DataContext = Services.GetRequiredService<MainWindowViewModel>(),
+                                DataContext = viewModel,
                             };
 
                             Log("Startup: Showing MainWindow");
@@ -203,6 +241,34 @@ public partial class App : Application
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>
+    /// Prompts the user to select an Excel file.
+    /// </summary>
+    /// <param name="parentWindow">The parent window for the file dialog</param>
+    /// <returns>The selected file path, or null if cancelled</returns>
+    private static async Task<string?> PromptForExcelFile(Window parentWindow)
+    {
+        var storageProvider = parentWindow.StorageProvider;
+
+        var result = await storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Select Excel Source File",
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("Excel files") { Patterns = new[] { "*.xlsx", "*.xls" } },
+                new FilePickerFileType("All files") { Patterns = new[] { "*" } }
+            }
+        });
+
+        if (result.Count > 0)
+        {
+            return result[0].Path.LocalPath;
+        }
+
+        return null;
     }
 
     /// <summary>

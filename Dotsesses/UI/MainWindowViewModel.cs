@@ -88,6 +88,9 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private string? _currentSaveFilePath;
 
+    [ObservableProperty]
+    private string _sourceFileName = "No file loaded";
+
     /// <summary>
     /// Exposes the hover delay service for debug display and clear command binding.
     /// </summary>
@@ -141,8 +144,46 @@ public partial class MainWindowViewModel : ViewModelBase
             HasUnsavedChanges = true; // Mark as changed when comments edited
         });
 
-        Log("MainWindowViewModel: Initializing with synthetic data");
-        InitializeWithSyntheticData();
+        Log("MainWindowViewModel: Constructor completed (data loading deferred)");
+    }
+
+    /// <summary>
+    /// Loads student data from an Excel file and initializes all UI components.
+    /// </summary>
+    /// <param name="excelFilePath">Path to the Excel file containing scores</param>
+    public void LoadFromExcelFile(string excelFilePath)
+    {
+        Log($"MainWindowViewModel: Loading from Excel file: {excelFilePath}");
+
+        _currentSourceFile = excelFilePath;
+
+        var scoreReader = new ScoreReader();
+        var students = scoreReader.Read(excelFilePath);
+
+        var curveGenerator = new DefaultCurveGenerator();
+        var defaultCurve = curveGenerator.GenerateRanges(students.Count);
+
+        var midpointCurve = defaultCurve
+            .Where(r => r.LowerBound > 0 || r.UpperBound > 0)
+            .Select(r => new CutoffCount(r.Grade, r.Midpoint))
+            .ToList();
+
+        var initialCutoffs = _initialCutoffCalculator.Calculate(students, midpointCurve);
+        var current = _cutoffCountCalculator.Calculate(students, initialCutoffs);
+
+        var muppetNameGenerator = new MuppetNameGenerator();
+        var studentIds = students.Select(s => s.Id).OrderBy(id => id);
+        var muppetNameMap = muppetNameGenerator.Generate(studentIds);
+
+        ClassAssessment = new ClassAssessment(
+            students,
+            initialCutoffs,
+            defaultCurve,
+            current,
+            muppetNameMap
+        );
+
+        _gradeAssigner = new GradeAssigner(initialCutoffs);
 
         Log("MainWindowViewModel: Initializing cursors");
         InitializeCursors();
@@ -153,14 +194,16 @@ public partial class MainWindowViewModel : ViewModelBase
         Log("MainWindowViewModel: Initializing compliance grid");
         InitializeComplianceGrid();
 
-        Log("MainWindowViewModel: Recalculating grade counts for all enabled grades");
+        Log("MainWindowViewModel: Recalculating grade counts");
         RecalculateGradeCounts();
 
         Log("MainWindowViewModel: Initializing dotplot");
         InitializeDotplot();
 
-        Log("MainWindowViewModel: Constructor completed (violin plot deferred)");
-        // Defer violin plot initialization to avoid blocking UI on startup
+        // Update the display filename
+        SourceFileName = Path.GetFileName(excelFilePath);
+
+        Log("MainWindowViewModel: Excel file loaded successfully");
     }
 
     /// <summary>
@@ -231,41 +274,6 @@ public partial class MainWindowViewModel : ViewModelBase
 
             Log("MainWindowViewModel: Violin plot initialization completed");
         });
-    }
-
-    private void InitializeWithSyntheticData()
-    {
-        // Read real scores from Excel file
-        const string scoresFilePath = "/Users/trumbjd/Dev/Dotsesses/Dotsesses/2025 IP Final Scores.xlsx";
-        var scoreReader = new ScoreReader();
-        var students = scoreReader.Read(scoresFilePath);
-
-        var curveGenerator = new DefaultCurveGenerator();
-        var defaultCurve = curveGenerator.GenerateRanges(students.Count);
-
-        // Use midpoints for initial cursor placement (only for grades with ranges)
-        var midpointCurve = defaultCurve
-            .Where(r => r.LowerBound > 0 || r.UpperBound > 0)
-            .Select(r => new CutoffCount(r.Grade, r.Midpoint))
-            .ToList();
-
-        var initialCutoffs = _initialCutoffCalculator.Calculate(students, midpointCurve);
-        var current = _cutoffCountCalculator.Calculate(students, initialCutoffs);
-
-        // Get MuppetName map from generator
-        var muppetNameGenerator = new MuppetNameGenerator();
-        var studentIds = students.Select(s => s.Id).OrderBy(id => id);
-        var muppetNameMap = muppetNameGenerator.Generate(studentIds);
-
-        ClassAssessment = new ClassAssessment(
-            students,
-            initialCutoffs,
-            defaultCurve,
-            current,
-            muppetNameMap
-        );
-
-        _gradeAssigner = new GradeAssigner(initialCutoffs);
     }
 
     private void InitializeDotplot()

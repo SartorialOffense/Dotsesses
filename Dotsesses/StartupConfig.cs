@@ -16,6 +16,11 @@ public static class StartupConfig
     public static string? SnapshotOutputPath { get; set; }
 
     /// <summary>
+    /// Source Excel file path (required for snapshot mode).
+    /// </summary>
+    public static string? SourceFilePath { get; set; }
+
+    /// <summary>
     /// Parses command-line arguments and populates configuration.
     /// </summary>
     public static void ParseArguments(string[] args)
@@ -34,6 +39,15 @@ public static class StartupConfig
                     if (i + 1 < args.Length)
                     {
                         SnapshotOutputPath = args[i + 1];
+                        i++; // Skip next arg
+                    }
+                    break;
+
+                case "--source":
+                case "-s":
+                    if (i + 1 < args.Length)
+                    {
+                        SourceFilePath = args[i + 1];
                         i++; // Skip next arg
                     }
                     break;
