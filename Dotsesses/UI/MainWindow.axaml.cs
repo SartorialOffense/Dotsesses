@@ -19,7 +19,9 @@ using Dotsesses.Services;
 using Dotsesses.UI;
 using Microsoft.Extensions.DependencyInjection;
 using MsBox.Avalonia;
+using MsBox.Avalonia.Dto;
 using MsBox.Avalonia.Enums;
+using MsBox.Avalonia.Models;
 using MsBoxIcon = MsBox.Avalonia.Enums.Icon;
 using OxyPlot;
 
@@ -203,10 +205,23 @@ public partial class MainWindow : Window
                 ? System.IO.Path.GetFileNameWithoutExtension(vm.CurrentSourceFile)
                 : "export";
 
+            // Build file paths and check for existing files
+            var gradesFile = System.IO.Path.Combine(exportDirectory, $"{fileNameStem}-Grades.xlsx");
+            var distributionFile = System.IO.Path.Combine(exportDirectory, $"{fileNameStem}-Grade-Distribution.xlsx");
+
+            var existingFiles = new[] { gradesFile, distributionFile }.Where(File.Exists).ToList();
+            if (existingFiles.Any())
+            {
+                if (!await ConfirmActionAsync("Files Exist", "Exported files already exist", "Overwrite existing files"))
+                {
+                    return;
+                }
+            }
+
             try
             {
                 var exportService = new Dotsesses.Services.ExportService();
-                var (gradesFile, distributionFile) = exportService.Export(
+                exportService.Export(
                     exportDirectory,
                     fileNameStem,
                     vm.ClassAssessment.Assessments,
@@ -409,6 +424,30 @@ public partial class MainWindow : Window
     /// Triggers the save dialog. Called from native menu.
     /// </summary>
     public async Task TriggerSave() => await SaveWithDialog();
+
+    /// <summary>
+    /// Shows a confirmation dialog with custom action button text.
+    /// </summary>
+    /// <param name="title">Dialog title</param>
+    /// <param name="message">Dialog message</param>
+    /// <param name="actionButtonText">Text for the action button</param>
+    /// <returns>True if user clicked the action button, false if cancelled</returns>
+    private async Task<bool> ConfirmActionAsync(string title, string message, string actionButtonText)
+    {
+        var box = MessageBoxManager.GetMessageBoxCustom(new MessageBoxCustomParams
+        {
+            ContentTitle = title,
+            ContentMessage = message,
+            ButtonDefinitions =
+            [
+                new ButtonDefinition { Name = actionButtonText },
+                new ButtonDefinition { Name = "Cancel", IsCancel = true, IsDefault = true }
+            ],
+            WindowStartupLocation = WindowStartupLocation.CenterOwner
+        });
+        var result = await box.ShowWindowDialogAsync(this);
+        return result == actionButtonText;
+    }
 
     /// <summary>
     /// Saves a PNG snapshot of the window to the specified path or temp folder.
