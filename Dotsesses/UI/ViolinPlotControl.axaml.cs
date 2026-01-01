@@ -598,28 +598,37 @@ public partial class ViolinPlotControl : UserControl
 
         // Use fully saturated series color
         var scoreColor = Color.Parse(point.Color);
+        var colorBrush = new SolidColorBrush(scoreColor);
+        var whiteBrush = new SolidColorBrush(Colors.White);
 
-        // Build tooltip: score with sigma only (colored, bold)
-        // For Total series, also include the letter grade
+        // Build tooltip with white pipe separators
         var sigmaSign = point.SigmaValue >= 0 ? "+" : "";
-        var tooltipText = $"{Math.Round(point.Value)} | {sigmaSign}{point.SigmaValue:F1}σ";
 
+        var scoreText = new TextBlock
+        {
+            FontSize = 14,
+            FontWeight = FontWeight.Bold
+        };
+
+        // Score value (colored)
+        scoreText.Inlines.Add(new Avalonia.Controls.Documents.Run($"{Math.Round(point.Value)} ") { Foreground = colorBrush });
+        // Pipe (white)
+        scoreText.Inlines.Add(new Avalonia.Controls.Documents.Run("| ") { Foreground = whiteBrush });
+        // Sigma value (colored)
+        scoreText.Inlines.Add(new Avalonia.Controls.Documents.Run($"{sigmaSign}{point.SigmaValue:F1}σ") { Foreground = colorBrush });
+
+        // For Total series, also include the letter grade
         if (point.Series.Equals("Total", StringComparison.OrdinalIgnoreCase) && DataContext is ViolinPlotViewModel vm)
         {
             var grade = vm.GetGradeForScore(point.Value);
             if (!string.IsNullOrEmpty(grade))
             {
-                tooltipText += $" | {grade}";
+                // Pipe (white)
+                scoreText.Inlines.Add(new Avalonia.Controls.Documents.Run(" | ") { Foreground = whiteBrush });
+                // Grade (colored)
+                scoreText.Inlines.Add(new Avalonia.Controls.Documents.Run(grade) { Foreground = colorBrush });
             }
         }
-
-        var scoreText = new TextBlock
-        {
-            Text = tooltipText,
-            FontSize = 14,
-            FontWeight = FontWeight.Bold,
-            Foreground = new SolidColorBrush(scoreColor)
-        };
 
         tooltipBorder.Child = scoreText;
 

@@ -393,16 +393,27 @@ public partial class MainWindow : Window
             Padding = new Thickness(4, 2)
         };
 
-        // Format: score | sigma | grade (matching violin plot Total tooltip)
-        // Use fully saturated color
+        // Format: score | sigma | grade with white pipe separators
+        var colorBrush = new SolidColorBrush(dotColor);
+        var whiteBrush = new SolidColorBrush(Colors.White);
         var sigmaSign = sigmaValue >= 0 ? "+" : "";
+
         var scoreText = new TextBlock
         {
-            Text = $"{score} | {sigmaSign}{sigmaValue:F1}σ | {grade}",
             FontSize = 14,
-            FontWeight = FontWeight.Bold,
-            Foreground = new SolidColorBrush(dotColor)
+            FontWeight = FontWeight.Bold
         };
+
+        // Score value (colored)
+        scoreText.Inlines.Add(new Avalonia.Controls.Documents.Run($"{score} ") { Foreground = colorBrush });
+        // Pipe (white)
+        scoreText.Inlines.Add(new Avalonia.Controls.Documents.Run("| ") { Foreground = whiteBrush });
+        // Sigma value (colored)
+        scoreText.Inlines.Add(new Avalonia.Controls.Documents.Run($"{sigmaSign}{sigmaValue:F1}σ ") { Foreground = colorBrush });
+        // Pipe (white)
+        scoreText.Inlines.Add(new Avalonia.Controls.Documents.Run("| ") { Foreground = whiteBrush });
+        // Grade (colored)
+        scoreText.Inlines.Add(new Avalonia.Controls.Documents.Run(grade) { Foreground = colorBrush });
 
         tooltipBorder.Child = scoreText;
 
