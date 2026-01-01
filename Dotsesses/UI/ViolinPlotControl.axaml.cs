@@ -312,8 +312,10 @@ public partial class ViolinPlotControl : UserControl
             PointsOverlay.Children.Add(hitArea);
 
             // Add visible shape on top
+            // Use live comment to determine shape (hollow square for comments, filled circle otherwise)
+            var liveComment = vm.GetLiveComment(point.StudentId, point.Series);
             Control shape;
-            if (!string.IsNullOrEmpty(point.Comment))
+            if (!string.IsNullOrEmpty(liveComment))
             {
                 // Hollow square for students with comments
                 var rect = new Rectangle
@@ -431,17 +433,19 @@ public partial class ViolinPlotControl : UserControl
                 CreateTooltip(point, displayX, displayY);
 
                 // Create comment at top or bottom based on series index, centered on series X position
-                if (!string.IsNullOrEmpty(point.Comment))
+                // Use live comment from ClassAssessment instead of cached point.Comment
+                var liveComment = vm.GetLiveComment(point.StudentId, point.Series);
+                if (!string.IsNullOrEmpty(liveComment))
                 {
                     // Find series index to determine top vs bottom positioning
                     var seriesIndex = studentPoints.IndexOf(point);
-                    CreateSeriesComment(point, displayX, displayHeight, seriesIndex);
+                    CreateSeriesComment(point, liveComment, displayX, displayHeight, seriesIndex);
                 }
             }
         }
     }
 
-    private void CreateSeriesComment(ViolinDataPoint point, double displayX, double displayHeight, int seriesIndex)
+    private void CreateSeriesComment(ViolinDataPoint point, string comment, double displayX, double displayHeight, int seriesIndex)
     {
         if (DataContext is not ViolinPlotViewModel vm) return;
 
@@ -479,7 +483,7 @@ public partial class ViolinPlotControl : UserControl
         commentBlock.Children.Add(seriesHeader);
 
         // Comment lines with bullets
-        var commentLines = point.Comment.Split('\n')
+        var commentLines = comment.Split('\n')
             .Select(line => line.Trim())
             .Where(line => !string.IsNullOrEmpty(line));
 

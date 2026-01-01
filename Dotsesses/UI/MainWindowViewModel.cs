@@ -147,12 +147,12 @@ public partial class MainWindowViewModel : ViewModelBase
             }
         });
 
-        // Register for student edited messages to refresh plots
+        // Register for student edited messages to refresh comment displays
         _messenger.Register<StudentEditedMessage>(this, (r, m) =>
         {
             UpdateDotplotPoints();
-            InitializeViolinPlot();
-            HasUnsavedChanges = true; // Mark as changed when comments edited
+            ViolinPlotViewModel?.RefreshHoverVisualization();
+            HasUnsavedChanges = true;
         });
 
         Log("MainWindowViewModel: Constructor completed (data loading deferred)");
@@ -280,6 +280,7 @@ public partial class MainWindowViewModel : ViewModelBase
             // Now update the ViewModel on the UI thread
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
+                ViolinPlotViewModel.SetClassAssessment(ClassAssessment);
                 ViolinPlotViewModel.UpdateDataAndRegenerate(seriesData, commentMap, muppetNameMap, 3.0);
             });
 
@@ -1266,6 +1267,9 @@ public partial class MainWindowViewModel : ViewModelBase
 
     partial void OnHoveredStudentIdChanged(int? value)
     {
+        // Dispose previous StudentCardViewModel to unsubscribe from score changes
+        HoveredStudent?.Dispose();
+
         if (value.HasValue)
         {
             var student = ClassAssessment.Assessments.FirstOrDefault(s => s.Id == value.Value);

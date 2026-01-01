@@ -28,6 +28,7 @@ public partial class ViolinPlotViewModel : ViewModelBase
     private Dictionary<(int StudentId, string SeriesName), string> _commentMap = new();
     private Dictionary<int, string> _muppetNameMap = new();
     private double _dotSize = 3.0;
+    private ClassAssessment? _classAssessment;
 
     // Plot area bounds in SVG coordinates (extracted from data points)
     // In SVG, Y increases downward, so _svgPlotTop < _svgPlotBottom
@@ -229,6 +230,47 @@ public partial class ViolinPlotViewModel : ViewModelBase
     public List<ViolinDataPoint> GetAllPoints()
     {
         return _dataPoints;
+    }
+
+    /// <summary>
+    /// Triggers a re-render of the hover visualization by notifying property change.
+    /// </summary>
+    public void RefreshHoverVisualization()
+    {
+        OnPropertyChanged(nameof(HoveredStudentId));
+    }
+
+    /// <summary>
+    /// Sets the ClassAssessment reference for live comment lookup.
+    /// </summary>
+    public void SetClassAssessment(ClassAssessment classAssessment)
+    {
+        _classAssessment = classAssessment;
+    }
+
+    /// <summary>
+    /// Gets the live comment for a student's score from the ClassAssessment.
+    /// Returns the current value from the Score object, not a cached snapshot.
+    /// </summary>
+    public string? GetLiveComment(int studentId, string seriesName)
+    {
+        if (_classAssessment == null) return null;
+
+        var student = _classAssessment.Assessments.FirstOrDefault(a => a.Id == studentId);
+        if (student == null) return null;
+
+        // Find the score matching the series name
+        // Series names may include an index suffix (e.g., "Homework 1")
+        foreach (var score in student.Scores)
+        {
+            var scoreSeries = score.Index.HasValue ? $"{score.Name} {score.Index}" : score.Name;
+            if (scoreSeries == seriesName)
+            {
+                return score.Comment;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
