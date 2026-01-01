@@ -388,22 +388,9 @@ public partial class ViolinPlotControl : UserControl
         // Re-render all points in their correct positions
         RenderPointsAsShapes();
 
-        // If hovering, dim non-hovered points and add ring overlays to hovered ones
+        // If hovering, add ring overlays to hovered points
         if (vm.HoveredStudentId.HasValue)
         {
-            // Dim all points first (both ellipses and rectangles)
-            foreach (var shape in PointsOverlay.Children.OfType<Control>())
-            {
-                if (shape is Ellipse ellipse)
-                {
-                    ellipse.Opacity = 0.45;
-                }
-                else if (shape is Rectangle rect)
-                {
-                    rect.Opacity = 0.45;
-                }
-            }
-
             // Get all points for this student
             var studentPoints = vm.GetPointsForStudent(vm.HoveredStudentId.Value);
 
@@ -423,16 +410,6 @@ public partial class ViolinPlotControl : UserControl
 
                 if (shape != null)
                 {
-                    // Keep original shape at full opacity
-                    if (shape is Ellipse ellipse)
-                    {
-                        ellipse.Opacity = 1.0;
-                    }
-                    else if (shape is Rectangle rect)
-                    {
-                        rect.Opacity = 1.0;
-                    }
-
                     double ringSize = 14;
                     double ringThickness = 2;
 
