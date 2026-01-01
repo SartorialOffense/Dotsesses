@@ -381,8 +381,9 @@ public partial class ViolinPlotControl : UserControl
 
     private void UpdateHoverVisualization(ViolinPlotViewModel vm)
     {
-        // Clear tooltips
+        // Clear tooltips and comments
         TooltipsOverlay.Children.Clear();
+        CommentsOverlay.Children.Clear();
 
         // Re-render all points in their correct positions
         RenderPointsAsShapes();
@@ -451,8 +452,97 @@ public partial class ViolinPlotControl : UserControl
 
                 // Create tooltip
                 CreateTooltip(point, displayX, displayY);
+
+                // Create comment at top or bottom based on series index, centered on series X position
+                if (!string.IsNullOrEmpty(point.Comment))
+                {
+                    // Find series index to determine top vs bottom positioning
+                    var seriesIndex = studentPoints.IndexOf(point);
+                    CreateSeriesComment(point, displayX, displayHeight, seriesIndex);
+                }
             }
         }
+    }
+
+    private void CreateSeriesComment(ViolinDataPoint point, double displayX, double displayHeight, int seriesIndex)
+    {
+        if (DataContext is not ViolinPlotViewModel vm) return;
+
+        // Parse and lighten color if too dark
+        var seriesColor = Color.Parse(point.Color);
+        double luminance = 0.2126 * seriesColor.R + 0.7152 * seriesColor.G + 0.0722 * seriesColor.B;
+        if (luminance < 128)
+        {
+            double factor = 0.6;
+            seriesColor = Color.FromRgb(
+                (byte)(seriesColor.R + (255 - seriesColor.R) * factor),
+                (byte)(seriesColor.G + (255 - seriesColor.G) * factor),
+                (byte)(seriesColor.B + (255 - seriesColor.B) * factor));
+        }
+
+        var commentBorder = new Border
+        {
+            Background = new SolidColorBrush(Color.FromArgb(204, 26, 26, 26)), // #CC1A1A1A
+            BorderBrush = Brushes.White,
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(6, 3),
+            CornerRadius = new CornerRadius(3)
+        };
+
+        var commentBlock = new StackPanel { Orientation = Avalonia.Layout.Orientation.Vertical, Spacing = 1 };
+
+        // Series name header
+        var seriesHeader = new TextBlock
+        {
+            Text = point.Series,
+            FontSize = 10,
+            FontWeight = FontWeight.Bold,
+            Foreground = new SolidColorBrush(seriesColor)
+        };
+        commentBlock.Children.Add(seriesHeader);
+
+        // Comment lines
+        var commentLines = point.Comment.Split('\n')
+            .Select(line => line.Trim())
+            .Where(line => !string.IsNullOrEmpty(line));
+
+        foreach (var line in commentLines)
+        {
+            var lineText = new TextBlock
+            {
+                Text = line,
+                FontSize = 10,
+                Foreground = Brushes.White,
+                TextWrapping = TextWrapping.NoWrap
+            };
+            commentBlock.Children.Add(lineText);
+        }
+
+        commentBorder.Child = commentBlock;
+
+        // Measure to get dimensions for centering
+        commentBorder.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        var commentWidth = commentBorder.DesiredSize.Width;
+        var commentHeight = commentBorder.DesiredSize.Height;
+
+        // Position based on series index: even at bottom (-0.3), odd at top (1.3)
+        bool isBottom = seriesIndex % 2 == 0;
+        var normalizedY = isBottom ? -0.3 : 1.3;
+        var commentY = vm.NormalizedYToDisplayY(normalizedY, displayHeight);
+
+        Canvas.SetLeft(commentBorder, displayX - commentWidth / 2);
+        if (isBottom)
+        {
+            // Bottom: position bottom of comment at -0.2
+            Canvas.SetTop(commentBorder, commentY - commentHeight);
+        }
+        else
+        {
+            // Top: position top of comment at 1.2
+            Canvas.SetTop(commentBorder, commentY);
+        }
+
+        CommentsOverlay.Children.Add(commentBorder);
     }
 
     private void CreateTooltip(ViolinDataPoint point, double displayX, double displayY)
@@ -501,26 +591,6 @@ public partial class ViolinPlotControl : UserControl
             Foreground = Brushes.White
         };
         tooltipPanel.Children.Add(idText);
-
-        // Comments if present - white, bulleted, trimmed
-        if (!string.IsNullOrEmpty(point.Comment))
-        {
-            var commentLines = point.Comment.Split('\n')
-                .Select(line => line.Trim())
-                .Where(line => !string.IsNullOrEmpty(line));
-
-            foreach (var line in commentLines)
-            {
-                var commentText = new TextBlock
-                {
-                    Text = $"● {line}",
-                    FontSize = 10,
-                    Foreground = Brushes.White,
-                    TextWrapping = TextWrapping.NoWrap
-                };
-                tooltipPanel.Children.Add(commentText);
-            }
-        }
 
         tooltipBorder.Child = tooltipPanel;
 

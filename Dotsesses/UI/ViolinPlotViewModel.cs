@@ -411,4 +411,27 @@ public partial class ViolinPlotViewModel : ViewModelBase
         var normalized = ScoreToNormalized(score);
         return plotAreaTop + (1.0 - normalized) * plotAreaHeight;
     }
+
+    /// <summary>
+    /// Converts a normalized Y value (0-1 range, can extend beyond) to display Y coordinate.
+    /// normalized 1.0 → plotAreaTop, normalized 0.0 → plotAreaBottom
+    /// </summary>
+    public double NormalizedYToDisplayY(double normalizedY, double displayHeight)
+    {
+        // Get the plot area bounds as fractions of total height
+        var topFraction = GetPlotAreaTopFraction();
+        var bottomFraction = GetPlotAreaBottomFraction();
+
+        // Calculate display Y coordinates for plot area
+        var plotAreaTop = topFraction * displayHeight;
+        var plotAreaBottom = bottomFraction * displayHeight;
+        var plotAreaHeight = plotAreaBottom - plotAreaTop;
+
+        if (plotAreaHeight <= 0) return displayHeight / 2;
+
+        // Map normalized Y to plot area
+        // normalized 1.0 → plotAreaTop, normalized 0.0 → plotAreaBottom
+        // Values below 0 (like -0.2) will be below plotAreaBottom
+        return plotAreaTop + (1.0 - normalizedY) * plotAreaHeight;
+    }
 }

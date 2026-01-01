@@ -28,6 +28,9 @@
 
             <!-- Canvas for tooltips -->
             <Canvas x:Name="TooltipsOverlay" />
+
+            <!-- Canvas for comments overlay -->
+            <Canvas x:Name="CommentsOverlay" IsHitTestVisible="False" />
         </Grid>
 
         <!-- Cursor column (Canvas-based) - right column -->
