@@ -927,7 +927,7 @@ public partial class ViolinPlotControl : UserControl
         var plotTop = vm.GetPlotAreaTopFraction() * height;
         var plotBottom = vm.GetPlotAreaBottomFraction() * height;
 
-        const double labelOffset = 0; // pixels from cursor line
+        const double labelOffset = 28; // pixels from cursor line (3x original spacing)
         const double gradeColWidth = 18; // fixed width for grade column
         const double countColWidth = 16; // fixed width for count column
         const double deviationColWidth = 26; // fixed width for deviation column
@@ -1019,22 +1019,13 @@ public partial class ViolinPlotControl : UserControl
 
             if (i == 0)
             {
-                // Top grade (A): centered between its cursor line and the top of the plot
-                // Unless cursor is above max value, then just use cursor position
+                // Top grade (A): position above its cursor line with offset
                 var cursor = enabledCursors.FirstOrDefault(c => c.Grade.Order == grade.Order);
                 if (cursor != null)
                 {
                     var cursorY = vm.ScoreToDisplayY(cursor.Score, height);
-                    if (cursorY < plotTop)
-                    {
-                        // Cursor is above plot top (score > max), just position below cursor
-                        labelY = cursorY;
-                    }
-                    else
-                    {
-                        // Center between cursor and top of plot
-                        labelY = (plotTop + cursorY) / 2.0 - containerHeight / 2.0;
-                    }
+                    // Position label above cursor (smaller Y = higher on screen)
+                    labelY = cursorY - labelOffset - containerHeight;
                 }
                 else
                 {
