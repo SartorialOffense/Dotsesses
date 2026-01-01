@@ -393,18 +393,8 @@ public partial class MainWindow : Window
             Padding = new Thickness(4, 2)
         };
 
-        // Lighten color if too dark
-        double luminance = 0.2126 * dotColor.R + 0.7152 * dotColor.G + 0.0722 * dotColor.B;
-        if (luminance < 128)
-        {
-            double factor = 0.6;
-            dotColor = Color.FromRgb(
-                (byte)(dotColor.R + (255 - dotColor.R) * factor),
-                (byte)(dotColor.G + (255 - dotColor.G) * factor),
-                (byte)(dotColor.B + (255 - dotColor.B) * factor));
-        }
-
         // Format: score | sigma | grade (matching violin plot Total tooltip)
+        // Use fully saturated color
         var sigmaSign = sigmaValue >= 0 ? "+" : "";
         var scoreText = new TextBlock
         {

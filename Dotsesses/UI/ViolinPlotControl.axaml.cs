@@ -535,7 +535,7 @@ public partial class ViolinPlotControl : UserControl
         var seriesHeader = new TextBlock
         {
             Text = point.Series,
-            FontSize = 10,
+            FontSize = 12,
             FontWeight = FontWeight.Bold,
             Foreground = new SolidColorBrush(seriesColor)
         };
@@ -551,7 +551,7 @@ public partial class ViolinPlotControl : UserControl
             var lineText = new TextBlock
             {
                 Text = $"● {line}",
-                FontSize = 10,
+                FontSize = 12,
                 Foreground = ThemeColors.ForegroundBrush(_currentTheme),
                 TextWrapping = TextWrapping.NoWrap
             };
@@ -596,17 +596,8 @@ public partial class ViolinPlotControl : UserControl
             Padding = new Thickness(4, 2)
         };
 
-        // Score color (lightened if too dark)
+        // Use fully saturated series color
         var scoreColor = Color.Parse(point.Color);
-        double luminance = 0.2126 * scoreColor.R + 0.7152 * scoreColor.G + 0.0722 * scoreColor.B;
-        if (luminance < 128)
-        {
-            double factor = 0.6;
-            scoreColor = Color.FromRgb(
-                (byte)(scoreColor.R + (255 - scoreColor.R) * factor),
-                (byte)(scoreColor.G + (255 - scoreColor.G) * factor),
-                (byte)(scoreColor.B + (255 - scoreColor.B) * factor));
-        }
 
         // Build tooltip: score with sigma only (colored, bold)
         // For Total series, also include the letter grade
