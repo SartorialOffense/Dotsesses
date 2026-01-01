@@ -25,6 +25,7 @@ public class ViolinPlotService
     /// <param name="muppetNameMap">Map of student ID to muppet name</param>
     /// <param name="dotSize">Size of swarm dots</param>
     /// <param name="swarmSpread">Multiplier for horizontal spread of swarm dots (default 1.0, increase to spread wider)</param>
+    /// <param name="theme">Theme name for rendering ('dark' or 'light')</param>
     /// <returns>Tuple of (SVG content string, list of data points for rendering)</returns>
     public (string SvgContent, List<ViolinDataPoint> DataPoints) GeneratePlot(
         (double Width, double Height) figSize,
@@ -32,12 +33,16 @@ public class ViolinPlotService
         Dictionary<(int StudentId, string SeriesName), string> commentMap,
         Dictionary<int, string> muppetNameMap,
         double dotSize = 5.0,
-        double swarmSpread = 1.0)
+        double swarmSpread = 1.0,
+        ThemeName theme = ThemeName.DarkMode)
     {
         // Convert to format expected by Python module
         var pySeriesList = seriesData
             .Select(s => (s.SeriesName, (IReadOnlyDictionary<string, double>)s.Scores.AsReadOnly()))
             .ToList();
+
+        // Convert theme enum to Python string
+        var themeStr = theme == ThemeName.LightMode ? "light" : "dark";
 
         // Call Python module
         var result = _violinModule.CreateViolinSwarmPlot(
@@ -48,7 +53,8 @@ public class ViolinPlotService
             "", // xlabel (empty - just show series names)
             "Normalized Score (0-1)",
             dotSize,
-            swarmSpread
+            swarmSpread,
+            themeStr
         );
 
         // Extract SVG string and point data

@@ -128,8 +128,26 @@ def saturate_color(rgb):
     # Set saturation to maximum (1.0)
     return hls_to_rgb(h, l, 1.0)
 
-# Apply dark theme
-plt.style.use('dark_background')
+
+def apply_theme(theme: str = 'dark'):
+    """Apply matplotlib theme based on theme name."""
+    if theme == 'light':
+        plt.style.use('default')
+        plt.rcParams.update({
+            'axes.facecolor': 'white',
+            'axes.edgecolor': 'black',
+            'axes.labelcolor': 'black',
+            'text.color': 'black',
+            'xtick.color': 'black',
+            'ytick.color': 'black',
+            'figure.facecolor': 'white',
+        })
+    else:
+        plt.style.use('dark_background')
+
+
+# Apply dark theme by default
+apply_theme('dark')
 
 
 def create_violin_swarm_plot(
@@ -140,7 +158,8 @@ def create_violin_swarm_plot(
     xlabel: str = 'Series',
     ylabel: str = 'Normalized Score (0-1)',
     dot_size: float = 5.0,
-    swarm_spread: float = 1.0
+    swarm_spread: float = 1.0,
+    theme: str = 'dark'
 ) -> Tuple[Dict[str, int], str, List[Dict]]:
     """
     Create a violin + swarm plot with embedded metadata.
@@ -154,6 +173,7 @@ def create_violin_swarm_plot(
     - ylabel: y-axis label (default: 'Normalized Score (0-1)')
     - dot_size: size for dots (default: 5.0)
     - swarm_spread: multiplier for horizontal spread of swarm dots (default: 1.0, use 4.0 for 4x spread)
+    - theme: 'dark' or 'light' for visual theme (default: 'dark')
 
     Returns:
     - tuple of (timing_dict, svg_string, point_data_list)
@@ -162,6 +182,9 @@ def create_violin_swarm_plot(
       point_data_list contains: [{'x': float, 'y': float, 'id': str, 'series': str, 'color': str}, ...]
     """
     t_start = time.perf_counter()
+
+    # Apply the requested theme
+    apply_theme(theme)
 
     # Set random seed for reproducible jitter positions
     np.random.seed(42)
@@ -271,7 +294,8 @@ def create_violin_swarm_plot(
                 stat_labels.append(f'-{i}σ')
 
         ax2.set_yticks(stat_ticks)
-        ax2.set_yticklabels(stat_labels, fontsize=10, color='#B4B4B4')
+        stat_label_color = '#555555' if theme == 'light' else '#B4B4B4'
+        ax2.set_yticklabels(stat_labels, fontsize=10, color=stat_label_color)
         ax2.tick_params(axis='y', length=0, pad=2)  # No tick marks, just labels
         # Hide all spines on secondary axis
         for spine in ax2.spines.values():

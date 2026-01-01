@@ -31,7 +31,7 @@
         </Border>
 
         <!-- Top Row: Dotplot -->
-        <Border Grid.Row="1" Background="#101010" CornerRadius="8">
+        <Border x:Name="DotPlotBorder" Grid.Row="1" Background="#101010" CornerRadius="8">
             <Grid>
                 <!-- Existing content -->
                 <Grid x:Name="DotPlotContainer">

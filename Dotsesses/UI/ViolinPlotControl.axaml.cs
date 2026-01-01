@@ -37,6 +37,9 @@ public partial class ViolinPlotControl : UserControl
     private bool _isDraggingCursor;
     private readonly CursorValidation _cursorValidation = new();
 
+    // Current rendering theme
+    private ThemeName _currentTheme = ThemeName.DarkMode;
+
     public ViolinPlotControl()
     {
         InitializeComponent();
@@ -52,6 +55,49 @@ public partial class ViolinPlotControl : UserControl
 
         // Render cursor column when its layout is updated (bounds become available)
         CursorColumnCanvas.LayoutUpdated += OnCursorColumnLayoutUpdated;
+
+        // Subscribe to theme change messages
+        WeakReferenceMessenger.Default.Register<RenderWithThemeMessage>(this, OnRenderWithThemeMessage);
+    }
+
+    private void OnRenderWithThemeMessage(object recipient, RenderWithThemeMessage message)
+    {
+        _currentTheme = message.Theme;
+
+        // Update background color based on theme
+        Background = ThemeColors.BackgroundBrush(_currentTheme);
+
+        // Re-render all visual elements with new theme
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (DataContext is ViolinPlotViewModel vm)
+            {
+                // Regenerate the entire plot (including SVG from Python) with the new theme
+                var width = ViolinPlotArea.Bounds.Width;
+                var height = ViolinPlotArea.Bounds.Height;
+                if (width > 0 && height > 0)
+                {
+                    vm.RegeneratePlot(width, height, _currentTheme);
+
+                    // Update the SVG display with new content
+                    if (!string.IsNullOrEmpty(vm.SvgContent))
+                    {
+                        UpdateSvgDisplay(vm.SvgContent);
+                    }
+                }
+
+                UpdateHoverVisualization(vm);
+            }
+            else
+            {
+                RenderPointsAsShapes();
+            }
+            RenderRegionBands();
+            RenderCursorColumn();
+
+            // Invoke callback after rendering is complete
+            message.OnRenderComplete?.Invoke();
+        }, DispatcherPriority.Render);
     }
 
     private void OnLoaded(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -476,8 +522,8 @@ public partial class ViolinPlotControl : UserControl
 
         var commentBorder = new Border
         {
-            Background = new SolidColorBrush(Color.FromRgb(16, 16, 16)), // #101010 - solid dark to match UI
-            BorderBrush = Brushes.White,
+            Background = ThemeColors.BackgroundBrush(_currentTheme),
+            BorderBrush = ThemeColors.BorderBrush(_currentTheme),
             BorderThickness = new Thickness(1),
             Padding = new Thickness(6, 3),
             CornerRadius = new CornerRadius(3)
@@ -506,7 +552,7 @@ public partial class ViolinPlotControl : UserControl
             {
                 Text = $"● {line}",
                 FontSize = 10,
-                Foreground = Brushes.White,
+                Foreground = ThemeColors.ForegroundBrush(_currentTheme),
                 TextWrapping = TextWrapping.NoWrap
             };
             commentBlock.Children.Add(lineText);
@@ -543,8 +589,8 @@ public partial class ViolinPlotControl : UserControl
     {
         var tooltipBorder = new Border
         {
-            Background = new SolidColorBrush(Color.FromRgb(16, 16, 16)), // #101010 - solid dark to match UI
-            BorderBrush = new SolidColorBrush(Colors.White),
+            Background = ThemeColors.BackgroundBrush(_currentTheme),
+            BorderBrush = ThemeColors.BorderBrush(_currentTheme),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(3),
             Padding = new Thickness(4, 2)
@@ -722,8 +768,9 @@ public partial class ViolinPlotControl : UserControl
 
         if (!cursorsWithLines.Any()) return;
 
-        var lineBrush = new SolidColorBrush(Color.FromArgb(128, 255, 255, 255)); // 50% transparent white
-        var handleBrush = Brushes.White; // Handles stay fully opaque
+        var lineBrush = ThemeColors.TransparentLineBrush(_currentTheme);
+        var handleBrush = ThemeColors.ForegroundBrush(_currentTheme);
+        var handleFill = ThemeColors.BackgroundBrush(_currentTheme);
 
         // Draw barbell cursors at each grade boundary
         foreach (var cursor in cursorsWithLines)
@@ -747,7 +794,7 @@ public partial class ViolinPlotControl : UserControl
             {
                 Width = BarbellHandleSize,
                 Height = BarbellHandleSize,
-                Fill = Brushes.Black,
+                Fill = handleFill,
                 Stroke = handleBrush,
                 StrokeThickness = 2,
                 Tag = cursor,
@@ -762,7 +809,7 @@ public partial class ViolinPlotControl : UserControl
             {
                 Width = BarbellHandleSize,
                 Height = BarbellHandleSize,
-                Fill = Brushes.Black,
+                Fill = handleFill,
                 Stroke = handleBrush,
                 StrokeThickness = 2,
                 Tag = cursor,
@@ -899,15 +946,15 @@ public partial class ViolinPlotControl : UserControl
                 Spacing = colSpacing
             };
 
-            // Grade column: white box with black text, centered
+            // Grade column: inverted colors (white bg/black text in dark mode, black bg/white text in light mode)
             var gradeBox = new Border
             {
-                Background = Brushes.White,
+                Background = ThemeColors.ForegroundBrush(_currentTheme),
                 Width = gradeColWidth,
                 Child = new TextBlock
                 {
                     Text = grade.DisplayName,
-                    Foreground = Brushes.Black,
+                    Foreground = ThemeColors.BackgroundBrush(_currentTheme),
                     FontSize = 11,
                     FontWeight = FontWeight.Bold,
                     TextAlignment = TextAlignment.Center,
@@ -934,7 +981,7 @@ public partial class ViolinPlotControl : UserControl
             var countText = new TextBlock
             {
                 Text = currentCount.ToString(),
-                Foreground = Brushes.White,
+                Foreground = ThemeColors.ForegroundBrush(_currentTheme),
                 FontSize = 11,
                 Width = countColWidth,
                 TextAlignment = TextAlignment.Right,

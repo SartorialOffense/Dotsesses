@@ -13,8 +13,10 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Messaging;
 using Dotsesses.Messages;
+using Dotsesses.Models;
 using Dotsesses.Services;
 using Dotsesses.UI;
 using Microsoft.Extensions.DependencyInjection;
@@ -44,6 +46,31 @@ public partial class MainWindow : Window
         {
             await HandleEditStudentRequest(m);
         });
+
+        // Subscribe to theme change messages for DotPlot
+        WeakReferenceMessenger.Default.Register<RenderWithThemeMessage>(this, OnRenderWithThemeMessage);
+    }
+
+    // Current theme for DotPlot
+    private ThemeName _currentDotPlotTheme = ThemeName.DarkMode;
+
+    private void OnRenderWithThemeMessage(object recipient, RenderWithThemeMessage message)
+    {
+        _currentDotPlotTheme = message.Theme;
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            // Update DotPlot border background
+            DotPlotBorder.Background = ThemeColors.BackgroundBrush(_currentDotPlotTheme);
+
+            // Apply theme to the OxyPlot model via ViewModel
+            if (DataContext is MainWindowViewModel vm)
+            {
+                vm.ApplyTheme(_currentDotPlotTheme);
+            }
+
+            // Note: Callback is not invoked here - ViolinPlotControl handles it
+        }, DispatcherPriority.Render);
     }
 
     private async void OnWindowClosing(object? sender, WindowClosingEventArgs e)

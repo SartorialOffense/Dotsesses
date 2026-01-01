@@ -1561,4 +1561,61 @@ public partial class MainWindowViewModel : ViewModelBase
 
         return nearest;
     }
+
+    /// <summary>
+    /// Applies the specified theme to the DotPlot model.
+    /// </summary>
+    public void ApplyTheme(ThemeName theme)
+    {
+        if (DotplotModel == null) return;
+
+        // Update model background
+        DotplotModel.Background = ThemeColors.OxyBackground(theme);
+        DotplotModel.PlotAreaBackground = ThemeColors.OxyBackground(theme);
+        DotplotModel.PlotAreaBorderColor = ThemeColors.OxyBorder(theme);
+
+        // Update annotations colors
+        foreach (var annotation in DotplotModel.Annotations)
+        {
+            switch (annotation)
+            {
+                case LineAnnotation line:
+                    // Cursor lines use transparent line color
+                    if (line.Color.A < 255) // Semi-transparent
+                    {
+                        line.Color = ThemeColors.OxyTransparentLine(theme);
+                    }
+                    else
+                    {
+                        line.Color = ThemeColors.OxyBorder(theme);
+                    }
+                    break;
+
+                case RectangleAnnotation rect:
+                    // Cursor handles
+                    rect.Fill = ThemeColors.OxyHandleFill(theme);
+                    rect.Stroke = ThemeColors.OxyHandleStroke(theme);
+                    break;
+
+                case TextAnnotation text:
+                    // Grade labels have white bg/black text in dark mode (inverted)
+                    // So in dark mode: Stroke=Transparent (bg shows), TextColor=White
+                    // In light mode: we want black text on white
+                    if (text.Background != OxyColors.Undefined && text.Background != OxyColors.Transparent)
+                    {
+                        // Grade labels with background - use inverted colors
+                        text.Background = ThemeColors.OxyForeground(theme);
+                        text.TextColor = theme == ThemeName.DarkMode ? OxyColors.Black : OxyColors.White;
+                    }
+                    else
+                    {
+                        // Statistics labels - use secondary text color
+                        text.TextColor = ThemeColors.OxySecondaryText(theme);
+                    }
+                    break;
+            }
+        }
+
+        DotplotModel.InvalidatePlot(true);
+    }
 }

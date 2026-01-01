@@ -110,7 +110,8 @@ public partial class ViolinPlotViewModel : ViewModelBase
         List<(string SeriesName, Dictionary<string, double> Scores)> seriesData,
         Dictionary<(int StudentId, string SeriesName), string> commentMap,
         Dictionary<int, string> muppetNameMap,
-        double dotSize = 5.0)
+        double dotSize = 5.0,
+        ThemeName theme = ThemeName.DarkMode)
     {
         // Store data for later regeneration
         _seriesData = seriesData;
@@ -131,7 +132,8 @@ public partial class ViolinPlotViewModel : ViewModelBase
             seriesData,
             commentMap,
             muppetNameMap,
-            dotSize);
+            dotSize,
+            theme: theme);
 
         SvgContent = svgContent;
         _dataPoints = dataPoints;
@@ -146,9 +148,9 @@ public partial class ViolinPlotViewModel : ViewModelBase
     /// <summary>
     /// Regenerates the plot with new display dimensions using stored data.
     /// </summary>
-    public void RegeneratePlot(double displayWidth, double displayHeight)
+    public void RegeneratePlot(double displayWidth, double displayHeight, ThemeName theme = ThemeName.DarkMode)
     {
-        Console.WriteLine($"[ViolinPlotViewModel] RegeneratePlot called: {displayWidth}x{displayHeight}, SeriesData count: {_seriesData.Count}");
+        Console.WriteLine($"[ViolinPlotViewModel] RegeneratePlot called: {displayWidth}x{displayHeight}, SeriesData count: {_seriesData.Count}, Theme: {theme}");
 
         if (_seriesData.Count == 0)
         {
@@ -156,7 +158,7 @@ public partial class ViolinPlotViewModel : ViewModelBase
             return;
         }
 
-        GeneratePlot((displayWidth, displayHeight), _seriesData, _commentMap, _muppetNameMap, _dotSize);
+        GeneratePlot((displayWidth, displayHeight), _seriesData, _commentMap, _muppetNameMap, _dotSize, theme);
     }
 
     /// <summary>
