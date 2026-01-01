@@ -492,13 +492,10 @@ public partial class ViolinPlotControl : UserControl
         };
         tooltipPanel.Children.Add(scoreText);
 
-        // Student ID and muppet name - white and bold
-        var idDisplayText = string.IsNullOrEmpty(point.MuppetName)
-            ? point.StudentId.ToString()
-            : $"{point.StudentId} - {point.MuppetName}";
+        // Student ID - white and bold
         var idText = new TextBlock
         {
-            Text = idDisplayText,
+            Text = point.StudentId.ToString(),
             FontSize = 11,
             FontWeight = FontWeight.Bold,
             Foreground = Brushes.White
