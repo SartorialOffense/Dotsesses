@@ -260,7 +260,16 @@ public partial class ViolinPlotControl : UserControl
             // Delay rendering points slightly to let SVG settle
             Dispatcher.UIThread.Post(() =>
             {
-                RenderPointsAsShapes();
+                // Use UpdateHoverVisualization instead of RenderPointsAsShapes directly
+                // to preserve hover state (ring, tooltips, comments) after resize regeneration
+                if (DataContext is ViolinPlotViewModel viewModel)
+                {
+                    UpdateHoverVisualization(viewModel);
+                }
+                else
+                {
+                    RenderPointsAsShapes();
+                }
                 RenderRegionBands();
                 RenderCursorColumn();
                 Console.WriteLine("[ViolinPlot] Points, bands, and cursors re-rendered after SVG update");
