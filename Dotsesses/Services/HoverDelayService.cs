@@ -19,7 +19,6 @@ public partial class HoverDelayService : ObservableObject
     private const double MaxDelayMs = 2000;     // Delay for fast/traversing mouse
     private const double MinVelocityPxPerSec = 100;  // Below this, use MinDelay
     private const double MaxVelocityPxPerSec = 500;  // Above this, use MaxDelay
-    private const double StabilityTolerancePx = 5;   // "Hasn't moved" threshold
     private const int PositionHistorySize = 10;      // Number of samples for velocity calc
 
     // Position history for velocity calculation
@@ -29,8 +28,6 @@ public partial class HoverDelayService : ObservableObject
     private int? _pendingStudentId;
     private DispatcherTimer? _timer;
 
-    // Position when hover candidate was first reported (for stability check)
-    private Point _positionAtCandidateStart;
 
     /// <summary>
     /// Current smoothed velocity in pixels per second.
@@ -82,13 +79,15 @@ public partial class HoverDelayService : ObservableObject
     /// <summary>
     /// Reports a hover candidate (mouse is over a specific student's point).
     /// The service will delay activation based on current velocity.
-    /// Pass null to indicate mouse is no longer over any point (ignored - use ClearHover for explicit clear).
+    /// Pass null to indicate mouse is no longer over any point (cancels pending hover).
     /// </summary>
     public void ReportHoverCandidate(int? studentId, Point position)
     {
-        // Ignore null candidates - we require explicit clear
+        // If mouse moved to blank area, cancel any pending hover
         if (studentId == null)
         {
+            _timer?.Stop();
+            _pendingStudentId = null;
             return;
         }
 
@@ -103,10 +102,6 @@ public partial class HoverDelayService : ObservableObject
 
         // Set new pending candidate
         _pendingStudentId = studentId;
-
-        // Record the global mouse position at the time the candidate was reported
-        // This is used for the stability check (comparing global coords to global coords)
-        _positionAtCandidateStart = GetCurrentPosition();
 
         // Calculate delay based on current velocity
         var delay = CalculateDelay(CurrentVelocity);
@@ -137,19 +132,14 @@ public partial class HoverDelayService : ObservableObject
     {
         _timer?.Stop();
 
-        // Check stability - has mouse moved significantly since candidate was reported?
-        // Both positions are in window coordinates (global)
-        var currentPos = GetCurrentPosition();
-        var distance = CalculateDistance(currentPos, _positionAtCandidateStart);
-
-        if (distance <= StabilityTolerancePx)
+        // Activate the pending hover - the velocity-based delay already ensured deliberate intent.
+        // If mouse moved to a different student during the delay, a new candidate would have
+        // replaced _pendingStudentId, so we always activate whatever is pending.
+        if (_pendingStudentId.HasValue)
         {
-            // Mouse is stable - activate the hover
             ActiveHoveredStudentId = _pendingStudentId;
             OnHoverActivated?.Invoke(_pendingStudentId);
         }
-        // If mouse moved, don't activate - the candidate is stale
-        // A new candidate will be reported if mouse is over a different point
 
         _pendingStudentId = null;
     }

@@ -209,11 +209,8 @@ public partial class ViolinPlotViewModel : ViewModelBase
         int? candidateId = hit != null && hit.Dist < 15 ? hit.Point.StudentId : null;
 
         // Report hover candidate to delay service (it handles timing)
-        if (candidateId != null)
-        {
-            _hoverDelayService.ReportHoverCandidate(candidateId, position);
-        }
-        // Don't clear on null - require explicit clear
+        // Pass null when not over any student to cancel pending hover
+        _hoverDelayService.ReportHoverCandidate(candidateId, position);
     }
 
     /// <summary>
