@@ -360,10 +360,10 @@ public partial class MainWindow : Window
             return;
 
         // Draw hover marker as annulus/ring in screen coordinates (6x normal size)
-        const double dotSize = 2.0;
+        const double dotSize = 3.0;  // 50% larger than original 2.0
         double markerSize = dotSize * 6;
         double ringThickness = dotSize * 1.0;
-        Color dotColor = Color.FromArgb(255, 255, 255, 255); // White
+        Color dotColor = Color.FromRgb(255, 51, 51); // Total series red (#FF3333)
         var hoverMarker = new Ellipse
         {
             Width = markerSize,
@@ -377,11 +377,12 @@ public partial class MainWindow : Window
 
         DotPlotHoverOverlay.Children.Add(hoverMarker);
 
-        // Create tooltip with sigma value
-        CreateDotPlotTooltip(student.AggregateGrade, sigmaValue, dotColor, screenPoint.X, screenPoint.Y);
+        // Create tooltip with sigma value and letter grade
+        var grade = vm.GradeAssigner.AssignGrade(student.AggregateGrade).DisplayName;
+        CreateDotPlotTooltip(student.AggregateGrade, sigmaValue, grade, dotColor, screenPoint.X, screenPoint.Y);
     }
 
-    private void CreateDotPlotTooltip(int score, double sigmaValue, Color dotColor, double screenX, double screenY)
+    private void CreateDotPlotTooltip(int score, double sigmaValue, string grade, Color dotColor, double screenX, double screenY)
     {
         var tooltipBorder = new Border
         {
@@ -403,12 +404,13 @@ public partial class MainWindow : Window
                 (byte)(dotColor.B + (255 - dotColor.B) * factor));
         }
 
-        // Format sigma with sign
+        // Format: score | sigma | grade (matching violin plot Total tooltip)
         var sigmaSign = sigmaValue >= 0 ? "+" : "";
         var scoreText = new TextBlock
         {
-            Text = $"{score} {sigmaSign}{sigmaValue:F1}σ",
-            FontSize = 11,
+            Text = $"{score} | {sigmaSign}{sigmaValue:F1}σ | {grade}",
+            FontSize = 14,
+            FontWeight = FontWeight.Bold,
             Foreground = new SolidColorBrush(dotColor)
         };
 

@@ -491,8 +491,8 @@ public partial class MainWindowViewModel : ViewModelBase
             .GroupBy(a => a.AggregateGrade)
             .OrderBy(g => g.Key);
 
-        // Fixed dot size
-        const double markerSize = 2.0;
+        // Fixed dot size (50% larger than original 2.0)
+        const double markerSize = 3.0;
 
         // Red dots to match violin plot Total series - separate series for circles and squares
         var totalRed = OxyColor.Parse("#FF3333"); // Match violin plot Total series color
