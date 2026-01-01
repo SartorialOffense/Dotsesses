@@ -728,14 +728,16 @@ public partial class MainWindowViewModel : ViewModelBase
                     Text = grade.DisplayName,
                     TextPosition = new DataPoint(labelX, 0.5),
                     TextColor = OxyColors.White,
-                    FontSize = 16,
+                    FontSize = 11,
                     FontWeight = FontWeights.Bold,
                     TextHorizontalAlignment = HorizontalAlignment.Center,
                     TextVerticalAlignment = VerticalAlignment.Middle,
                     XAxisKey = "SharedX",
                     YAxisKey = "CursorY",
-                    Stroke = OxyColors.Transparent,
-                    StrokeThickness = 0
+                    Background = OxyColors.Transparent,
+                    Stroke = OxyColors.White,
+                    StrokeThickness = 1,
+                    Padding = new OxyThickness(2, 2, 2, 1)
                 };
                 DotplotModel.Annotations.Add(label);
             }
@@ -1617,14 +1619,14 @@ public partial class MainWindowViewModel : ViewModelBase
                     break;
 
                 case TextAnnotation text:
-                    // Grade labels have white bg/black text in dark mode (inverted)
-                    // So in dark mode: Stroke=Transparent (bg shows), TextColor=White
-                    // In light mode: we want black text on white
-                    if (text.Background != OxyColors.Undefined && text.Background != OxyColors.Transparent)
+                    // Grade labels have white border (Stroke) and transparent background
+                    // Statistics labels have no border (Stroke = Transparent)
+                    if (text.StrokeThickness > 0 && text.Stroke != OxyColors.Transparent)
                     {
-                        // Grade labels with background - use inverted colors
-                        text.Background = ThemeColors.OxyForeground(theme);
-                        text.TextColor = theme == ThemeName.DarkMode ? OxyColors.Black : OxyColors.White;
+                        // Grade labels with border - use foreground color for text and stroke
+                        text.TextColor = ThemeColors.OxyForeground(theme);
+                        text.Stroke = ThemeColors.OxyForeground(theme);
+                        text.Background = OxyColors.Transparent;
                     }
                     else
                     {
