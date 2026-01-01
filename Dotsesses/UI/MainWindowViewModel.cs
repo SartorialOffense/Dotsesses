@@ -317,10 +317,11 @@ public partial class MainWindowViewModel : ViewModelBase
         // Hook up to updated event to maintain fixed heights
         DotplotModel.Updated += (s, e) => UpdateAxisPositions();
 
-        // Calculate score range with padding
+        // Calculate score range with padding (20% on each side, like violin plot's -0.2 to 1.2)
         var minScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade);
         var maxScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade);
-        var xPadding = 10;
+        var scoreRange = maxScore - minScore;
+        var xPadding = scoreRange * 0.2;
 
         // Calculate Y-axis padding for Dot Display based on max students in a bin
         var scoreGroups = ClassAssessment.Assessments.GroupBy(a => a.AggregateGrade);
@@ -573,8 +574,12 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         var enabledCursors = Cursors.Where(c => c.IsEnabled).OrderBy(c => c.Score).ToList();
-        var minScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade) - 10;
-        var maxScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade) + 10;
+        var minRawScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade);
+        var maxRawScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade);
+        var scoreRange = maxRawScore - minRawScore;
+        var xPadding = scoreRange * 0.2;
+        var minScore = minRawScore - xPadding;
+        var maxScore = maxRawScore + xPadding;
 
         // Get axis positions for proper rendering
         var dotYAxis = DotplotModel.Axes.FirstOrDefault(a => a.Key == "DotY");
@@ -688,8 +693,18 @@ public partial class MainWindowViewModel : ViewModelBase
                 }
                 else if (i == enabledGrades.Count - 1)
                 {
-                    // Lowest grade (worst): between left boundary and first cursor
-                    labelX = (minScore + enabledCursors.First().Score) / 2;
+                    // Lowest grade (worst): between left boundary and first cursor WITH A LINE
+                    // (The lowest grade's cursor doesn't have a line drawn, so use the next one)
+                    var firstCursorWithLine = enabledCursors.Where(c => c != lowestGrade).OrderBy(c => c.Score).FirstOrDefault();
+                    if (firstCursorWithLine != null)
+                    {
+                        labelX = (minScore + firstCursorWithLine.Score) / 2;
+                    }
+                    else
+                    {
+                        // Only one grade enabled - center in the plot
+                        labelX = (minScore + maxScore) / 2;
+                    }
                 }
                 else
                 {
@@ -735,9 +750,13 @@ public partial class MainWindowViewModel : ViewModelBase
         var scores = ClassAssessment.Assessments.Select(a => (double)a.AggregateGrade).ToList();
         var mean = scores.Average();
         var stdDev = Math.Sqrt(scores.Average(s => Math.Pow(s - mean, 2)));
-        
-        var minScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade) - 10;
-        var maxScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade) + 10;
+
+        var minRawScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade);
+        var maxRawScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade);
+        var scoreRange = maxRawScore - minRawScore;
+        var xPadding = scoreRange * 0.2;
+        var minScore = minRawScore - xPadding;
+        var maxScore = maxRawScore + xPadding;
 
         var lightGray = OxyColor.FromRgb(180, 180, 180);
 

@@ -31,7 +31,8 @@
         </Border>
 
         <!-- Top Row: Dotplot -->
-        <Border x:Name="DotPlotBorder" Grid.Row="1" Background="#101010" CornerRadius="8">
+        <Border x:Name="DotPlotBorder" Grid.Row="1" Background="#101010" CornerRadius="8"
+                BorderThickness="1" BorderBrush="Transparent">
             <Grid>
                 <!-- Existing content -->
                 <Grid x:Name="DotPlotContainer">
@@ -53,7 +54,7 @@
                 <Button x:Name="CopyDotPlotButton"
                         HorizontalAlignment="Right"
                         VerticalAlignment="Top"
-                        Margin="0,4,4,0"
+                        Margin="0,24,4,0"
                         Width="28" Height="28"
                         Background="#3A3A3C"
                         Foreground="White"

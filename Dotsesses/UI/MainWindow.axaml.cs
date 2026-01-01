@@ -60,8 +60,11 @@ public partial class MainWindow : Window
 
         Dispatcher.UIThread.Post(() =>
         {
-            // Update DotPlot border background
+            // Update DotPlot border background and border color
             DotPlotBorder.Background = ThemeColors.BackgroundBrush(_currentDotPlotTheme);
+            DotPlotBorder.BorderBrush = _currentDotPlotTheme == ThemeName.DarkMode
+                ? Brushes.Transparent
+                : Brushes.Black;
 
             // Apply theme to the OxyPlot model via ViewModel
             if (DataContext is MainWindowViewModel vm)
