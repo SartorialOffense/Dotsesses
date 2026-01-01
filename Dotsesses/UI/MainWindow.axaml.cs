@@ -525,3 +525,23 @@ public class CommentDisplayConverter : IMultiValueConverter
         throw new NotImplementedException();
     }
 }
+
+/// <summary>
+/// Converts boolean to color: true = red (#FF6B6B), false = transparent.
+/// </summary>
+public class BoolToColorConverter : IValueConverter
+{
+    public static readonly BoolToColorConverter Instance = new();
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        return value is bool b && b
+            ? new SolidColorBrush(Color.FromRgb(255, 107, 107))
+            : new SolidColorBrush(Colors.Transparent);
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
