@@ -11,3 +11,5 @@ riderModule.iml
 *.pyc
 __pycache__/
 publish/Dotsesses.app/Contents
+# Excel temp files
+~$*
