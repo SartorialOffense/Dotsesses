@@ -92,6 +92,11 @@ public partial class MainWindowViewModel : ViewModelBase
     private string _sourceFileName = "No file loaded";
 
     /// <summary>
+    /// Gets the full path to the current source file.
+    /// </summary>
+    public string? CurrentSourceFile => _currentSourceFile;
+
+    /// <summary>
     /// Exposes the hover delay service for debug display and clear command binding.
     /// </summary>
     public HoverDelayService HoverDelayService => _hoverDelayService;

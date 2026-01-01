@@ -131,10 +131,23 @@ public partial class MainWindow : Window
 
         var storageProvider = StorageProvider;
 
-        // Get starting directory (last used or default)
+        // Default to same directory and name as source file, but with .dots extension
         IStorageFolder? startLocation = null;
-        if (!string.IsNullOrEmpty(vm.StateService.LastUsedDirectory) &&
-            Directory.Exists(vm.StateService.LastUsedDirectory))
+        string suggestedFileName = "dotsesses_state.dots";
+
+        if (!string.IsNullOrEmpty(vm.CurrentSourceFile))
+        {
+            var sourceDir = System.IO.Path.GetDirectoryName(vm.CurrentSourceFile);
+            var sourceNameWithoutExt = System.IO.Path.GetFileNameWithoutExtension(vm.CurrentSourceFile);
+            suggestedFileName = sourceNameWithoutExt + ".dots";
+
+            if (!string.IsNullOrEmpty(sourceDir) && Directory.Exists(sourceDir))
+            {
+                startLocation = await storageProvider.TryGetFolderFromPathAsync(sourceDir);
+            }
+        }
+        else if (!string.IsNullOrEmpty(vm.StateService.LastUsedDirectory) &&
+                 Directory.Exists(vm.StateService.LastUsedDirectory))
         {
             startLocation = await storageProvider.TryGetFolderFromPathAsync(vm.StateService.LastUsedDirectory);
         }
@@ -143,10 +156,10 @@ public partial class MainWindow : Window
         {
             Title = "Save State",
             SuggestedStartLocation = startLocation,
-            SuggestedFileName = "dotsesses_state.json",
+            SuggestedFileName = suggestedFileName,
             FileTypeChoices = new[]
             {
-                new FilePickerFileType("JSON files") { Patterns = new[] { "*.json" } },
+                new FilePickerFileType("Dotsesses files") { Patterns = new[] { "*.dots" } },
                 new FilePickerFileType("All files") { Patterns = new[] { "*" } }
             }
         });
@@ -193,7 +206,7 @@ public partial class MainWindow : Window
             AllowMultiple = false,
             FileTypeFilter = new[]
             {
-                new FilePickerFileType("JSON files") { Patterns = new[] { "*.json" } },
+                new FilePickerFileType("Dotsesses files") { Patterns = new[] { "*.dots" } },
                 new FilePickerFileType("All files") { Patterns = new[] { "*" } }
             }
         });
