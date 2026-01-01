@@ -273,6 +273,12 @@ public partial class MainWindow : Window
         if (student == null)
             return;
 
+        // Calculate mean and standard deviation for sigma display
+        var scores = vm.ClassAssessment.Assessments.Select(a => (double)a.AggregateGrade).ToList();
+        var mean = scores.Average();
+        var stdDev = Math.Sqrt(scores.Average(s => Math.Pow(s - mean, 2)));
+        var sigmaValue = (student.AggregateGrade - mean) / stdDev;
+
         // Calculate data coordinates (same logic as in ViewModel)
         var studentsAtScore = vm.ClassAssessment.Assessments
             .Where(a => a.AggregateGrade == student.AggregateGrade)
@@ -312,11 +318,11 @@ public partial class MainWindow : Window
 
         DotPlotHoverOverlay.Children.Add(hoverMarker);
 
-        // Create tooltip
-        CreateDotPlotTooltip(student.AggregateGrade, dotColor, screenPoint.X, screenPoint.Y);
+        // Create tooltip with sigma value
+        CreateDotPlotTooltip(student.AggregateGrade, sigmaValue, dotColor, screenPoint.X, screenPoint.Y);
     }
 
-    private void CreateDotPlotTooltip(int score, Color dotColor, double screenX, double screenY)
+    private void CreateDotPlotTooltip(int score, double sigmaValue, Color dotColor, double screenX, double screenY)
     {
         var tooltipBorder = new Border
         {
@@ -327,7 +333,6 @@ public partial class MainWindow : Window
             Padding = new Thickness(4, 2)
         };
 
-        // Score value only
         // Lighten color if too dark
         double luminance = 0.2126 * dotColor.R + 0.7152 * dotColor.G + 0.0722 * dotColor.B;
         if (luminance < 128)
@@ -339,9 +344,11 @@ public partial class MainWindow : Window
                 (byte)(dotColor.B + (255 - dotColor.B) * factor));
         }
 
+        // Format sigma with sign
+        var sigmaSign = sigmaValue >= 0 ? "+" : "";
         var scoreText = new TextBlock
         {
-            Text = score.ToString(),
+            Text = $"{score} {sigmaSign}{sigmaValue:F1}σ",
             FontSize = 11,
             Foreground = new SolidColorBrush(dotColor)
         };

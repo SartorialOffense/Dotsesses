@@ -55,6 +55,17 @@ public class ViolinPlotService
         string svgContent = result.Item2;
         var pointDataList = result.Item3;
 
+        // Calculate mean and std dev per series for sigma values
+        var seriesStats = seriesData.ToDictionary(
+            s => s.SeriesName,
+            s =>
+            {
+                var values = s.Scores.Values.ToList();
+                var mean = values.Average();
+                var stdDev = Math.Sqrt(values.Average(v => Math.Pow(v - mean, 2)));
+                return (Mean: mean, StdDev: stdDev);
+            });
+
         // Convert PyObject point data to ViolinDataPoint records
         var dataPoints = new List<ViolinDataPoint>();
         foreach (var pointPyObj in pointDataList)
@@ -77,7 +88,11 @@ public class ViolinPlotService
             // Get muppet name for this student
             string muppetName = muppetNameMap.TryGetValue(studentId, out string? name) ? name : "";
 
-            dataPoints.Add(new ViolinDataPoint(x, y, studentId, series, color, value, comment, muppetName));
+            // Calculate sigma value for this point's series
+            var stats = seriesStats[series];
+            var sigmaValue = stats.StdDev > 0 ? (value - stats.Mean) / stats.StdDev : 0;
+
+            dataPoints.Add(new ViolinDataPoint(x, y, studentId, series, color, value, sigmaValue, comment, muppetName));
         }
 
         return (svgContent, dataPoints);

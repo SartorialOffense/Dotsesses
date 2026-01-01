@@ -466,6 +466,11 @@ public partial class MainWindowViewModel : ViewModelBase
         // Clear existing series (keep axes)
         DotplotModel.Series.Clear();
 
+        // Calculate mean and standard deviation for sigma display
+        var scores = ClassAssessment.Assessments.Select(a => (double)a.AggregateGrade).ToList();
+        var mean = scores.Average();
+        var stdDev = Math.Sqrt(scores.Average(s => Math.Pow(s - mean, 2)));
+
         // Group students by aggregate score and stack vertically
         var scoreGroups = ClassAssessment.Assessments
             .GroupBy(a => a.AggregateGrade)
@@ -511,7 +516,11 @@ public partial class MainWindowViewModel : ViewModelBase
                 var student = studentsAtScore[i];
                 var muppetName = ClassAssessment.MuppetNameMap.TryGetValue(student.Id, out var info) ? info.Name : "Unknown";
 
-                var point = new ScatterPoint(group.Key, yPos, tag: $"{muppetName}\nScore: {student.AggregateGrade}");
+                // Calculate delta from mean in sigma units
+                var sigmaValue = (student.AggregateGrade - mean) / stdDev;
+                var sigmaSign = sigmaValue >= 0 ? "+" : "";
+
+                var point = new ScatterPoint(group.Key, yPos, tag: $"{muppetName}\nScore: {student.AggregateGrade} ({sigmaSign}{sigmaValue:F1}σ)");
 
                 // Add to appropriate series based on whether the Total score has a comment
                 var totalScore = student.Scores.FirstOrDefault(s => s.Name.Equals("Total", StringComparison.OrdinalIgnoreCase));

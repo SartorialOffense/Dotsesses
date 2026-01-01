@@ -478,13 +478,14 @@ public partial class ViolinPlotControl : UserControl
                 (byte)(scoreColor.B + (255 - scoreColor.B) * factor));
         }
 
-        // Build tooltip: score (colored, bold), student ID (white, bold), comments (white, bulleted)
+        // Build tooltip: score with sigma (colored, bold), student ID (white, bold), comments (white, bulleted)
         var tooltipPanel = new StackPanel { Spacing = 2 };
 
-        // Score value - colored and bold, larger font
+        // Score value with sigma - colored and bold, larger font
+        var sigmaSign = point.SigmaValue >= 0 ? "+" : "";
         var scoreText = new TextBlock
         {
-            Text = Math.Round(point.Value).ToString(),
+            Text = $"{Math.Round(point.Value)} {sigmaSign}{point.SigmaValue:F1}σ",
             FontSize = 14,
             FontWeight = FontWeight.Bold,
             Foreground = new SolidColorBrush(scoreColor)
