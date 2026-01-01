@@ -58,9 +58,44 @@
         <Border Grid.Row="3">
             <Grid ColumnDefinitions="300,2,*">
 
-                <!-- Left: Drill-Down Panel (Student Card) -->
+                <!-- Left: Drill-Down Panel (Save/Load buttons + Student Card) -->
                 <Border Grid.Column="0" Background="#101010" CornerRadius="8">
-                    <ContentControl Content="{Binding HoveredStudent}"
+                    <Grid RowDefinitions="Auto,*">
+                        <!-- Save/Load Buttons -->
+                        <Border Grid.Row="0" BorderBrush="#202020" BorderThickness="0,0,0,2" Padding="10,6,10,6">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button x:Name="SaveButton"
+                                        Content="💾 Save"
+                                        FontSize="12"
+                                        Padding="12,3"
+                                        Background="#2D2D30"
+                                        Foreground="White"
+                                        BorderThickness="1"
+                                        BorderBrush="#3F3F46"
+                                        CornerRadius="4"
+                                        ToolTip.Tip="Save state to file"/>
+                                <Button x:Name="LoadButton"
+                                        Content="📂 Load"
+                                        FontSize="12"
+                                        Padding="12,3"
+                                        Background="#2D2D30"
+                                        Foreground="White"
+                                        BorderThickness="1"
+                                        BorderBrush="#3F3F46"
+                                        CornerRadius="4"
+                                        ToolTip.Tip="Load state from file"/>
+                                <TextBlock Text="●"
+                                           Foreground="#FF6B6B"
+                                           FontSize="10"
+                                           VerticalAlignment="Center"
+                                           Margin="4,0,0,0"
+                                           IsVisible="{Binding HasUnsavedChanges}"
+                                           ToolTip.Tip="Unsaved changes"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Student Card -->
+                        <ContentControl Grid.Row="1" Content="{Binding HoveredStudent}"
                                    HorizontalAlignment="Stretch"
                                    HorizontalContentAlignment="Stretch">
                         <ContentControl.ContentTemplate>
@@ -165,6 +200,7 @@
                             </DataTemplate>
                         </ContentControl.ContentTemplate>
                     </ContentControl>
+                    </Grid>
                 </Border>
 
                 <!-- Vertical Splitter -->

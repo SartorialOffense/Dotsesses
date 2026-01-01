@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
 using System.IO;
@@ -11,11 +12,15 @@ using Avalonia.Data.Converters;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.Messaging;
 using Dotsesses.Messages;
 using Dotsesses.Services;
 using Dotsesses.UI;
 using Microsoft.Extensions.DependencyInjection;
+using MsBox.Avalonia;
+using MsBox.Avalonia.Enums;
+using MsBoxIcon = MsBox.Avalonia.Enums.Icon;
 using OxyPlot;
 
 namespace Dotsesses.UI;
@@ -29,6 +34,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
         Loaded += OnWindowLoaded;
+        Closing += OnWindowClosing;
         PointerMoved += OnGlobalPointerMoved;
 
         // Subscribe to edit student messages
@@ -36,6 +42,34 @@ public partial class MainWindow : Window
         {
             await HandleEditStudentRequest(m);
         });
+    }
+
+    private async void OnWindowClosing(object? sender, WindowClosingEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel vm && vm.HasUnsavedChanges)
+        {
+            e.Cancel = true; // Prevent immediate close
+
+            var box = MessageBoxManager.GetMessageBoxStandard(
+                "Unsaved Changes",
+                "You have unsaved changes. Would you like to save before closing?",
+                ButtonEnum.YesNoCancel,
+                MsBoxIcon.Question);
+
+            var result = await box.ShowWindowDialogAsync(this);
+
+            if (result == ButtonResult.Yes)
+            {
+                await SaveWithDialog();
+                Close(); // Close after saving
+            }
+            else if (result == ButtonResult.No)
+            {
+                vm.HasUnsavedChanges = false; // Clear flag to allow close
+                Close();
+            }
+            // Cancel: do nothing, window stays open
+        }
     }
 
     private void OnGlobalPointerMoved(object? sender, PointerEventArgs e)
@@ -58,6 +92,10 @@ public partial class MainWindow : Window
         // (OxyPlot captures events, so we need handledEventsToo=true)
         DotPlotView.AddHandler(PointerMovedEvent, OnDotPlotPointerMoved, Avalonia.Interactivity.RoutingStrategies.Tunnel | Avalonia.Interactivity.RoutingStrategies.Bubble, handledEventsToo: true);
 
+        // Wire up Save/Load button click handlers
+        SaveButton.Click += OnSaveButtonClick;
+        LoadButton.Click += OnLoadButtonClick;
+
         // Initialize violin plot asynchronously after window is displayed
         if (DataContext is MainWindowViewModel vm)
         {
@@ -67,6 +105,108 @@ public partial class MainWindow : Window
         else
         {
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] MainWindow: DataContext is not MainWindowViewModel!");
+        }
+    }
+
+    private async void OnSaveButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        await SaveWithDialog();
+    }
+
+    private async void OnLoadButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        await LoadWithDialog();
+    }
+
+    private async Task SaveWithDialog()
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+
+        var storageProvider = StorageProvider;
+
+        // Get starting directory (last used or default)
+        IStorageFolder? startLocation = null;
+        if (!string.IsNullOrEmpty(vm.StateService.LastUsedDirectory) &&
+            Directory.Exists(vm.StateService.LastUsedDirectory))
+        {
+            startLocation = await storageProvider.TryGetFolderFromPathAsync(vm.StateService.LastUsedDirectory);
+        }
+
+        var result = await storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Save State",
+            SuggestedStartLocation = startLocation,
+            SuggestedFileName = "dotsesses_state.json",
+            FileTypeChoices = new[]
+            {
+                new FilePickerFileType("JSON files") { Patterns = new[] { "*.json" } },
+                new FilePickerFileType("All files") { Patterns = new[] { "*" } }
+            }
+        });
+
+        if (result != null)
+        {
+            var filePath = result.Path.LocalPath;
+            await vm.SaveStateCommand.ExecuteAsync(filePath);
+        }
+    }
+
+    private async Task LoadWithDialog()
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+
+        // Check for unsaved changes before loading
+        if (vm.HasUnsavedChanges)
+        {
+            var confirmBox = MessageBoxManager.GetMessageBoxStandard(
+                "Unsaved Changes",
+                "You have unsaved changes. Loading a file will discard them. Continue?",
+                ButtonEnum.YesNo,
+                MsBoxIcon.Warning);
+
+            var confirmResult = await confirmBox.ShowWindowDialogAsync(this);
+            if (confirmResult != ButtonResult.Yes)
+                return;
+        }
+
+        var storageProvider = StorageProvider;
+
+        // Get starting directory (last used or default)
+        IStorageFolder? startLocation = null;
+        if (!string.IsNullOrEmpty(vm.StateService.LastUsedDirectory) &&
+            Directory.Exists(vm.StateService.LastUsedDirectory))
+        {
+            startLocation = await storageProvider.TryGetFolderFromPathAsync(vm.StateService.LastUsedDirectory);
+        }
+
+        var result = await storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Load State",
+            SuggestedStartLocation = startLocation,
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("JSON files") { Patterns = new[] { "*.json" } },
+                new FilePickerFileType("All files") { Patterns = new[] { "*" } }
+            }
+        });
+
+        if (result.Count > 0)
+        {
+            var filePath = result[0].Path.LocalPath;
+            try
+            {
+                await vm.LoadStateCommand.ExecuteAsync(filePath);
+            }
+            catch (Exception ex)
+            {
+                var errorBox = MessageBoxManager.GetMessageBoxStandard(
+                    "Error Loading File",
+                    $"Failed to load state file: {ex.Message}",
+                    ButtonEnum.Ok,
+                    MsBoxIcon.Error);
+                await errorBox.ShowWindowDialogAsync(this);
+            }
         }
     }
 

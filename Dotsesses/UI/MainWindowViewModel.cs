@@ -37,10 +37,12 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly CursorValidation _cursorValidation = null!;
     private readonly IMessenger _messenger = null!;
     private readonly HoverDelayService _hoverDelayService = null!;
+    private readonly StateService _stateService = new();
 
     private GradeAssigner _gradeAssigner = null!;
     private CursorViewModel? _draggingCursor;
     private bool _isDraggingCursor;
+    private string? _currentSourceFile;
 
     // Double-click tracking
     private DateTime _lastClickTime;
@@ -80,10 +82,18 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private ViolinPlotViewModel? _violinPlotViewModel;
 
+    [ObservableProperty]
+    private bool _hasUnsavedChanges;
+
     /// <summary>
     /// Exposes the hover delay service for debug display and clear command binding.
     /// </summary>
     public HoverDelayService HoverDelayService => _hoverDelayService;
+
+    /// <summary>
+    /// Exposes the state service for checking last used directory.
+    /// </summary>
+    public StateService StateService => _stateService;
 
     public MainWindowViewModel()
     {
@@ -125,6 +135,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             UpdateDotplotPoints();
             InitializeViolinPlot();
+            HasUnsavedChanges = true; // Mark as changed when comments edited
         });
 
         Log("MainWindowViewModel: Initializing with synthetic data");
@@ -894,14 +905,16 @@ public partial class MainWindowViewModel : ViewModelBase
         if (_isUpdatingCursorsFromSubscription) return; // Prevent re-entrancy
         if (DotplotModel == null) return; // Not yet initialized
 
-        if (e.PropertyName == nameof(CursorViewModel.Score))
+        if (e.PropertyName == nameof(CursorViewModel.Score) ||
+            e.PropertyName == nameof(CursorViewModel.IsEnabled))
         {
-            // Cursor was moved (possibly from violin plot)
+            // Cursor was moved or enabled/disabled
             _isUpdatingCursorsFromSubscription = true;
             try
             {
                 UpdateCursors(); // Refresh dot plot annotations
                 RecalculateGradeCounts(); // Update compliance grid counts
+                HasUnsavedChanges = true; // Mark as changed
             }
             finally
             {
@@ -1086,6 +1099,98 @@ public partial class MainWindowViewModel : ViewModelBase
     private void ToggleViolinPane()
     {
         IsViolinPaneOpen = !IsViolinPaneOpen;
+    }
+
+    /// <summary>
+    /// Saves current state to a JSON file. Called from UI.
+    /// The actual file dialog is handled in the View.
+    /// </summary>
+    [RelayCommand]
+    private async Task SaveStateAsync(string? filePath)
+    {
+        if (string.IsNullOrEmpty(filePath)) return;
+
+        try
+        {
+            await _stateService.SaveAsync(
+                filePath,
+                ClassAssessment.Assessments,
+                Cursors,
+                _currentSourceFile);
+
+            HasUnsavedChanges = false;
+            Log($"State saved to: {filePath}");
+        }
+        catch (Exception ex)
+        {
+            Log($"Error saving state: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Loads state from a JSON file. Called from UI.
+    /// The actual file dialog is handled in the View.
+    /// </summary>
+    [RelayCommand]
+    private async Task LoadStateAsync(string? filePath)
+    {
+        if (string.IsNullOrEmpty(filePath)) return;
+
+        try
+        {
+            var state = await _stateService.LoadAsync(filePath);
+
+            // Convert saved students back to domain models
+            var (students, muppetMap) = _stateService.ConvertToStudents(state);
+
+            // Rebuild ClassAssessment with loaded data
+            var curveGenerator = new DefaultCurveGenerator();
+            var defaultCurve = curveGenerator.GenerateRanges(students.Count);
+
+            var midpointCurve = defaultCurve
+                .Where(r => r.LowerBound > 0 || r.UpperBound > 0)
+                .Select(r => new CutoffCount(r.Grade, r.Midpoint))
+                .ToList();
+
+            var initialCutoffs = _initialCutoffCalculator.Calculate(students, midpointCurve);
+            var current = _cutoffCountCalculator.Calculate(students, initialCutoffs);
+
+            ClassAssessment = new ClassAssessment(
+                students,
+                initialCutoffs,
+                defaultCurve,
+                current,
+                muppetMap);
+
+            _currentSourceFile = state.SourceFile;
+
+            // Apply saved cursor positions
+            _stateService.ApplyCursors(state, Cursors);
+
+            // Refresh UI
+            _gradeAssigner = new GradeAssigner(ClassAssessment.CurrentCutoffs);
+            RecalculateGradeCounts();
+            UpdateDotplotPoints();
+            UpdateCursors();
+            InitializeViolinPlot();
+
+            HasUnsavedChanges = false;
+            Log($"State loaded from: {filePath}");
+        }
+        catch (Exception ex)
+        {
+            Log($"Error loading state: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Marks the state as having unsaved changes.
+    /// </summary>
+    public void MarkAsChanged()
+    {
+        HasUnsavedChanges = true;
     }
 
     private string GetGradeForStudent(StudentAssessment student)
