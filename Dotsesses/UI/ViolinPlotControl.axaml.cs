@@ -18,6 +18,7 @@ using CommunityToolkit.Mvvm.Messaging;
 using Dotsesses.Calculators;
 using Dotsesses.Messages;
 using Dotsesses.Models;
+using Dotsesses.Services;
 using Dotsesses.UI;
 
 namespace Dotsesses.UI;
@@ -45,6 +46,9 @@ public partial class ViolinPlotControl : UserControl
 
         // Add click handler to the points overlay
         PointsOverlay.PointerPressed += OnPointsOverlayClick;
+
+        // Add copy button click handler
+        CopyViolinPlotButton.Click += OnCopyViolinPlotClick;
 
         // Render cursor column when its layout is updated (bounds become available)
         CursorColumnCanvas.LayoutUpdated += OnCursorColumnLayoutUpdated;
@@ -472,7 +476,7 @@ public partial class ViolinPlotControl : UserControl
 
         var commentBorder = new Border
         {
-            Background = new SolidColorBrush(Color.FromArgb(204, 26, 26, 26)), // #CC1A1A1A
+            Background = new SolidColorBrush(Color.FromRgb(16, 16, 16)), // #101010 - solid dark to match UI
             BorderBrush = Brushes.White,
             BorderThickness = new Thickness(1),
             Padding = new Thickness(6, 3),
@@ -539,7 +543,7 @@ public partial class ViolinPlotControl : UserControl
     {
         var tooltipBorder = new Border
         {
-            Background = new SolidColorBrush(Color.FromArgb(128, 0, 0, 0)), // 50% alpha black
+            Background = new SolidColorBrush(Color.FromRgb(16, 16, 16)), // #101010 - solid dark to match UI
             BorderBrush = new SolidColorBrush(Colors.White),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(3),
@@ -1114,5 +1118,15 @@ public partial class ViolinPlotControl : UserControl
             _draggingCursor = null;
             e.Handled = true;
         }
+    }
+
+    private async void OnCopyViolinPlotClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var topLevel = TopLevel.GetTopLevel(this);
+        var clipboard = topLevel?.Clipboard;
+        if (clipboard == null) return;
+
+        // Copy the entire control (includes all overlays)
+        await ImageCopyService.CopyControlToClipboardAsync(this, clipboard);
     }
 }

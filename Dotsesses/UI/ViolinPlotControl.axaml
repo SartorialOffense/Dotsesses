@@ -9,37 +9,55 @@
              Background="Transparent"
              >
 
-    <Grid ColumnDefinitions="*,70">
-        <!-- Violin plot area - left column -->
-        <Grid x:Name="ViolinPlotArea" Grid.Column="0" PointerMoved="OnPointerMoved" >
-            <!-- SVG Background -->
-            <Image x:Name="SvgView" Stretch="Fill" />
+    <Grid>
+        <!-- Existing content -->
+        <Grid ColumnDefinitions="*,70">
+            <!-- Violin plot area - left column -->
+            <Grid x:Name="ViolinPlotArea" Grid.Column="0" PointerMoved="OnPointerMoved" >
+                <!-- SVG Background -->
+                <Image x:Name="SvgView" Stretch="Fill" />
 
-            <!-- Canvas for grade boundary cursors (barbells) -->
-            <Canvas x:Name="RegionBandsOverlay"
-                    PointerPressed="OnBarbellPointerPressed"
-                    PointerMoved="OnBarbellPointerMoved"
-                    PointerReleased="OnBarbellPointerReleased"
-                    Background="Transparent"
-                    />
+                <!-- Canvas for grade boundary cursors (barbells) -->
+                <Canvas x:Name="RegionBandsOverlay"
+                        PointerPressed="OnBarbellPointerPressed"
+                        PointerMoved="OnBarbellPointerMoved"
+                        PointerReleased="OnBarbellPointerReleased"
+                        Background="Transparent"
+                        />
 
-            <!-- Canvas for swarm point overlays -->
-            <Canvas x:Name="PointsOverlay" />
+                <!-- Canvas for swarm point overlays -->
+                <Canvas x:Name="PointsOverlay" />
 
-            <!-- Canvas for tooltips -->
-            <Canvas x:Name="TooltipsOverlay" />
+                <!-- Canvas for tooltips -->
+                <Canvas x:Name="TooltipsOverlay" />
 
-            <!-- Canvas for comments overlay -->
-            <Canvas x:Name="CommentsOverlay" IsHitTestVisible="False" />
+                <!-- Canvas for comments overlay -->
+                <Canvas x:Name="CommentsOverlay" IsHitTestVisible="False" />
+            </Grid>
+
+            <!-- Cursor column (Canvas-based) - right column -->
+            <Border Grid.Column="1">
+                <Canvas x:Name="CursorColumnCanvas"
+                        PointerPressed="OnCursorColumnPointerPressed"
+                        PointerMoved="OnCursorColumnPointerMoved"
+                        PointerReleased="OnCursorColumnPointerReleased"
+                        Background="Transparent" />
+            </Border>
         </Grid>
 
-        <!-- Cursor column (Canvas-based) - right column -->
-        <Border Grid.Column="1">
-            <Canvas x:Name="CursorColumnCanvas"
-                    PointerPressed="OnCursorColumnPointerPressed"
-                    PointerMoved="OnCursorColumnPointerMoved"
-                    PointerReleased="OnCursorColumnPointerReleased"
-                    Background="Transparent" />
-        </Border>
+        <!-- Copy button overlay -->
+        <Button x:Name="CopyViolinPlotButton"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Margin="0,4,4,0"
+                Width="28" Height="28"
+                Background="#3A3A3C"
+                Foreground="White"
+                BorderThickness="0"
+                CornerRadius="4"
+                Opacity="0.7"
+                ToolTip.Tip="Copy to clipboard (inverted for print)">
+            <TextBlock Text="&#x1F4CB;" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Button>
     </Grid>
 </UserControl>

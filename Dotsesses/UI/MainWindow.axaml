@@ -32,7 +32,9 @@
 
         <!-- Top Row: Dotplot -->
         <Border Grid.Row="1" Background="#101010" CornerRadius="8">
-                <Grid>
+            <Grid>
+                <!-- Existing content -->
+                <Grid x:Name="DotPlotContainer">
                     <oxy:PlotView x:Name="DotPlotView" Model="{Binding DotplotModel}" Background="Transparent">
                         <oxy:PlotView.Cursor>
                             <MultiBinding>
@@ -46,6 +48,22 @@
                     <!-- Canvas overlay for hover marker in screen coordinates -->
                     <Canvas x:Name="DotPlotHoverOverlay" Background="Transparent" IsHitTestVisible="False" />
                 </Grid>
+
+                <!-- Copy button overlay -->
+                <Button x:Name="CopyDotPlotButton"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        Margin="0,4,4,0"
+                        Width="28" Height="28"
+                        Background="#3A3A3C"
+                        Foreground="White"
+                        BorderThickness="0"
+                        CornerRadius="4"
+                        Opacity="0.7"
+                        ToolTip.Tip="Copy to clipboard (inverted for print)">
+                    <TextBlock Text="&#x1F4CB;" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Button>
+            </Grid>
         </Border>
 
         <!-- Splitter -->

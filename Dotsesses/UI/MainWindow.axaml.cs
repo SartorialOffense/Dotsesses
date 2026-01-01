@@ -94,9 +94,10 @@ public partial class MainWindow : Window
         // (OxyPlot captures events, so we need handledEventsToo=true)
         DotPlotView.AddHandler(PointerMovedEvent, OnDotPlotPointerMoved, Avalonia.Interactivity.RoutingStrategies.Tunnel | Avalonia.Interactivity.RoutingStrategies.Bubble, handledEventsToo: true);
 
-        // Wire up Save and Export button click handlers
+        // Wire up Save, Export, and Copy button click handlers
         SaveButton.Click += OnSaveButtonClick;
         ExportButton.Click += OnExportButtonClick;
+        CopyDotPlotButton.Click += OnCopyDotPlotClick;
 
         // Initialize violin plot asynchronously after window is displayed
         if (DataContext is MainWindowViewModel vm)
@@ -118,6 +119,15 @@ public partial class MainWindow : Window
     private async void OnExportButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         await ExportWithDialog();
+    }
+
+    private async void OnCopyDotPlotClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+        if (clipboard == null) return;
+
+        // Copy the DotPlotContainer (includes the plot and hover overlay)
+        await ImageCopyService.CopyControlToClipboardAsync(DotPlotContainer, clipboard);
     }
 
     private async Task SaveWithDialog(bool forceDialog = false)
