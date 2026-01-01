@@ -475,4 +475,34 @@ public partial class ViolinPlotViewModel : ViewModelBase
         // Values below 0 (like -0.2) will be below plotAreaBottom
         return plotAreaTop + (1.0 - normalizedY) * plotAreaHeight;
     }
+
+    /// <summary>
+    /// Gets the letter grade for a given score based on cursor thresholds.
+    /// </summary>
+    /// <param name="score">The score to evaluate</param>
+    /// <returns>The grade display name (e.g., "A", "B+"), or empty string if no cursors</returns>
+    public string GetGradeForScore(double score)
+    {
+        if (Cursors == null || !Cursors.Any(c => c.IsEnabled))
+            return "";
+
+        // Check cursors from highest score to lowest - first match wins
+        var enabledCursors = Cursors.Where(c => c.IsEnabled).OrderByDescending(c => c.Score).ToList();
+
+        foreach (var cursor in enabledCursors)
+        {
+            if (score >= cursor.Score)
+            {
+                return cursor.Grade.DisplayName;
+            }
+        }
+
+        // If below all cutoffs, return the lowest grade (highest Order)
+        var lowestGrade = Cursors
+            .Where(c => c.IsEnabled)
+            .OrderByDescending(c => c.Grade.Order)
+            .FirstOrDefault();
+
+        return lowestGrade?.Grade.DisplayName ?? "";
+    }
 }

@@ -609,10 +609,22 @@ public partial class ViolinPlotControl : UserControl
         }
 
         // Build tooltip: score with sigma only (colored, bold)
+        // For Total series, also include the letter grade
         var sigmaSign = point.SigmaValue >= 0 ? "+" : "";
+        var tooltipText = $"{Math.Round(point.Value)} | {sigmaSign}{point.SigmaValue:F1}σ";
+
+        if (point.Series.Equals("Total", StringComparison.OrdinalIgnoreCase) && DataContext is ViolinPlotViewModel vm)
+        {
+            var grade = vm.GetGradeForScore(point.Value);
+            if (!string.IsNullOrEmpty(grade))
+            {
+                tooltipText += $" | {grade}";
+            }
+        }
+
         var scoreText = new TextBlock
         {
-            Text = $"{Math.Round(point.Value)} | {sigmaSign}{point.SigmaValue:F1}σ",
+            Text = tooltipText,
             FontSize = 14,
             FontWeight = FontWeight.Bold,
             Foreground = new SolidColorBrush(scoreColor)
