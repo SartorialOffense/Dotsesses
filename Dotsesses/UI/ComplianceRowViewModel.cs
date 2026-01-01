@@ -24,9 +24,9 @@ public partial class ComplianceRowViewModel : ObservableObject
     private bool _isEnabled;
 
     /// <summary>
-    /// Display format for target range: "L-U" (e.g., "3-7").
+    /// Display format for target range: "L-U" (e.g., "3-7"), or blank for 0-0.
     /// </summary>
-    public string TargetRange => $"{LowerTarget}-{UpperTarget}";
+    public string TargetRange => LowerTarget == 0 && UpperTarget == 0 ? "" : $"{LowerTarget}-{UpperTarget}";
 
     /// <summary>
     /// Signed deviation from the violated bound.
