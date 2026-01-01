@@ -36,6 +36,7 @@
             <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
             <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
         </PackageReference>
+        <PackageReference Include="ClosedXML" Version="0.105.0" />
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.1" />
         <PackageReference Include="MessageBox.Avalonia" Version="3.1.6" />
         <PackageReference Include="CSnakes.Runtime" Version="1.2.1" />

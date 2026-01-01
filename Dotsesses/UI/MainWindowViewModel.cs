@@ -40,6 +40,12 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly StateService _stateService = new();
 
     private GradeAssigner _gradeAssigner = null!;
+
+    /// <summary>
+    /// Gets the current grade assigner for export purposes.
+    /// </summary>
+    public GradeAssigner GradeAssigner => _gradeAssigner;
+
     private CursorViewModel? _draggingCursor;
     private bool _isDraggingCursor;
     private string? _currentSourceFile;

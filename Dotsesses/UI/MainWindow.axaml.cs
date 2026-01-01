@@ -92,8 +92,9 @@ public partial class MainWindow : Window
         // (OxyPlot captures events, so we need handledEventsToo=true)
         DotPlotView.AddHandler(PointerMovedEvent, OnDotPlotPointerMoved, Avalonia.Interactivity.RoutingStrategies.Tunnel | Avalonia.Interactivity.RoutingStrategies.Bubble, handledEventsToo: true);
 
-        // Wire up Save button click handler
+        // Wire up Save and Export button click handlers
         SaveButton.Click += OnSaveButtonClick;
+        ExportButton.Click += OnExportButtonClick;
 
         // Initialize violin plot asynchronously after window is displayed
         if (DataContext is MainWindowViewModel vm)
@@ -110,6 +111,11 @@ public partial class MainWindow : Window
     private async void OnSaveButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         await SaveWithDialog();
+    }
+
+    private async void OnExportButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        await ExportWithDialog();
     }
 
     private async Task SaveWithDialog(bool forceDialog = false)
@@ -162,6 +168,68 @@ public partial class MainWindow : Window
         {
             var filePath = result.Path.LocalPath;
             await vm.SaveStateCommand.ExecuteAsync(filePath);
+        }
+    }
+
+    private async Task ExportWithDialog()
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+
+        var storageProvider = StorageProvider;
+
+        // Default to same directory as source file
+        IStorageFolder? startLocation = null;
+        if (!string.IsNullOrEmpty(vm.CurrentSourceFile))
+        {
+            var sourceDir = System.IO.Path.GetDirectoryName(vm.CurrentSourceFile);
+            if (!string.IsNullOrEmpty(sourceDir) && Directory.Exists(sourceDir))
+            {
+                startLocation = await storageProvider.TryGetFolderFromPathAsync(sourceDir);
+            }
+        }
+
+        // Prompt for export directory
+        var result = await storageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "Select Export Directory",
+            SuggestedStartLocation = startLocation,
+            AllowMultiple = false
+        });
+
+        if (result.Count > 0)
+        {
+            var exportDirectory = result[0].Path.LocalPath;
+            var fileNameStem = !string.IsNullOrEmpty(vm.CurrentSourceFile)
+                ? System.IO.Path.GetFileNameWithoutExtension(vm.CurrentSourceFile)
+                : "export";
+
+            try
+            {
+                var exportService = new Dotsesses.Services.ExportService();
+                var (gradesFile, distributionFile) = exportService.Export(
+                    exportDirectory,
+                    fileNameStem,
+                    vm.ClassAssessment.Assessments,
+                    vm.GradeAssigner,
+                    vm.ComplianceRows);
+
+                // Show success message
+                var successBox = MessageBoxManager.GetMessageBoxStandard(
+                    "Export Complete",
+                    $"Files exported successfully:\n\n• {gradesFile}\n• {distributionFile}",
+                    ButtonEnum.Ok,
+                    MsBoxIcon.Success);
+                await successBox.ShowWindowDialogAsync(this);
+            }
+            catch (Exception ex)
+            {
+                var errorBox = MessageBoxManager.GetMessageBoxStandard(
+                    "Export Error",
+                    $"Failed to export files: {ex.Message}",
+                    ButtonEnum.Ok,
+                    MsBoxIcon.Error);
+                await errorBox.ShowWindowDialogAsync(this);
+            }
         }
     }
 
