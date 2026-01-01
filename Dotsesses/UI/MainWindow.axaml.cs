@@ -229,11 +229,15 @@ public partial class MainWindow : Window
                     vm.ComplianceRows);
 
                 // Show success message
-                var successBox = MessageBoxManager.GetMessageBoxStandard(
-                    "Export Complete",
-                    $"Files exported successfully:\n\n• {gradesFile}\n• {distributionFile}",
-                    ButtonEnum.Ok,
-                    MsBoxIcon.Success);
+                var successBox = MessageBoxManager.GetMessageBoxCustom(new MessageBoxCustomParams
+                {
+                    ContentTitle = "Export Complete",
+                    ContentMessage = $"Files exported successfully:\n\n• {System.IO.Path.GetFileName(gradesFile)}\n• {System.IO.Path.GetFileName(distributionFile)}    ",
+                    Icon = MsBoxIcon.Success,
+                    ButtonDefinitions = [new ButtonDefinition { Name = "OK", IsDefault = true }],
+                    SizeToContent = SizeToContent.WidthAndHeight,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner
+                });
                 await successBox.ShowWindowDialogAsync(this);
             }
             catch (Exception ex)
