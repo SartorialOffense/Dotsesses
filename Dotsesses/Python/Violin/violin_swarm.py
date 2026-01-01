@@ -209,13 +209,16 @@ def create_violin_swarm_plot(
             colors.append(cycling_palette[i % len(cycling_palette)])
         colors.append(total_color)  # Last series (Total) is always red
 
-    # Sort data by ID for consistent ordering
+    # Sort data by ID for consistent ordering within each series
     plot_data = plot_data.sort_values(['Series', 'id']).reset_index(drop=True)
+
+    # Preserve original series order from input
+    series_order = [s[0] for s in series]
 
     # Create violin plot (alpha=0.4 for more transparency, making dots more visible)
     sns.violinplot(data=plot_data, x='Series', y='Normalized Value',
                    hue='Series', palette=colors, alpha=0.4, inner=None,
-                   legend=False, ax=ax)
+                   legend=False, ax=ax, order=series_order, hue_order=series_order)
 
     # Reset seed right before swarmplot for consistent positioning
     np.random.seed(42)
@@ -223,7 +226,7 @@ def create_violin_swarm_plot(
     # Add swarm plot - beeswarm algorithm avoids overlap for easier selection
     swarm = sns.swarmplot(data=plot_data, x='Series', y='Normalized Value',
                           hue='Series', palette=colors, size=dot_size,
-                          dodge=False, legend=False, ax=ax)
+                          dodge=False, legend=False, ax=ax, order=series_order, hue_order=series_order)
 
     # Customize plot
     if title:
@@ -302,7 +305,7 @@ def create_violin_swarm_plot(
 
     # Find all use elements in PathCollection groups (swarm points)
     svg_points = []
-    series_list = plot_data['Series'].unique()
+    series_list = [s[0] for s in series]  # Preserve original input order
 
     for elem in root.iter():
         if elem.tag.endswith('g') and elem.get('id', '').startswith('PathCollection'):
