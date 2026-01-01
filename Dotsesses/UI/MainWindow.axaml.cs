@@ -376,6 +376,16 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
+    /// Triggers the save dialog. Called from native menu.
+    /// </summary>
+    public async Task TriggerSave() => await SaveWithDialog();
+
+    /// <summary>
+    /// Triggers the load dialog. Called from native menu.
+    /// </summary>
+    public async Task TriggerLoad() => await LoadWithDialog();
+
+    /// <summary>
     /// Saves a PNG snapshot of the window to the specified path or temp folder.
     /// </summary>
     /// <param name="outputPath">Optional output path. If null, saves to temp folder with timestamp.</param>

@@ -59,18 +59,18 @@ public partial class App : Application
                 ConfigureServices(services);
                 Services = services.BuildServiceProvider();
 
-                var mainWindow = new MainWindow
+                _mainWindow = new MainWindow
                 {
                     DataContext = Services.GetRequiredService<MainWindowViewModel>(),
                 };
 
-                desktop.MainWindow = mainWindow;
+                desktop.MainWindow = _mainWindow;
 
-                mainWindow.Opened += async (s, e) =>
+                _mainWindow.Opened += async (s, e) =>
                 {
                     try
                     {
-                        var snapshotPath = await mainWindow.SaveSnapshotAsync(StartupConfig.SnapshotOutputPath);
+                        var snapshotPath = await _mainWindow.SaveSnapshotAsync(StartupConfig.SnapshotOutputPath);
                         Console.WriteLine($"Snapshot saved to: {snapshotPath}");
                         desktop.Shutdown(0);
                     }
@@ -176,14 +176,14 @@ public partial class App : Application
                         await Dispatcher.UIThread.InvokeAsync(() =>
                         {
                             Log("Startup: Instantiating MainWindow");
-                            var mainWindow = new MainWindow
+                            _mainWindow = new MainWindow
                             {
                                 DataContext = Services.GetRequiredService<MainWindowViewModel>(),
                             };
 
                             Log("Startup: Showing MainWindow");
-                            desktop.MainWindow = mainWindow;
-                            mainWindow.Show();
+                            desktop.MainWindow = _mainWindow;
+                            _mainWindow.Show();
                             splashWindow.Close();
                             Log("Startup: MainWindow visible, splash closed");
                         });
@@ -262,6 +262,24 @@ public partial class App : Application
         foreach (var plugin in dataValidationPluginsToRemove)
         {
             BindingPlugins.DataValidators.Remove(plugin);
+        }
+    }
+
+    private MainWindow? _mainWindow;
+
+    private async void OnOpenClicked(object? sender, EventArgs e)
+    {
+        if (_mainWindow != null)
+        {
+            await _mainWindow.TriggerLoad();
+        }
+    }
+
+    private async void OnSaveClicked(object? sender, EventArgs e)
+    {
+        if (_mainWindow != null)
+        {
+            await _mainWindow.TriggerSave();
         }
     }
 }
