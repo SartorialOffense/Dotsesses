@@ -898,6 +898,19 @@ public partial class ViolinPlotControl : UserControl
                     VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
                 }
             };
+
+            // Add tooltip with compliance info
+            if (compliance != null)
+            {
+                var tooltipText = $"Target: {compliance.LowerTarget}-{compliance.UpperTarget}\nCurrent: {currentCount}";
+                if (deviation != 0)
+                {
+                    var deviationSign = deviation > 0 ? "+" : "";
+                    tooltipText += $"\nDelta: {deviationSign}{deviation}";
+                }
+                ToolTip.SetTip(gradeBox, tooltipText);
+            }
+
             container.Children.Add(gradeBox);
 
             // Count column: right-aligned
