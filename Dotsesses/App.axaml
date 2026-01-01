@@ -2,9 +2,15 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Dotsesses.App"
              xmlns:local="using:Dotsesses"
+             xmlns:ui="using:Dotsesses.UI"
              Name="Dotsesses"
              RequestedThemeVariant="Dark">
              <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+
+    <Application.Resources>
+        <ui:ScoreColorConverter x:Key="ScoreColorConverter"/>
+        <ui:ScoreColorWithAlphaConverter x:Key="ScoreColorWithAlphaConverter"/>
+    </Application.Resources>
 
     <Application.DataTemplates>
         <local:ViewLocator/>

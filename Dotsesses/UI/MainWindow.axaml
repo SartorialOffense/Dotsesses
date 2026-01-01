@@ -151,26 +151,57 @@
                                                                                 <Grid ColumnDefinitions="*,Auto">
                                                                                     <TextBlock Grid.Column="0"
                                                                                              Text="{Binding Name}"
-                                                                                             Foreground="#AAAAAA"
-                                                                                             FontSize="11"/>
+                                                                                             FontSize="11">
+                                                                                        <TextBlock.Foreground>
+                                                                                            <MultiBinding Converter="{StaticResource ScoreColorConverter}">
+                                                                                                <Binding Path="."/>
+                                                                                                <ReflectionBinding Path="Content.SeriesColorMap" RelativeSource="{RelativeSource AncestorType=ContentControl}"/>
+                                                                                            </MultiBinding>
+                                                                                        </TextBlock.Foreground>
+                                                                                    </TextBlock>
                                                                                     <TextBlock Grid.Column="1"
                                                                                              Text="{Binding Value, StringFormat='{}{0:0}'}"
-                                                                                             Foreground="White"
                                                                                              FontSize="11"
-                                                                                             FontWeight="Medium"/>
+                                                                                             FontWeight="Medium">
+                                                                                        <TextBlock.Foreground>
+                                                                                            <MultiBinding Converter="{StaticResource ScoreColorConverter}">
+                                                                                                <Binding Path="."/>
+                                                                                                <ReflectionBinding Path="Content.SeriesColorMap" RelativeSource="{RelativeSource AncestorType=ContentControl}"/>
+                                                                                            </MultiBinding>
+                                                                                        </TextBlock.Foreground>
+                                                                                    </TextBlock>
                                                                                 </Grid>
                                                                                 <!-- Editable comment TextBox (auto-sizing) -->
                                                                                 <TextBox Text="{Binding Comment, Mode=TwoWay}"
                                                                                         TextWrapping="Wrap"
                                                                                         AcceptsReturn="True"
                                                                                         Foreground="#CCCCCC"
-                                                                                        BorderBrush="#3F3F46"
                                                                                         BorderThickness="1"
+                                                                                        BorderBrush="Transparent"
                                                                                         FontSize="10"
                                                                                         Padding="4"
                                                                                         Margin="0,2,0,0"
                                                                                         Watermark="Add comment..."
-                                                                                        UseFloatingWatermark="False"/>
+                                                                                        UseFloatingWatermark="False">
+                                                                                    <TextBox.Background>
+                                                                                        <MultiBinding Converter="{StaticResource ScoreColorWithAlphaConverter}" ConverterParameter="32">
+                                                                                            <Binding Path="."/>
+                                                                                            <ReflectionBinding Path="Content.SeriesColorMap" RelativeSource="{RelativeSource AncestorType=ContentControl}"/>
+                                                                                        </MultiBinding>
+                                                                                    </TextBox.Background>
+                                                                                    <TextBox.Styles>
+                                                                                        <Style Selector="TextBox:focus">
+                                                                                            <Setter Property="BorderBrush">
+                                                                                                <Setter.Value>
+                                                                                                    <MultiBinding Converter="{StaticResource ScoreColorConverter}">
+                                                                                                        <Binding Path="."/>
+                                                                                                        <ReflectionBinding Path="Content.SeriesColorMap" RelativeSource="{RelativeSource AncestorType=ContentControl}"/>
+                                                                                                    </MultiBinding>
+                                                                                                </Setter.Value>
+                                                                                            </Setter>
+                                                                                        </Style>
+                                                                                    </TextBox.Styles>
+                                                                                </TextBox>
                                                                             </StackPanel>
                                                                         </DataTemplate>
                                                                     </ItemsControl.ItemTemplate>

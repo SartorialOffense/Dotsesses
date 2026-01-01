@@ -186,12 +186,20 @@ public partial class MainWindowViewModel : ViewModelBase
         var studentIds = students.Select(s => s.Id).OrderBy(id => id);
         var muppetNameMap = muppetNameGenerator.Generate(studentIds);
 
+        // Generate series color map from first student's scores
+        var firstStudent = students.First();
+        var seriesNames = firstStudent.Scores
+            .Select(s => s.Index.HasValue ? $"{s.Name} {s.Index}" : s.Name)
+            .ToList();
+        var seriesColorMap = SeriesColorService.GenerateColorMap(seriesNames);
+
         ClassAssessment = new ClassAssessment(
             students,
             initialCutoffs,
             defaultCurve,
             current,
-            muppetNameMap
+            muppetNameMap,
+            seriesColorMap
         );
 
         _gradeAssigner = new GradeAssigner(initialCutoffs);
@@ -1189,12 +1197,20 @@ public partial class MainWindowViewModel : ViewModelBase
             var initialCutoffs = _initialCutoffCalculator.Calculate(students, midpointCurve);
             var current = _cutoffCountCalculator.Calculate(students, initialCutoffs);
 
+            // Generate series color map from first student's scores
+            var firstStudent = students.First();
+            var seriesNames = firstStudent.Scores
+                .Select(s => s.Index.HasValue ? $"{s.Name} {s.Index}" : s.Name)
+                .ToList();
+            var seriesColorMap = SeriesColorService.GenerateColorMap(seriesNames);
+
             ClassAssessment = new ClassAssessment(
                 students,
                 initialCutoffs,
                 defaultCurve,
                 current,
-                muppetMap);
+                muppetMap,
+                seriesColorMap);
 
             _currentSourceFile = state.SourceFile;
             CurrentSaveFilePath = filePath;
@@ -1276,7 +1292,7 @@ public partial class MainWindowViewModel : ViewModelBase
             if (student != null)
             {
                 var grade = GetGradeForStudent(student);
-                HoveredStudent = new StudentCardViewModel(student, grade, () => _hoverDelayService.ClearHover());
+                HoveredStudent = new StudentCardViewModel(student, grade, ClassAssessment.SeriesColorMap, () => _hoverDelayService.ClearHover());
             }
             else
             {

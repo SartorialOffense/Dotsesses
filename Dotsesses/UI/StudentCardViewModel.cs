@@ -1,6 +1,7 @@
 namespace Dotsesses.UI;
 
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,10 +26,16 @@ public partial class StudentCardViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private string _assignedGrade;
 
-    public StudentCardViewModel(StudentAssessment assessment, string assignedGrade, Action? clearAction = null)
+    /// <summary>
+    /// Series name to hex color map for coloring score labels and comment borders.
+    /// </summary>
+    public Dictionary<string, string> SeriesColorMap { get; }
+
+    public StudentCardViewModel(StudentAssessment assessment, string assignedGrade, Dictionary<string, string> seriesColorMap, Action? clearAction = null)
     {
         _assessment = assessment;
         _assignedGrade = assignedGrade;
+        SeriesColorMap = seriesColorMap;
         _clearAction = clearAction;
 
         // Subscribe to comment changes on all scores
