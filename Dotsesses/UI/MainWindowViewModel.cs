@@ -1192,15 +1192,33 @@ public partial class MainWindowViewModel : ViewModelBase
             _currentSourceFile = state.SourceFile;
             CurrentSaveFilePath = filePath;
 
-            // Apply saved cursor positions
+            // Initialize grade assigner
+            _gradeAssigner = new GradeAssigner(initialCutoffs);
+
+            // Initialize UI components (same as LoadFromExcelFile)
+            Log("LoadStateAsync: Initializing cursors");
+            InitializeCursors();
+
+            Log("LoadStateAsync: Wiring cursors to violin plot");
+            WireCursorsToViolinPlot();
+
+            Log("LoadStateAsync: Initializing compliance grid");
+            InitializeComplianceGrid();
+
+            // Apply saved cursor positions (after cursors are initialized)
             _stateService.ApplyCursors(state, Cursors);
 
-            // Refresh UI
-            _gradeAssigner = new GradeAssigner(ClassAssessment.CurrentCutoffs);
+            Log("LoadStateAsync: Recalculating grade counts");
             RecalculateGradeCounts();
-            UpdateDotplotPoints();
-            UpdateCursors();
-            InitializeViolinPlot();
+
+            Log("LoadStateAsync: Initializing dotplot");
+            InitializeDotplot();
+
+            // Update the display filename from the source file in the saved state
+            if (!string.IsNullOrEmpty(state.SourceFile))
+            {
+                SourceFileName = Path.GetFileName(state.SourceFile);
+            }
 
             HasUnsavedChanges = false;
             Log($"State loaded from: {filePath}");

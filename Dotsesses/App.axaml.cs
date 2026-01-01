@@ -179,21 +179,21 @@ public partial class App : Application
                             Log("Startup: ViolinPlotService initialized");
                         });
 
-                        await Dispatcher.UIThread.InvokeAsync(() => splashWindow.UpdateStatus("Select Excel source file..."));
+                        await Dispatcher.UIThread.InvokeAsync(() => splashWindow.UpdateStatus("Select source file..."));
 
                         // Small delay to show the status
                         await Task.Delay(200);
 
-                        Log("Startup: Prompting for Excel file");
+                        Log("Startup: Prompting for source file");
 
-                        // Prompt for Excel file on UI thread
-                        string? excelFilePath = null;
+                        // Prompt for source file on UI thread
+                        string? sourceFilePath = null;
                         await Dispatcher.UIThread.InvokeAsync(async () =>
                         {
-                            excelFilePath = await PromptForExcelFile(splashWindow);
+                            sourceFilePath = await PromptForSourceFile(splashWindow);
                         });
 
-                        if (string.IsNullOrEmpty(excelFilePath))
+                        if (string.IsNullOrEmpty(sourceFilePath))
                         {
                             Log("Startup: No file selected, shutting down");
                             await Dispatcher.UIThread.InvokeAsync(() =>
@@ -204,15 +204,27 @@ public partial class App : Application
                             return;
                         }
 
-                        Log($"Startup: Excel file selected: {excelFilePath}");
+                        Log($"Startup: Source file selected: {sourceFilePath}");
                         await Dispatcher.UIThread.InvokeAsync(() => splashWindow.UpdateStatus("Creating main window..."));
 
                         // Switch to main window on UI thread
-                        await Dispatcher.UIThread.InvokeAsync(() =>
+                        await Dispatcher.UIThread.InvokeAsync(async () =>
                         {
                             Log("Startup: Instantiating MainWindow");
                             var viewModel = Services.GetRequiredService<MainWindowViewModel>();
-                            viewModel.LoadFromExcelFile(excelFilePath);
+
+                            // Load based on file extension
+                            var extension = Path.GetExtension(sourceFilePath).ToLowerInvariant();
+                            if (extension == ".dots")
+                            {
+                                Log("Startup: Loading .dots file");
+                                await viewModel.LoadStateCommand.ExecuteAsync(sourceFilePath);
+                            }
+                            else
+                            {
+                                Log("Startup: Loading Excel file");
+                                viewModel.LoadFromExcelFile(sourceFilePath);
+                            }
 
                             _mainWindow = new MainWindow
                             {
@@ -244,21 +256,23 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Prompts the user to select an Excel file.
+    /// Prompts the user to select an Excel or Dotsesses (.dots) file.
     /// </summary>
     /// <param name="parentWindow">The parent window for the file dialog</param>
     /// <returns>The selected file path, or null if cancelled</returns>
-    private static async Task<string?> PromptForExcelFile(Window parentWindow)
+    private static async Task<string?> PromptForSourceFile(Window parentWindow)
     {
         var storageProvider = parentWindow.StorageProvider;
 
         var result = await storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Select Excel Source File",
+            Title = "Select Source File",
             AllowMultiple = false,
             FileTypeFilter = new[]
             {
+                new FilePickerFileType("Supported files") { Patterns = new[] { "*.xlsx", "*.xls", "*.dots" } },
                 new FilePickerFileType("Excel files") { Patterns = new[] { "*.xlsx", "*.xls" } },
+                new FilePickerFileType("Dotsesses files") { Patterns = new[] { "*.dots" } },
                 new FilePickerFileType("All files") { Patterns = new[] { "*" } }
             }
         });
