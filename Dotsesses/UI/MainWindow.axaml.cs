@@ -92,9 +92,8 @@ public partial class MainWindow : Window
         // (OxyPlot captures events, so we need handledEventsToo=true)
         DotPlotView.AddHandler(PointerMovedEvent, OnDotPlotPointerMoved, Avalonia.Interactivity.RoutingStrategies.Tunnel | Avalonia.Interactivity.RoutingStrategies.Bubble, handledEventsToo: true);
 
-        // Wire up Save/Load button click handlers
+        // Wire up Save button click handler
         SaveButton.Click += OnSaveButtonClick;
-        LoadButton.Click += OnLoadButtonClick;
 
         // Initialize violin plot asynchronously after window is displayed
         if (DataContext is MainWindowViewModel vm)
@@ -111,11 +110,6 @@ public partial class MainWindow : Window
     private async void OnSaveButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         await SaveWithDialog();
-    }
-
-    private async void OnLoadButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        await LoadWithDialog();
     }
 
     private async Task SaveWithDialog(bool forceDialog = false)
@@ -168,65 +162,6 @@ public partial class MainWindow : Window
         {
             var filePath = result.Path.LocalPath;
             await vm.SaveStateCommand.ExecuteAsync(filePath);
-        }
-    }
-
-    private async Task LoadWithDialog()
-    {
-        if (DataContext is not MainWindowViewModel vm) return;
-
-        // Check for unsaved changes before loading
-        if (vm.HasUnsavedChanges)
-        {
-            var confirmBox = MessageBoxManager.GetMessageBoxStandard(
-                "Unsaved Changes",
-                "You have unsaved changes. Loading a file will discard them. Continue?",
-                ButtonEnum.YesNo,
-                MsBoxIcon.Warning);
-
-            var confirmResult = await confirmBox.ShowWindowDialogAsync(this);
-            if (confirmResult != ButtonResult.Yes)
-                return;
-        }
-
-        var storageProvider = StorageProvider;
-
-        // Get starting directory (last used or default)
-        IStorageFolder? startLocation = null;
-        if (!string.IsNullOrEmpty(vm.StateService.LastUsedDirectory) &&
-            Directory.Exists(vm.StateService.LastUsedDirectory))
-        {
-            startLocation = await storageProvider.TryGetFolderFromPathAsync(vm.StateService.LastUsedDirectory);
-        }
-
-        var result = await storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-        {
-            Title = "Load State",
-            SuggestedStartLocation = startLocation,
-            AllowMultiple = false,
-            FileTypeFilter = new[]
-            {
-                new FilePickerFileType("Dotsesses files") { Patterns = new[] { "*.dots" } },
-                new FilePickerFileType("All files") { Patterns = new[] { "*" } }
-            }
-        });
-
-        if (result.Count > 0)
-        {
-            var filePath = result[0].Path.LocalPath;
-            try
-            {
-                await vm.LoadStateCommand.ExecuteAsync(filePath);
-            }
-            catch (Exception ex)
-            {
-                var errorBox = MessageBoxManager.GetMessageBoxStandard(
-                    "Error Loading File",
-                    $"Failed to load state file: {ex.Message}",
-                    ButtonEnum.Ok,
-                    MsBoxIcon.Error);
-                await errorBox.ShowWindowDialogAsync(this);
-            }
         }
     }
 
@@ -406,11 +341,6 @@ public partial class MainWindow : Window
     /// Triggers the save dialog. Called from native menu.
     /// </summary>
     public async Task TriggerSave() => await SaveWithDialog();
-
-    /// <summary>
-    /// Triggers the load dialog. Called from native menu.
-    /// </summary>
-    public async Task TriggerLoad() => await LoadWithDialog();
 
     /// <summary>
     /// Saves a PNG snapshot of the window to the specified path or temp folder.

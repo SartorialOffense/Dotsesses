@@ -14,7 +14,6 @@
         <NativeMenu>
             <NativeMenuItem Header="File">
                 <NativeMenu>
-                    <NativeMenuItem Header="Open..." Click="OnOpenClicked" Gesture="Cmd+O"/>
                     <NativeMenuItem Header="Save..." Click="OnSaveClicked" Gesture="Cmd+S"/>
                 </NativeMenu>
             </NativeMenuItem>

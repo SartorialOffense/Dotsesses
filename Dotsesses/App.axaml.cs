@@ -347,14 +347,6 @@ public partial class App : Application
 
     private MainWindow? _mainWindow;
 
-    private async void OnOpenClicked(object? sender, EventArgs e)
-    {
-        if (_mainWindow != null)
-        {
-            await _mainWindow.TriggerLoad();
-        }
-    }
-
     private async void OnSaveClicked(object? sender, EventArgs e)
     {
         if (_mainWindow != null)
