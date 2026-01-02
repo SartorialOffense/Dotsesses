@@ -67,6 +67,9 @@ public partial class ViolinPlotControl : UserControl
         // Update background color based on theme
         Background = ThemeColors.BackgroundBrush(_currentTheme);
 
+        // Hide/show copy button based on theme (hide during export)
+        CopyViolinPlotButton.IsVisible = _currentTheme == ThemeName.DarkMode;
+
         // Re-render all visual elements with new theme
         Dispatcher.UIThread.Post(() =>
         {

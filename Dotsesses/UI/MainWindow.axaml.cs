@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -10,6 +11,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Data.Converters;
 using Avalonia.Input;
+using Avalonia.VisualTree;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
@@ -60,17 +62,26 @@ public partial class MainWindow : Window
 
         Dispatcher.UIThread.Post(() =>
         {
-            // Update DotPlot border background and border color
+            // Update DotPlot backgrounds for theme
             DotPlotBorder.Background = ThemeColors.BackgroundBrush(_currentDotPlotTheme);
             DotPlotBorder.BorderBrush = _currentDotPlotTheme == ThemeName.DarkMode
                 ? Brushes.Transparent
                 : Brushes.Black;
+
+            // Also update DotPlotContainer background (this is what gets rendered/exported)
+            DotPlotContainer.Background = ThemeColors.BackgroundBrush(_currentDotPlotTheme);
+
+            // Hide/show copy button based on theme (hide during export)
+            CopyDotPlotButton.IsVisible = _currentDotPlotTheme == ThemeName.DarkMode;
 
             // Apply theme to the OxyPlot model via ViewModel
             if (DataContext is MainWindowViewModel vm)
             {
                 vm.ApplyTheme(_currentDotPlotTheme);
             }
+
+            // Re-render hover overlay with new theme colors
+            UpdateHoverOverlay();
 
             // Note: Callback is not invoked here - ViolinPlotControl handles it
         }, DispatcherPriority.Render);
@@ -127,6 +138,7 @@ public partial class MainWindow : Window
         // Wire up Save, Export, and Copy button click handlers
         SaveButton.Click += OnSaveButtonClick;
         ExportButton.Click += OnExportButtonClick;
+        ExportPptxButton.Click += OnExportPptxButtonClick;
         CopyDotPlotButton.Click += OnCopyDotPlotClick;
 
         // Initialize violin plot asynchronously after window is displayed
@@ -156,8 +168,112 @@ public partial class MainWindow : Window
         var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
         if (clipboard == null) return;
 
-        // Copy the DotPlotContainer (includes the plot and hover overlay)
-        await ImageCopyService.CopyControlToClipboardAsync(DotPlotContainer, clipboard);
+        // Copy the DotPlotBorder (includes the border, which becomes visible in light mode)
+        await ImageCopyService.CopyControlToClipboardAsync(DotPlotBorder, clipboard);
+    }
+
+    private async void OnExportPptxButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        await ExportPptxWithDialog();
+    }
+
+    private async Task ExportPptxWithDialog()
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+
+        var storageProvider = StorageProvider;
+
+        // Default to same directory as source file
+        IStorageFolder? startLocation = null;
+        string suggestedFileName = "presentation.pptx";
+
+        if (!string.IsNullOrEmpty(vm.CurrentSourceFile))
+        {
+            var sourceDir = System.IO.Path.GetDirectoryName(vm.CurrentSourceFile);
+            var sourceNameWithoutExt = System.IO.Path.GetFileNameWithoutExtension(vm.CurrentSourceFile);
+            suggestedFileName = $"{sourceNameWithoutExt}-Presentation.pptx";
+
+            if (!string.IsNullOrEmpty(sourceDir) && Directory.Exists(sourceDir))
+            {
+                startLocation = await storageProvider.TryGetFolderFromPathAsync(sourceDir);
+            }
+        }
+
+        // Prompt for save location
+        var result = await storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export PowerPoint Presentation",
+            SuggestedStartLocation = startLocation,
+            SuggestedFileName = suggestedFileName,
+            FileTypeChoices = new[]
+            {
+                new FilePickerFileType("PowerPoint Presentation") { Patterns = new[] { "*.pptx" } }
+            }
+        });
+
+        if (result == null) return;
+
+        var outputPath = result.Path.LocalPath;
+
+        try
+        {
+            // Get the ViolinPlotControl instance
+            var violinPlotControl = this.FindControl<ViolinPlotControl>("ViolinPlotControl")
+                                    ?? this.GetVisualDescendants().OfType<ViolinPlotControl>().FirstOrDefault();
+
+            if (violinPlotControl == null)
+            {
+                var errorBox = MessageBoxManager.GetMessageBoxStandard(
+                    "Export Error",
+                    "Could not find ViolinPlot control.",
+                    ButtonEnum.Ok,
+                    MsBoxIcon.Error);
+                await errorBox.ShowWindowDialogAsync(this);
+                return;
+            }
+
+            var exportService = new PowerPointExportService();
+            var className = !string.IsNullOrEmpty(vm.CurrentSourceFile)
+                ? System.IO.Path.GetFileNameWithoutExtension(vm.CurrentSourceFile)
+                : "Grade Analysis";
+
+            await exportService.ExportAsync(
+                outputPath,
+                DotPlotBorder,
+                violinPlotControl,
+                vm.ComplianceRows,
+                className);
+
+            // Show success message with option to open
+            var successBox = MessageBoxManager.GetMessageBoxCustom(new MessageBoxCustomParams
+            {
+                ContentTitle = "Export Complete",
+                ContentMessage = $"Presentation exported successfully:\n\n• {System.IO.Path.GetFileName(outputPath)}     ",
+                Icon = MsBoxIcon.Success,
+                ButtonDefinitions =
+                [
+                    new ButtonDefinition { Name = "Open", IsDefault = true },
+                    new ButtonDefinition { Name = "OK" }
+                ],
+                SizeToContent = SizeToContent.WidthAndHeight,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner
+            });
+
+            var buttonResult = await successBox.ShowWindowDialogAsync(this);
+            if (buttonResult == "Open")
+            {
+                Process.Start(new ProcessStartInfo(outputPath) { UseShellExecute = true });
+            }
+        }
+        catch (Exception ex)
+        {
+            var errorBox = MessageBoxManager.GetMessageBoxStandard(
+                "Export Error",
+                $"Failed to export presentation: {ex.Message}",
+                ButtonEnum.Ok,
+                MsBoxIcon.Error);
+            await errorBox.ShowWindowDialogAsync(this);
+        }
     }
 
     private async Task SaveWithDialog(bool forceDialog = false)
@@ -389,16 +505,16 @@ public partial class MainWindow : Window
     {
         var tooltipBorder = new Border
         {
-            Background = new SolidColorBrush(Colors.Black),
-            BorderBrush = new SolidColorBrush(Colors.White),
+            Background = ThemeColors.BackgroundBrush(_currentDotPlotTheme),
+            BorderBrush = ThemeColors.BorderBrush(_currentDotPlotTheme),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(3),
             Padding = new Thickness(4, 2)
         };
 
-        // Format: score | sigma | grade with white pipe separators
+        // Format: score | sigma | grade with pipe separators in foreground color
         var colorBrush = new SolidColorBrush(dotColor);
-        var whiteBrush = new SolidColorBrush(Colors.White);
+        var pipeBrush = ThemeColors.ForegroundBrush(_currentDotPlotTheme);
         var sigmaSign = sigmaValue >= 0 ? "+" : "";
 
         var scoreText = new TextBlock
@@ -409,12 +525,12 @@ public partial class MainWindow : Window
 
         // Score value (colored)
         scoreText.Inlines.Add(new Avalonia.Controls.Documents.Run($"{score} ") { Foreground = colorBrush });
-        // Pipe (white)
-        scoreText.Inlines.Add(new Avalonia.Controls.Documents.Run("| ") { Foreground = whiteBrush });
+        // Pipe (theme foreground)
+        scoreText.Inlines.Add(new Avalonia.Controls.Documents.Run("| ") { Foreground = pipeBrush });
         // Sigma value (colored)
         scoreText.Inlines.Add(new Avalonia.Controls.Documents.Run($"{sigmaSign}{sigmaValue:F1}σ ") { Foreground = colorBrush });
-        // Pipe (white)
-        scoreText.Inlines.Add(new Avalonia.Controls.Documents.Run("| ") { Foreground = whiteBrush });
+        // Pipe (theme foreground)
+        scoreText.Inlines.Add(new Avalonia.Controls.Documents.Run("| ") { Foreground = pipeBrush });
         // Grade (colored)
         scoreText.Inlines.Add(new Avalonia.Controls.Documents.Run(grade) { Foreground = colorBrush });
 

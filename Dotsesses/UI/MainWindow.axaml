@@ -31,7 +31,7 @@
         </Border>
 
         <!-- Top Row: Dotplot -->
-        <Border x:Name="DotPlotBorder" Grid.Row="1" Background="#101010" CornerRadius="8"
+        <Border x:Name="DotPlotBorder" Grid.Row="1" Background="#101010" CornerRadius="0"
                 BorderThickness="1" BorderBrush="Transparent">
             <Grid>
                 <!-- Existing content -->
@@ -109,6 +109,16 @@
                                         BorderBrush="#3F3F46"
                                         CornerRadius="4"
                                         ToolTip.Tip="Export grades to Excel"/>
+                                <Button x:Name="ExportPptxButton"
+                                        Content="📽️ PPTX"
+                                        FontSize="12"
+                                        Padding="12,3"
+                                        Background="#2D2D30"
+                                        Foreground="White"
+                                        BorderThickness="1"
+                                        BorderBrush="#3F3F46"
+                                        CornerRadius="4"
+                                        ToolTip.Tip="Export presentation with plots"/>
                             </StackPanel>
                         </Border>
 
