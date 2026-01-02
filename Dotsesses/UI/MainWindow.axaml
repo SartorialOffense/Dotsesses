@@ -215,6 +215,12 @@
                                                                                         Margin="0,2,0,0"
                                                                                         Watermark="Add comment..."
                                                                                         UseFloatingWatermark="False">
+                                                                                    <TextBox.Tag>
+                                                                                        <MultiBinding Converter="{StaticResource ScoreColorConverter}">
+                                                                                            <Binding Path="."/>
+                                                                                            <ReflectionBinding Path="Content.SeriesColorMap" RelativeSource="{RelativeSource AncestorType=ContentControl}"/>
+                                                                                        </MultiBinding>
+                                                                                    </TextBox.Tag>
                                                                                     <TextBox.Background>
                                                                                         <MultiBinding Converter="{StaticResource ScoreColorWithAlphaConverter}" ConverterParameter="32">
                                                                                             <Binding Path="."/>
@@ -222,15 +228,9 @@
                                                                                         </MultiBinding>
                                                                                     </TextBox.Background>
                                                                                     <TextBox.Styles>
-                                                                                        <Style Selector="TextBox:focus">
-                                                                                            <Setter Property="BorderBrush">
-                                                                                                <Setter.Value>
-                                                                                                    <MultiBinding Converter="{StaticResource ScoreColorConverter}">
-                                                                                                        <Binding Path="."/>
-                                                                                                        <ReflectionBinding Path="Content.SeriesColorMap" RelativeSource="{RelativeSource AncestorType=ContentControl}"/>
-                                                                                                    </MultiBinding>
-                                                                                                </Setter.Value>
-                                                                                            </Setter>
+                                                                                        <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+                                                                                            <Setter Property="BorderBrush" Value="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"/>
+                                                                                            <Setter Property="BorderThickness" Value="1"/>
                                                                                         </Style>
                                                                                     </TextBox.Styles>
                                                                                 </TextBox>
