@@ -131,6 +131,22 @@ public partial class MainWindow : Window
     {
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] MainWindow: Loaded event fired");
 
+        // Set initial window size to 1700x1000 or max screen size
+        var screen = Screens.Primary ?? Screens.All.FirstOrDefault();
+        if (screen != null)
+        {
+            var workArea = screen.WorkingArea;
+            var targetWidth = Math.Min(1700, workArea.Width / screen.Scaling);
+            var targetHeight = Math.Min(1000, workArea.Height / screen.Scaling);
+            Width = targetWidth;
+            Height = targetHeight;
+
+            // Center on screen
+            Position = new PixelPoint(
+                (int)(workArea.X + (workArea.Width - targetWidth * screen.Scaling) / 2),
+                (int)(workArea.Y + (workArea.Height - targetHeight * screen.Scaling) / 2));
+        }
+
         // Add PointerMoved handler to DotPlotView to capture mouse movement
         // (OxyPlot captures events, so we need handledEventsToo=true)
         DotPlotView.AddHandler(PointerMovedEvent, OnDotPlotPointerMoved, Avalonia.Interactivity.RoutingStrategies.Tunnel | Avalonia.Interactivity.RoutingStrategies.Bubble, handledEventsToo: true);
