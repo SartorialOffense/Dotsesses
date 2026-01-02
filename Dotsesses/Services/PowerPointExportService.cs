@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 using Dotsesses.UI;
 using ShapeCrawler;
 
@@ -26,12 +27,14 @@ public class PowerPointExportService
     private const int MaxContentHeight = 460; // SlideHeight - ContentY - margin
 
     /// <summary>
-    /// Exports a complete presentation with DotPlot, ViolinPlot, and grade table.
+    /// Exports a complete presentation with DotPlot, ViolinPlot, CorrelationPlot, and grade table.
     /// </summary>
     public async Task ExportAsync(
         string outputPath,
         Control dotPlotControl,
         Control violinPlotControl,
+        Control correlationPlotControl,
+        PlotTabContainerViewModel tabViewModel,
         IEnumerable<ComplianceRowViewModel> complianceRows,
         string className = "Grade Analysis")
     {
@@ -44,22 +47,50 @@ public class PowerPointExportService
             ClearPlaceholders(pres, 1);
             await AddPlotSlideAsync(pres, 1, $"{className} - Score Distribution", dotPlotControl, restoreTheme: false);
 
-            // Slide 2: ViolinPlot (still in LightMode from previous render)
+            // Slide 2: ViolinPlot - ensure it's visible first
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                tabViewModel.SelectViolinCommand.Execute(null);
+            });
+            await Task.Delay(300); // Allow layout to update
+
             pres.Slides.Add(1);
             ClearPlaceholders(pres, 2);
             await AddPlotSlideAsync(pres, 2, $"{className} - Component Analysis", violinPlotControl, restoreTheme: false);
 
-            // Slide 3: Grade Table (no rendering needed)
+            // Slide 3: CorrelationPlot - switch to correlation tab first
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                tabViewModel.SelectCorrelationCommand.Execute(null);
+            });
+            // Allow more time for layout + Python plot regeneration in light theme
+            await Task.Delay(500);
+
             pres.Slides.Add(1);
             ClearPlaceholders(pres, 3);
-            AddGradeTableSlide(pres, 3, $"{className} - Grade Breakdown", complianceRows);
+            await AddPlotSlideAsync(pres, 3, $"{className} - Score Correlations", correlationPlotControl, restoreTheme: false);
+
+            // Slide 4: Grade Table (no rendering needed)
+            pres.Slides.Add(1);
+            ClearPlaceholders(pres, 4);
+            AddGradeTableSlide(pres, 4, $"{className} - Grade Breakdown", complianceRows);
+
+            // Delete existing file if it exists (ShapeCrawler doesn't overwrite cleanly)
+            if (File.Exists(outputPath))
+            {
+                File.Delete(outputPath);
+            }
 
             // Save presentation
             pres.Save(outputPath);
         }
         finally
         {
-            // Always restore DarkMode theme
+            // Restore to violin tab and DarkMode theme
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                tabViewModel.SelectViolinCommand.Execute(null);
+            });
             ImageCopyService.RestoreDarkMode();
         }
     }

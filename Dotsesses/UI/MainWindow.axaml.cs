@@ -83,7 +83,15 @@ public partial class MainWindow : Window
             // Re-render hover overlay with new theme colors
             UpdateHoverOverlay();
 
-            // Note: Callback is not invoked here - ViolinPlotControl handles it
+            // Force OxyPlot to render immediately by updating layout
+            DotPlotBorder.UpdateLayout();
+
+            // Note: Callback is handled by ViolinPlotControl/CorrelationPlotControl
+            // But we need to ensure the DotPlot has rendered, so post another frame
+            Dispatcher.UIThread.Post(() =>
+            {
+                // This ensures OxyPlot has completed its render cycle
+            }, DispatcherPriority.Render);
         }, DispatcherPriority.Render);
     }
 
@@ -251,6 +259,33 @@ public partial class MainWindow : Window
                 return;
             }
 
+            // Get the CorrelationPlotControl instance
+            var correlationPlotControl = this.FindControl<CorrelationPlotControl>("CorrelationPlotControl")
+                                         ?? this.GetVisualDescendants().OfType<CorrelationPlotControl>().FirstOrDefault();
+
+            if (correlationPlotControl == null)
+            {
+                var errorBox = MessageBoxManager.GetMessageBoxStandard(
+                    "Export Error",
+                    "Could not find CorrelationPlot control.",
+                    ButtonEnum.Ok,
+                    MsBoxIcon.Error);
+                await errorBox.ShowWindowDialogAsync(this);
+                return;
+            }
+
+            // Get the PlotTabContainerViewModel for tab switching
+            if (vm.PlotTabContainerViewModel == null)
+            {
+                var errorBox = MessageBoxManager.GetMessageBoxStandard(
+                    "Export Error",
+                    "Could not find PlotTabContainer view model.",
+                    ButtonEnum.Ok,
+                    MsBoxIcon.Error);
+                await errorBox.ShowWindowDialogAsync(this);
+                return;
+            }
+
             var exportService = new PowerPointExportService();
             var className = !string.IsNullOrEmpty(vm.CurrentSourceFile)
                 ? System.IO.Path.GetFileNameWithoutExtension(vm.CurrentSourceFile)
@@ -260,6 +295,8 @@ public partial class MainWindow : Window
                 outputPath,
                 DotPlotBorder,
                 violinPlotControl,
+                correlationPlotControl,
+                vm.PlotTabContainerViewModel,
                 vm.ComplianceRows,
                 className);
 

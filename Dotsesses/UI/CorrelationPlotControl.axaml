@@ -10,12 +10,12 @@
 
     <Grid>
         <!-- Main plot area -->
-        <Grid x:Name="CorrelationPlotArea" PointerMoved="OnPointerMoved">
+        <Grid x:Name="CorrelationPlotArea" PointerMoved="OnPointerMoved" PointerPressed="OnPlotAreaClick" Background="Transparent">
             <!-- SVG Background -->
             <Image x:Name="SvgView" Stretch="Fill" />
 
             <!-- Canvas for swarm point overlays -->
-            <Canvas x:Name="PointsOverlay" />
+            <Canvas x:Name="PointsOverlay" Background="Transparent" />
 
             <!-- Canvas for tooltips -->
             <Canvas x:Name="TooltipsOverlay" IsHitTestVisible="False" />

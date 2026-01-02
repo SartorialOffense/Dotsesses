@@ -57,6 +57,76 @@ def get_series_color(series_name: str, series_list: List[str]) -> str:
     return CYCLING_PALETTE[idx % len(CYCLING_PALETTE)]
 
 
+def get_r_squared_color(r_squared: float, theme: str = 'dark') -> str:
+    """
+    Get a color based on r² value using a gradient.
+
+    r² ranges from 0 (no correlation) to 1 (perfect correlation).
+    We use a gradient from gray/desaturated (low r²) to vibrant purple/blue (high r²).
+    """
+    # Clamp r_squared to valid range
+    r_squared = max(0.0, min(1.0, r_squared))
+
+    # Color scale from low to high r²:
+    # Dark theme: gray -> cyan -> blue -> purple
+    # Light theme: light gray -> light cyan -> medium blue -> dark purple
+
+    if theme == 'light':
+        # Light theme: darker colors for visibility on white background
+        if r_squared < 0.25:
+            # Very weak: gray
+            gray = int(180 - r_squared * 4 * 40)  # 180 -> 140
+            return f'#{gray:02x}{gray:02x}{gray:02x}'
+        elif r_squared < 0.5:
+            # Weak: gray-blue to cyan
+            t = (r_squared - 0.25) / 0.25
+            r = int(100 * (1 - t))
+            g = int(100 + 80 * t)  # -> 180
+            b = int(120 + 80 * t)  # -> 200
+            return f'#{r:02x}{g:02x}{b:02x}'
+        elif r_squared < 0.75:
+            # Moderate: cyan to blue
+            t = (r_squared - 0.5) / 0.25
+            r = int(30 * (1 - t))
+            g = int(180 - 100 * t)  # 180 -> 80
+            b = int(200 + 55 * t)   # 200 -> 255
+            return f'#{r:02x}{g:02x}{b:02x}'
+        else:
+            # Strong: blue to purple
+            t = (r_squared - 0.75) / 0.25
+            r = int(80 * t + 30 * (1 - t))   # 30 -> 80
+            g = int(20 * t + 80 * (1 - t))   # 80 -> 20
+            b = 255
+            return f'#{r:02x}{g:02x}{b:02x}'
+    else:
+        # Dark theme: brighter, more saturated colors
+        if r_squared < 0.25:
+            # Very weak: dim gray
+            gray = int(80 + r_squared * 4 * 30)  # 80 -> 110
+            return f'#{gray:02x}{gray:02x}{gray:02x}'
+        elif r_squared < 0.5:
+            # Weak: gray-cyan transition
+            t = (r_squared - 0.25) / 0.25
+            r = int(110 * (1 - t) + 50 * t)
+            g = int(110 + 90 * t)  # -> 200
+            b = int(110 + 90 * t)  # -> 200
+            return f'#{r:02x}{g:02x}{b:02x}'
+        elif r_squared < 0.75:
+            # Moderate: cyan to bright blue
+            t = (r_squared - 0.5) / 0.25
+            r = int(50 * (1 - t))
+            g = int(200 - 80 * t)  # 200 -> 120
+            b = int(200 + 55 * t)  # 200 -> 255
+            return f'#{r:02x}{g:02x}{b:02x}'
+        else:
+            # Strong: blue to vibrant purple
+            t = (r_squared - 0.75) / 0.25
+            r = int(150 * t)           # 0 -> 150
+            g = int(120 - 80 * t)      # 120 -> 40
+            b = 255
+            return f'#{r:02x}{g:02x}{b:02x}'
+
+
 def create_correlation_matrix(
     fig_size: Tuple[float, float],
     series: List[Tuple[str, Dict[str, float]]],
@@ -110,58 +180,86 @@ def create_correlation_matrix(
     for _, scores in series:
         all_ids.update(scores.keys())
 
+    # Pre-calculate r² for all lower-triangle cells (for coloring)
+    r_squared_matrix = {}
+    for i in range(n):
+        _, y_data = series[i]
+        for j in range(i):  # Only lower triangle
+            _, x_data = series[j]
+            common_ids = set(x_data.keys()) & set(y_data.keys())
+            if len(common_ids) > 1:
+                x_vals = [x_data[sid] for sid in common_ids]
+                y_vals = [y_data[sid] for sid in common_ids]
+                try:
+                    r = np.corrcoef(x_vals, y_vals)[0, 1]
+                    if not np.isnan(r):
+                        r_squared_matrix[(i, j)] = r ** 2
+                    else:
+                        r_squared_matrix[(i, j)] = 0.0
+                except Exception:
+                    r_squared_matrix[(i, j)] = 0.0
+            else:
+                r_squared_matrix[(i, j)] = 0.0
+
     # Process each cell
     for i in range(n):
         y_name, y_data = series[i]
-        y_color = get_series_color(y_name, series_names)
+        # Use series color for diagonal KDE/histogram
+        y_series_color = get_series_color(y_name, series_names)
 
         for j in range(n):
             x_name, x_data = series[j]
-            x_color = get_series_color(x_name, series_names)
+            x_series_color = get_series_color(x_name, series_names)
             ax = axes[i, j]
 
             if i < j:
                 # Upper triangle: remove axes (corner plot)
                 ax.axis('off')
             elif i == j:
-                # Diagonal: KDE or histogram
+                # Diagonal: KDE or histogram - use series color
                 values = list(x_data.values())
                 if len(values) > 1:
                     if diagonal_type == 'kde':
                         try:
                             sns.kdeplot(values, ax=ax, fill=True, alpha=0.5,
-                                       color=x_color, linewidth=1.5)
+                                       color=x_series_color, linewidth=1.5)
                         except Exception:
                             # Fallback to histogram if KDE fails
                             ax.hist(values, bins='auto', alpha=0.5,
-                                   color=x_color, edgecolor=x_color)
+                                   color=x_series_color, edgecolor=x_series_color)
                     else:
                         ax.hist(values, bins='auto', alpha=0.5,
-                               color=x_color, edgecolor=x_color)
+                               color=x_series_color, edgecolor=x_series_color)
 
                 # Add series name in diagonal
                 ax.text(0.5, 0.5, x_name, transform=ax.transAxes,
                        ha='center', va='center', fontsize=9, fontweight='bold',
-                       color=x_color, alpha=0.7)
+                       color=x_series_color, alpha=0.7)
             else:
-                # Lower triangle: scatter plot
+                # Lower triangle: scatter plot - color by r²
                 # Get common student IDs
                 common_ids = sorted(set(x_data.keys()) & set(y_data.keys()))
+
+                # Get r²-based color for this cell
+                r_sq = r_squared_matrix.get((i, j), 0.0)
+                cell_color = get_r_squared_color(r_sq, theme)
 
                 if len(common_ids) > 0:
                     x_vals = [x_data[sid] for sid in common_ids]
                     y_vals = [y_data[sid] for sid in common_ids]
 
-                    # Draw scatter - we'll extract positions later
+                    # Draw scatter with r²-based color
                     scatter = ax.scatter(x_vals, y_vals, s=dot_size**2,
-                                        alpha=0.6, c=y_color, edgecolors='none')
+                                        alpha=0.6, c=cell_color, edgecolors='none')
 
-                    # Calculate and show correlation coefficient
+                    # Calculate and show correlation coefficient (with r²)
                     if show_correlation_coefficients and len(x_vals) > 1:
+                        r = np.sqrt(r_sq) if r_sq > 0 else 0.0
+                        # Check sign of correlation
                         try:
-                            r = np.corrcoef(x_vals, y_vals)[0, 1]
-                            if not np.isnan(r):
-                                ax.annotate(f'r={r:.2f}', xy=(0.95, 0.05),
+                            r_signed = np.corrcoef(x_vals, y_vals)[0, 1]
+                            if not np.isnan(r_signed):
+                                ax.annotate(f'r={r_signed:.2f}', xy=(0.95, 0.05),
                                            xycoords='axes fraction', ha='right',
                                            fontsize=8, color=stat_label_color)
                         except Exception:
@@ -223,7 +321,6 @@ def create_correlation_matrix(
     collection_idx = 0
     for i in range(n):
         y_name, y_data = series[i]
-        y_color = get_series_color(y_name, series_names)
 
         for j in range(n):
             x_name, x_data = series[j]
@@ -237,6 +334,10 @@ def create_correlation_matrix(
 
             if len(common_ids) == 0:
                 continue
+
+            # Get r²-based color for this cell (same as used for matplotlib scatter)
+            r_sq = r_squared_matrix.get((i, j), 0.0)
+            cell_color = get_r_squared_color(r_sq, theme)
 
             # Get the corresponding PathCollection
             if collection_idx < len(path_collections):
@@ -270,7 +371,7 @@ def create_correlation_matrix(
                             'y_series': y_name,
                             'x_value': x_data[sid],
                             'y_value': y_data[sid],
-                            'color': y_color  # Color by Y-axis series
+                            'color': cell_color  # Color by r² value
                         })
 
                 # Mark points for removal from SVG (will render in C#)
@@ -314,7 +415,7 @@ def create_correlation_matrix(
                         'y_series': y_name,
                         'x_value': x_data[sid],
                         'y_value': y_data[sid],
-                        'color': y_color
+                        'color': cell_color  # Color by r² value
                     })
 
     # Convert back to string

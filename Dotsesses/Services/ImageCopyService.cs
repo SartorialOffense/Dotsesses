@@ -6,6 +6,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Messaging;
 using Dotsesses.Messages;
 using Dotsesses.Models;
@@ -26,21 +27,32 @@ public static class ImageCopyService
     /// <returns>A MemoryStream containing the PNG image data</returns>
     public static async Task<MemoryStream> RenderControlToPngStreamAsync(Control control, bool restoreTheme = true)
     {
-        // Ensure layout is current
-        control.UpdateLayout();
-
         // Switch to LightMode and wait for re-render
         var renderComplete = new TaskCompletionSource<bool>();
         WeakReferenceMessenger.Default.Send(new RenderWithThemeMessage(
             ThemeName.LightMode,
             () => renderComplete.TrySetResult(true)));
 
-        // Wait for render to complete (with timeout)
-        var timeoutTask = Task.Delay(500);
+        // Wait for render callback (with timeout)
+        var timeoutTask = Task.Delay(1000);
         await Task.WhenAny(renderComplete.Task, timeoutTask);
 
-        // Additional delay to ensure visual update is complete
-        await Task.Delay(100);
+        // Force layout update on UI thread
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            control.UpdateLayout();
+            control.InvalidateVisual();
+        });
+
+        // Wait for multiple render frames to ensure all async updates complete
+        // This is critical for OxyPlot, Python-generated SVGs, and Canvas overlays
+        await Task.Delay(500);
+
+        // Force another layout pass
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            control.UpdateLayout();
+        });
 
         // Capture the screenshot
         var bounds = control.Bounds;

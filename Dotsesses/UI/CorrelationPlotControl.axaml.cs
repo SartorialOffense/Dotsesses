@@ -408,6 +408,35 @@ public partial class CorrelationPlotControl : UserControl
         TooltipsOverlay.Children.Add(tooltipBorder);
     }
 
+    private void OnPlotAreaClick(object? sender, PointerPressedEventArgs e)
+    {
+        var position = e.GetCurrentPoint(CorrelationPlotArea);
+
+        // Check if we clicked on a point by hit testing the overlay
+        var clickedElement = PointsOverlay.InputHitTest(position.Position);
+
+        int? studentId = null;
+        if (clickedElement is Control control && control.Tag is ValueTuple<int, int> tag)
+        {
+            studentId = tag.Item2;
+        }
+
+        if (studentId.HasValue)
+        {
+            // Forward to point click handler
+            OnPointsOverlayClick(sender, e);
+        }
+        else
+        {
+            // Clicked on empty space - clear hover
+            if (position.Properties.IsLeftButtonPressed)
+            {
+                WeakReferenceMessenger.Default.Send(new StudentHoverMessage(null, "correlation"));
+                e.Handled = true;
+            }
+        }
+    }
+
     private void OnPointsOverlayClick(object? sender, PointerPressedEventArgs e)
     {
         var position = e.GetCurrentPoint(PointsOverlay);
