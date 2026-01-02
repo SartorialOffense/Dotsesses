@@ -316,8 +316,6 @@ public partial class CorrelationPlotControl : UserControl
             var displayWidth = plotBounds.Width > 0 ? plotBounds.Width : 800;
             var displayHeight = plotBounds.Height > 0 ? plotBounds.Height : 600;
 
-            bool tooltipShown = false;
-
             foreach (var point in studentPoints)
             {
                 var (displayX, displayY) = vm.SvgToDisplayWithSize(point.X, point.Y, displayWidth, displayHeight);
@@ -333,79 +331,8 @@ public partial class CorrelationPlotControl : UserControl
                 Canvas.SetLeft(hoverRing, displayX - 7);
                 Canvas.SetTop(hoverRing, displayY - 7);
                 PointsOverlay.Children.Add(hoverRing);
-
-                // Show tooltip for first point only (avoid clutter)
-                if (!tooltipShown)
-                {
-                    CreateTooltip(point, displayX, displayY);
-                    tooltipShown = true;
-                }
             }
         }
-    }
-
-    private void CreateTooltip(CorrelationDataPoint point, double displayX, double displayY)
-    {
-        var tooltipBorder = new Border
-        {
-            Background = ThemeColors.BackgroundBrush(_currentTheme),
-            BorderBrush = ThemeColors.BorderBrush(_currentTheme),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(3),
-            Padding = new Thickness(6, 4)
-        };
-
-        var tooltipContent = new StackPanel { Spacing = 2 };
-
-        // Muppet name (if available)
-        if (!string.IsNullOrEmpty(point.MuppetName))
-        {
-            var nameText = new TextBlock
-            {
-                Text = point.MuppetName,
-                FontSize = 12,
-                FontWeight = FontWeight.Bold,
-                Foreground = ThemeColors.ForegroundBrush(_currentTheme)
-            };
-            tooltipContent.Children.Add(nameText);
-        }
-
-        // X series value
-        var xText = new TextBlock
-        {
-            FontSize = 11,
-            Foreground = ThemeColors.ForegroundBrush(_currentTheme)
-        };
-        xText.Inlines.Add(new Avalonia.Controls.Documents.Run($"{point.XSeries}: ") { Foreground = ThemeColors.SecondaryTextBrush(_currentTheme) });
-        xText.Inlines.Add(new Avalonia.Controls.Documents.Run($"{point.XValue:F0}") { FontWeight = FontWeight.Medium });
-        tooltipContent.Children.Add(xText);
-
-        // Y series value
-        var yText = new TextBlock
-        {
-            FontSize = 11,
-            Foreground = ThemeColors.ForegroundBrush(_currentTheme)
-        };
-        yText.Inlines.Add(new Avalonia.Controls.Documents.Run($"{point.YSeries}: ") { Foreground = ThemeColors.SecondaryTextBrush(_currentTheme) });
-        yText.Inlines.Add(new Avalonia.Controls.Documents.Run($"{point.YValue:F0}") { FontWeight = FontWeight.Medium });
-        tooltipContent.Children.Add(yText);
-
-        tooltipBorder.Child = tooltipContent;
-
-        // Measure tooltip
-        tooltipBorder.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        double tooltipWidth = tooltipBorder.DesiredSize.Width;
-
-        // Position tooltip
-        double canvasWidth = TooltipsOverlay.Bounds.Width;
-        double leftPos = displayX + 20 + tooltipWidth > canvasWidth
-            ? displayX - tooltipWidth - 20
-            : displayX + 20;
-
-        Canvas.SetLeft(tooltipBorder, leftPos);
-        Canvas.SetTop(tooltipBorder, displayY - 10);
-
-        TooltipsOverlay.Children.Add(tooltipBorder);
     }
 
     private void OnPlotAreaClick(object? sender, PointerPressedEventArgs e)

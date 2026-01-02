@@ -252,6 +252,19 @@ def create_correlation_matrix(
                     scatter = ax.scatter(x_vals, y_vals, s=dot_size**2,
                                         alpha=0.6, c=cell_color, edgecolors='none')
 
+                    # Draw fitted line (linear regression)
+                    if len(x_vals) > 1:
+                        try:
+                            # Fit line using numpy polyfit
+                            slope, intercept = np.polyfit(x_vals, y_vals, 1)
+                            x_line = np.array([min(x_vals), max(x_vals)])
+                            y_line = slope * x_line + intercept
+                            # Draw line with same color but slightly darker/more opaque
+                            ax.plot(x_line, y_line, color=cell_color, linewidth=1.5,
+                                   alpha=0.8, linestyle='-')
+                        except Exception:
+                            pass
+
                     # Calculate and show correlation coefficient (with r²)
                     if show_correlation_coefficients and len(x_vals) > 1:
                         r = np.sqrt(r_sq) if r_sq > 0 else 0.0
