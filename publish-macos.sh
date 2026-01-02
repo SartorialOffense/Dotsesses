@@ -44,6 +44,9 @@ chmod +x "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 # Clean up the intermediate bin folder
 rm -rf "$OUTPUT_DIR/bin"
 
+codesign --force --deep --sign ./publish/Dotsesses.app
+ditto -c -k --sequesterRsrc --keepParent ./publish/Dotsesses.app ./publish/Dotsesses.zip
+
 echo ""
 echo "App bundle created: $APP_BUNDLE"
 echo ""
