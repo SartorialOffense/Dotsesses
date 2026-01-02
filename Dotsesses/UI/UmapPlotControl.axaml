@@ -1,0 +1,111 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Dotsesses.UI"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:Class="Dotsesses.UI.UmapPlotControl"
+             x:DataType="vm:UmapPlotViewModel"
+             Background="Transparent">
+
+    <Grid RowDefinitions="Auto,*">
+        <!-- Parameter sliders panel -->
+        <Border x:Name="SlidersPanel"
+                Grid.Row="0"
+                Background="#2D2D30"
+                Padding="8,6"
+                CornerRadius="0,0,4,4">
+            <Grid ColumnDefinitions="Auto,*,Auto,8,Auto,*,Auto">
+                <!-- n_neighbors slider -->
+                <TextBlock Grid.Column="0"
+                           Text="Neighbors:"
+                           Foreground="#CCCCCC"
+                           FontSize="11"
+                           VerticalAlignment="Center"
+                           Margin="0,0,6,0"/>
+                <Slider Grid.Column="1"
+                        x:Name="NeighborsSlider"
+                        Minimum="5"
+                        Maximum="50"
+                        Value="{Binding NNeighbors}"
+                        IsSnapToTickEnabled="True"
+                        TickFrequency="1"
+                        Width="120"
+                        VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="2"
+                           Text="{Binding NNeighbors, StringFormat={}{0}}"
+                           Foreground="#CCCCCC"
+                           FontSize="11"
+                           Width="24"
+                           VerticalAlignment="Center"/>
+
+                <!-- min_dist slider -->
+                <TextBlock Grid.Column="4"
+                           Text="Min Dist:"
+                           Foreground="#CCCCCC"
+                           FontSize="11"
+                           VerticalAlignment="Center"
+                           Margin="0,0,6,0"/>
+                <Slider Grid.Column="5"
+                        x:Name="MinDistSlider"
+                        Minimum="0.0"
+                        Maximum="1.0"
+                        Value="{Binding MinDist}"
+                        TickFrequency="0.05"
+                        Width="120"
+                        VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="6"
+                           Text="{Binding MinDist, StringFormat={}{0:F2}}"
+                           Foreground="#CCCCCC"
+                           FontSize="11"
+                           Width="30"
+                           VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+
+        <!-- Main plot area -->
+        <Grid x:Name="UmapPlotArea" Grid.Row="1" PointerMoved="OnPointerMoved" PointerPressed="OnPlotAreaClick" Background="Transparent">
+            <!-- SVG Background -->
+            <Image x:Name="SvgView" Stretch="Fill" />
+
+            <!-- Canvas for point overlays -->
+            <Canvas x:Name="PointsOverlay" Background="Transparent" />
+        </Grid>
+
+        <!-- Loading spinner -->
+        <Border x:Name="LoadingOverlay"
+                Grid.Row="1"
+                Background="#80000000"
+                IsVisible="{Binding IsLoading}"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Text="Computing UMAP..."
+                           Foreground="White"
+                           FontSize="14"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Controls overlay (top-right) -->
+        <StackPanel Grid.Row="1"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Orientation="Horizontal"
+                    Spacing="4"
+                    Margin="0,4,4,0">
+
+            <!-- Copy button -->
+            <Button x:Name="CopyUmapPlotButton"
+                    Width="28" Height="28"
+                    Background="#3A3A3C"
+                    Foreground="White"
+                    BorderThickness="0"
+                    CornerRadius="4"
+                    Opacity="0.7"
+                    ToolTip.Tip="Copy to clipboard (inverted for print)">
+                <TextBlock Text="&#x1F4CB;" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>

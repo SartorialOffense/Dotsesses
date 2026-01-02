@@ -53,6 +53,9 @@
         <AdditionalFiles Include="Python/Violin/correlation_matrix.py">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </AdditionalFiles>
+        <AdditionalFiles Include="Python/Violin/dimensionality_reduction.py">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </AdditionalFiles>
         <None Include="Python/Violin/pyproject.toml">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>

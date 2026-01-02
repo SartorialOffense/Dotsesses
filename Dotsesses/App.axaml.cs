@@ -179,6 +179,8 @@ public partial class App : Application
                             Log("Startup: ViolinPlotService initialized");
                             var __ = Services.GetRequiredService<CorrelationPlotService>();
                             Log("Startup: CorrelationPlotService initialized");
+                            var ___ = Services.GetRequiredService<DimensionalityReductionService>();
+                            Log("Startup: DimensionalityReductionService initialized");
                         });
 
                         await Dispatcher.UIThread.InvokeAsync(() => splashWindow.UpdateStatus("Select source file..."));
@@ -326,12 +328,16 @@ public partial class App : Application
         // Register services
         services.AddSingleton<ViolinPlotService>();
         services.AddSingleton<CorrelationPlotService>();
+        services.AddSingleton<DimensionalityReductionService>();
         services.AddSingleton<HoverDelayService>();
 
         // Register ViewModels
         services.AddTransient<MainWindowViewModel>();
         services.AddTransient<ViolinPlotViewModel>();
         services.AddTransient<CorrelationPlotViewModel>();
+        services.AddTransient<PcaPlotViewModel>();
+        services.AddTransient<UmapPlotViewModel>();
+        services.AddTransient<TsnePlotViewModel>();
 
         Log("ConfigureServices: Completed");
     }

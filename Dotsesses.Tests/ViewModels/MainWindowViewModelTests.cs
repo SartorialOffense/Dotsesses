@@ -11,7 +11,14 @@ public class MainWindowViewModelTests
     private static MainWindowViewModel CreateViewModel()
     {
         var hoverDelayService = new HoverDelayService();
-        return new MainWindowViewModel(WeakReferenceMessenger.Default, null!, null!, hoverDelayService);
+        return new MainWindowViewModel(
+            WeakReferenceMessenger.Default,
+            null!, // ViolinPlotViewModel
+            null!, // CorrelationPlotViewModel
+            null!, // PcaPlotViewModel
+            null!, // UmapPlotViewModel
+            null!, // TsnePlotViewModel
+            hoverDelayService);
     }
 
     [Fact]

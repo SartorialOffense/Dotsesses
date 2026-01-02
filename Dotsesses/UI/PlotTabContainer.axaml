@@ -28,6 +28,36 @@
                         Classes.selected="{Binding IsCorrelationSelected}">
                     <TextBlock Text="Correlation" />
                 </Button>
+
+                <!-- Separator -->
+                <Border Width="1" Height="16" Background="#333333" Margin="8,0" VerticalAlignment="Center" />
+
+                <!-- PCA Tab -->
+                <Button Command="{Binding SelectPcaCommand}"
+                        Classes="tab-button"
+                        Classes.selected="{Binding IsPcaSelected}">
+                    <TextBlock Text="PCA" />
+                </Button>
+
+                <!-- Separator -->
+                <Border Width="1" Height="16" Background="#333333" Margin="8,0" VerticalAlignment="Center" />
+
+                <!-- UMAP Tab -->
+                <Button Command="{Binding SelectUmapCommand}"
+                        Classes="tab-button"
+                        Classes.selected="{Binding IsUmapSelected}">
+                    <TextBlock Text="UMAP" />
+                </Button>
+
+                <!-- Separator -->
+                <Border Width="1" Height="16" Background="#333333" Margin="8,0" VerticalAlignment="Center" />
+
+                <!-- t-SNE Tab -->
+                <Button Command="{Binding SelectTsneCommand}"
+                        Classes="tab-button"
+                        Classes.selected="{Binding IsTsneSelected}">
+                    <TextBlock Text="t-SNE" />
+                </Button>
             </StackPanel>
         </Border>
 
@@ -40,6 +70,18 @@
             <!-- Correlation Plot -->
             <vm:CorrelationPlotControl DataContext="{Binding CorrelationPlotViewModel}"
                                        IsVisible="{Binding $parent[UserControl].((vm:PlotTabContainerViewModel)DataContext).IsCorrelationSelected}" />
+
+            <!-- PCA Plot -->
+            <vm:PcaPlotControl DataContext="{Binding PcaPlotViewModel}"
+                               IsVisible="{Binding $parent[UserControl].((vm:PlotTabContainerViewModel)DataContext).IsPcaSelected}" />
+
+            <!-- UMAP Plot -->
+            <vm:UmapPlotControl DataContext="{Binding UmapPlotViewModel}"
+                                IsVisible="{Binding $parent[UserControl].((vm:PlotTabContainerViewModel)DataContext).IsUmapSelected}" />
+
+            <!-- t-SNE Plot -->
+            <vm:TsnePlotControl DataContext="{Binding TsnePlotViewModel}"
+                                IsVisible="{Binding $parent[UserControl].((vm:PlotTabContainerViewModel)DataContext).IsTsneSelected}" />
         </Grid>
     </Grid>
 

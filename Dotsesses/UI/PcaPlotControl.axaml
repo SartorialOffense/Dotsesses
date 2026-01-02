@@ -1,0 +1,55 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Dotsesses.UI"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:Class="Dotsesses.UI.PcaPlotControl"
+             x:DataType="vm:PcaPlotViewModel"
+             Background="Transparent">
+
+    <Grid>
+        <!-- Main plot area -->
+        <Grid x:Name="PcaPlotArea" PointerMoved="OnPointerMoved" PointerPressed="OnPlotAreaClick" Background="Transparent">
+            <!-- SVG Background -->
+            <Image x:Name="SvgView" Stretch="Fill" />
+
+            <!-- Canvas for point overlays -->
+            <Canvas x:Name="PointsOverlay" Background="Transparent" />
+        </Grid>
+
+        <!-- Loading spinner -->
+        <Border x:Name="LoadingOverlay"
+                Background="#80000000"
+                IsVisible="{Binding IsLoading}"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Text="Computing PCA..."
+                           Foreground="White"
+                           FontSize="14"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Controls overlay (top-right) -->
+        <StackPanel HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Orientation="Horizontal"
+                    Spacing="4"
+                    Margin="0,4,4,0">
+
+            <!-- Copy button -->
+            <Button x:Name="CopyPcaPlotButton"
+                    Width="28" Height="28"
+                    Background="#3A3A3C"
+                    Foreground="White"
+                    BorderThickness="0"
+                    CornerRadius="4"
+                    Opacity="0.7"
+                    ToolTip.Tip="Copy to clipboard (inverted for print)">
+                <TextBlock Text="&#x1F4CB;" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>

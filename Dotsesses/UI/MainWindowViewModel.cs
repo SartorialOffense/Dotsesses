@@ -92,6 +92,15 @@ public partial class MainWindowViewModel : ViewModelBase
     private CorrelationPlotViewModel? _correlationPlotViewModel;
 
     [ObservableProperty]
+    private PcaPlotViewModel? _pcaPlotViewModel;
+
+    [ObservableProperty]
+    private UmapPlotViewModel? _umapPlotViewModel;
+
+    [ObservableProperty]
+    private TsnePlotViewModel? _tsnePlotViewModel;
+
+    [ObservableProperty]
     private PlotTabContainerViewModel? _plotTabContainerViewModel;
 
     [ObservableProperty]
@@ -127,6 +136,9 @@ public partial class MainWindowViewModel : ViewModelBase
         IMessenger messenger,
         ViolinPlotViewModel violinPlotViewModel,
         CorrelationPlotViewModel correlationPlotViewModel,
+        PcaPlotViewModel pcaPlotViewModel,
+        UmapPlotViewModel umapPlotViewModel,
+        TsnePlotViewModel tsnePlotViewModel,
         HoverDelayService hoverDelayService)
     {
         Log("MainWindowViewModel: Constructor started");
@@ -134,10 +146,18 @@ public partial class MainWindowViewModel : ViewModelBase
         _messenger = messenger;
         _violinPlotViewModel = violinPlotViewModel;
         _correlationPlotViewModel = correlationPlotViewModel;
+        _pcaPlotViewModel = pcaPlotViewModel;
+        _umapPlotViewModel = umapPlotViewModel;
+        _tsnePlotViewModel = tsnePlotViewModel;
         _hoverDelayService = hoverDelayService;
 
         // Create the tab container ViewModel
-        _plotTabContainerViewModel = new PlotTabContainerViewModel(violinPlotViewModel, correlationPlotViewModel);
+        _plotTabContainerViewModel = new PlotTabContainerViewModel(
+            violinPlotViewModel,
+            correlationPlotViewModel,
+            pcaPlotViewModel,
+            umapPlotViewModel,
+            tsnePlotViewModel);
 
         Log("MainWindowViewModel: Creating calculators");
         _cutoffCountCalculator = new CutoffCountCalculator();
@@ -362,6 +382,186 @@ public partial class MainWindowViewModel : ViewModelBase
 
             Log("MainWindowViewModel: Correlation plot initialization completed");
         });
+    }
+
+    /// <summary>
+    /// Initializes the PCA plot asynchronously after the UI is loaded.
+    /// </summary>
+    public void InitializePcaPlotAsync()
+    {
+        Log("MainWindowViewModel: Starting async PCA plot initialization");
+        Task.Run(async () =>
+        {
+            if (PcaPlotViewModel == null)
+            {
+                Log("MainWindowViewModel: PcaPlotViewModel is null, skipping");
+                return;
+            }
+
+            // Transform student assessment data into series format (excludes Total for dimensionality reduction)
+            var seriesData = new List<(string SeriesName, Dictionary<string, double> Scores)>();
+            var totalScores = new Dictionary<string, double>();
+            var firstStudent = ClassAssessment.Assessments.First();
+
+            foreach (var score in firstStudent.Scores)
+            {
+                var seriesName = score.Index.HasValue ? $"{score.Name} {score.Index}" : score.Name;
+
+                // Skip the Total column - we use it for coloring only
+                if (seriesName == "Total")
+                {
+                    foreach (var assessment in ClassAssessment.Assessments)
+                    {
+                        var studentScore = assessment.Scores.FirstOrDefault(s =>
+                            s.Name == score.Name && s.Index == score.Index);
+                        if (studentScore != null)
+                        {
+                            totalScores[$"S{assessment.Id:D3}"] = studentScore.Value;
+                        }
+                    }
+                    continue;
+                }
+
+                var seriesScores = new Dictionary<string, double>();
+                foreach (var assessment in ClassAssessment.Assessments)
+                {
+                    var studentScore = assessment.Scores.FirstOrDefault(s =>
+                        s.Name == score.Name && s.Index == score.Index);
+                    if (studentScore != null)
+                    {
+                        seriesScores[$"S{assessment.Id:D3}"] = studentScore.Value;
+                    }
+                }
+                seriesData.Add((seriesName, seriesScores));
+            }
+
+            // If no Total column found, use aggregate grade
+            if (totalScores.Count == 0)
+            {
+                foreach (var assessment in ClassAssessment.Assessments)
+                {
+                    totalScores[$"S{assessment.Id:D3}"] = assessment.AggregateGrade;
+                }
+            }
+
+            var muppetNameMap = ClassAssessment.MuppetNameMap
+                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Name);
+
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                PcaPlotViewModel.UpdateDataAndRegenerate(seriesData, totalScores, muppetNameMap, 5.0);
+            });
+
+            Log("MainWindowViewModel: PCA plot initialization completed");
+        });
+    }
+
+    /// <summary>
+    /// Initializes the UMAP plot asynchronously after the UI is loaded.
+    /// </summary>
+    public void InitializeUmapPlotAsync()
+    {
+        Log("MainWindowViewModel: Starting async UMAP plot initialization");
+        Task.Run(async () =>
+        {
+            if (UmapPlotViewModel == null)
+            {
+                Log("MainWindowViewModel: UmapPlotViewModel is null, skipping");
+                return;
+            }
+
+            var (seriesData, totalScores) = PrepareProjectionData();
+            var muppetNameMap = ClassAssessment.MuppetNameMap
+                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Name);
+
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                UmapPlotViewModel.UpdateDataAndRegenerate(seriesData, totalScores, muppetNameMap, 5.0);
+            });
+
+            Log("MainWindowViewModel: UMAP plot initialization completed");
+        });
+    }
+
+    /// <summary>
+    /// Initializes the t-SNE plot asynchronously after the UI is loaded.
+    /// </summary>
+    public void InitializeTsnePlotAsync()
+    {
+        Log("MainWindowViewModel: Starting async t-SNE plot initialization");
+        Task.Run(async () =>
+        {
+            if (TsnePlotViewModel == null)
+            {
+                Log("MainWindowViewModel: TsnePlotViewModel is null, skipping");
+                return;
+            }
+
+            var (seriesData, totalScores) = PrepareProjectionData();
+            var muppetNameMap = ClassAssessment.MuppetNameMap
+                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Name);
+
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                TsnePlotViewModel.UpdateDataAndRegenerate(seriesData, totalScores, muppetNameMap, 5.0);
+            });
+
+            Log("MainWindowViewModel: t-SNE plot initialization completed");
+        });
+    }
+
+    /// <summary>
+    /// Prepares data for projection plots (PCA, UMAP, t-SNE).
+    /// Excludes Total column and uses it for coloring.
+    /// </summary>
+    private (List<(string SeriesName, Dictionary<string, double> Scores)> seriesData, Dictionary<string, double> totalScores) PrepareProjectionData()
+    {
+        var seriesData = new List<(string SeriesName, Dictionary<string, double> Scores)>();
+        var totalScores = new Dictionary<string, double>();
+        var firstStudent = ClassAssessment.Assessments.First();
+
+        foreach (var score in firstStudent.Scores)
+        {
+            var seriesName = score.Index.HasValue ? $"{score.Name} {score.Index}" : score.Name;
+
+            // Skip the Total column - we use it for coloring only
+            if (seriesName == "Total")
+            {
+                foreach (var assessment in ClassAssessment.Assessments)
+                {
+                    var studentScore = assessment.Scores.FirstOrDefault(s =>
+                        s.Name == score.Name && s.Index == score.Index);
+                    if (studentScore != null)
+                    {
+                        totalScores[$"S{assessment.Id:D3}"] = studentScore.Value;
+                    }
+                }
+                continue;
+            }
+
+            var seriesScores = new Dictionary<string, double>();
+            foreach (var assessment in ClassAssessment.Assessments)
+            {
+                var studentScore = assessment.Scores.FirstOrDefault(s =>
+                    s.Name == score.Name && s.Index == score.Index);
+                if (studentScore != null)
+                {
+                    seriesScores[$"S{assessment.Id:D3}"] = studentScore.Value;
+                }
+            }
+            seriesData.Add((seriesName, seriesScores));
+        }
+
+        // If no Total column found, use aggregate grade
+        if (totalScores.Count == 0)
+        {
+            foreach (var assessment in ClassAssessment.Assessments)
+            {
+                totalScores[$"S{assessment.Id:D3}"] = assessment.AggregateGrade;
+            }
+        }
+
+        return (seriesData, totalScores);
     }
 
     private void InitializeDotplot()

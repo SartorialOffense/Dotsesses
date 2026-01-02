@@ -173,6 +173,15 @@ public partial class MainWindow : Window
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] MainWindow: Triggering async correlation plot initialization");
             vm.InitializeCorrelationPlotAsync();
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] MainWindow: Triggering async PCA plot initialization");
+            vm.InitializePcaPlotAsync();
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] MainWindow: Triggering async UMAP plot initialization");
+            vm.InitializeUmapPlotAsync();
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] MainWindow: Triggering async t-SNE plot initialization");
+            vm.InitializeTsnePlotAsync();
         }
         else
         {
@@ -274,6 +283,51 @@ public partial class MainWindow : Window
                 return;
             }
 
+            // Get the PcaPlotControl instance
+            var pcaPlotControl = this.FindControl<PcaPlotControl>("PcaPlotControl")
+                                 ?? this.GetVisualDescendants().OfType<PcaPlotControl>().FirstOrDefault();
+
+            if (pcaPlotControl == null)
+            {
+                var errorBox = MessageBoxManager.GetMessageBoxStandard(
+                    "Export Error",
+                    "Could not find PcaPlot control.",
+                    ButtonEnum.Ok,
+                    MsBoxIcon.Error);
+                await errorBox.ShowWindowDialogAsync(this);
+                return;
+            }
+
+            // Get the UmapPlotControl instance
+            var umapPlotControl = this.FindControl<UmapPlotControl>("UmapPlotControl")
+                                  ?? this.GetVisualDescendants().OfType<UmapPlotControl>().FirstOrDefault();
+
+            if (umapPlotControl == null)
+            {
+                var errorBox = MessageBoxManager.GetMessageBoxStandard(
+                    "Export Error",
+                    "Could not find UmapPlot control.",
+                    ButtonEnum.Ok,
+                    MsBoxIcon.Error);
+                await errorBox.ShowWindowDialogAsync(this);
+                return;
+            }
+
+            // Get the TsnePlotControl instance
+            var tsnePlotControl = this.FindControl<TsnePlotControl>("TsnePlotControl")
+                                  ?? this.GetVisualDescendants().OfType<TsnePlotControl>().FirstOrDefault();
+
+            if (tsnePlotControl == null)
+            {
+                var errorBox = MessageBoxManager.GetMessageBoxStandard(
+                    "Export Error",
+                    "Could not find TsnePlot control.",
+                    ButtonEnum.Ok,
+                    MsBoxIcon.Error);
+                await errorBox.ShowWindowDialogAsync(this);
+                return;
+            }
+
             // Get the PlotTabContainerViewModel for tab switching
             if (vm.PlotTabContainerViewModel == null)
             {
@@ -296,6 +350,9 @@ public partial class MainWindow : Window
                 DotPlotBorder,
                 violinPlotControl,
                 correlationPlotControl,
+                pcaPlotControl,
+                umapPlotControl,
+                tsnePlotControl,
                 vm.PlotTabContainerViewModel,
                 vm.ComplianceRows,
                 className);

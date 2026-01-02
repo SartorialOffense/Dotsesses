@@ -27,13 +27,17 @@ public class PowerPointExportService
     private const int MaxContentHeight = 460; // SlideHeight - ContentY - margin
 
     /// <summary>
-    /// Exports a complete presentation with DotPlot, ViolinPlot, CorrelationPlot, and grade table.
+    /// Exports a complete presentation with DotPlot, ViolinPlot, CorrelationPlot,
+    /// PCA, UMAP, t-SNE plots, and grade table.
     /// </summary>
     public async Task ExportAsync(
         string outputPath,
         Control dotPlotControl,
         Control violinPlotControl,
         Control correlationPlotControl,
+        Control pcaPlotControl,
+        Control umapPlotControl,
+        Control tsnePlotControl,
         PlotTabContainerViewModel tabViewModel,
         IEnumerable<ComplianceRowViewModel> complianceRows,
         string className = "Grade Analysis")
@@ -70,10 +74,43 @@ public class PowerPointExportService
             ClearPlaceholders(pres, 3);
             await AddPlotSlideAsync(pres, 3, $"{className} - Score Correlations", correlationPlotControl, restoreTheme: false);
 
-            // Slide 4: Grade Table (no rendering needed)
+            // Slide 4: PCA Plot - switch to PCA tab first
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                tabViewModel.SelectPcaCommand.Execute(null);
+            });
+            await Task.Delay(500); // Allow layout + Python regeneration
+
             pres.Slides.Add(1);
             ClearPlaceholders(pres, 4);
-            AddGradeTableSlide(pres, 4, $"{className} - Grade Breakdown", complianceRows);
+            await AddPlotSlideAsync(pres, 4, $"{className} - PCA Projection", pcaPlotControl, restoreTheme: false);
+
+            // Slide 5: UMAP Plot - switch to UMAP tab first
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                tabViewModel.SelectUmapCommand.Execute(null);
+            });
+            await Task.Delay(500); // Allow layout + Python regeneration
+
+            pres.Slides.Add(1);
+            ClearPlaceholders(pres, 5);
+            await AddPlotSlideAsync(pres, 5, $"{className} - UMAP Projection", umapPlotControl, restoreTheme: false);
+
+            // Slide 6: t-SNE Plot - switch to t-SNE tab first
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                tabViewModel.SelectTsneCommand.Execute(null);
+            });
+            await Task.Delay(500); // Allow layout + Python regeneration
+
+            pres.Slides.Add(1);
+            ClearPlaceholders(pres, 6);
+            await AddPlotSlideAsync(pres, 6, $"{className} - t-SNE Projection", tsnePlotControl, restoreTheme: false);
+
+            // Slide 7: Grade Table (no rendering needed)
+            pres.Slides.Add(1);
+            ClearPlaceholders(pres, 7);
+            AddGradeTableSlide(pres, 7, $"{className} - Grade Breakdown", complianceRows);
 
             // Delete existing file if it exists (ShapeCrawler doesn't overwrite cleanly)
             if (File.Exists(outputPath))
