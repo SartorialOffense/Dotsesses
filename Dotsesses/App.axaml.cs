@@ -171,12 +171,14 @@ public partial class App : Application
                                 splashWindow.UpdateStatus("Initializing Python interop..."));
                         }
 
-                        Log("Startup: Warming up ViolinPlotService");
+                        Log("Startup: Warming up plot services");
                         await Task.Run(() =>
                         {
-                            // Force ViolinPlotService to be created, which initializes Python interop
+                            // Force plot services to be created, which initializes Python interop
                             var _ = Services.GetRequiredService<ViolinPlotService>();
                             Log("Startup: ViolinPlotService initialized");
+                            var __ = Services.GetRequiredService<CorrelationPlotService>();
+                            Log("Startup: CorrelationPlotService initialized");
                         });
 
                         await Dispatcher.UIThread.InvokeAsync(() => splashWindow.UpdateStatus("Select source file..."));
@@ -323,11 +325,13 @@ public partial class App : Application
 
         // Register services
         services.AddSingleton<ViolinPlotService>();
+        services.AddSingleton<CorrelationPlotService>();
         services.AddSingleton<HoverDelayService>();
 
         // Register ViewModels
         services.AddTransient<MainWindowViewModel>();
         services.AddTransient<ViolinPlotViewModel>();
+        services.AddTransient<CorrelationPlotViewModel>();
 
         Log("ConfigureServices: Completed");
     }

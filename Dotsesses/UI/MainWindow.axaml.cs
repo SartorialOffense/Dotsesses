@@ -157,11 +157,14 @@ public partial class MainWindow : Window
         ExportPptxButton.Click += OnExportPptxButtonClick;
         CopyDotPlotButton.Click += OnCopyDotPlotClick;
 
-        // Initialize violin plot asynchronously after window is displayed
+        // Initialize plots asynchronously after window is displayed
         if (DataContext is MainWindowViewModel vm)
         {
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] MainWindow: Triggering async violin plot initialization");
             vm.InitializeViolinPlotAsync();
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] MainWindow: Triggering async correlation plot initialization");
+            vm.InitializeCorrelationPlotAsync();
         }
         else
         {

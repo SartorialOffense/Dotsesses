@@ -323,9 +323,9 @@
                               VerticalAlignment="Stretch"
                               Background="#202020"/>
 
-                <!-- Right: Violin Plot Panel -->
+                <!-- Right: Plot Tab Container (Violin + Correlation) -->
                 <Border Grid.Column="2" Background="#101010" CornerRadius="8">
-                    <local:ViolinPlotControl DataContext="{Binding ViolinPlotViewModel}" />
+                    <local:PlotTabContainer DataContext="{Binding PlotTabContainerViewModel}" />
                 </Border>
             </Grid>
         </Border>

@@ -89,6 +89,12 @@ public partial class MainWindowViewModel : ViewModelBase
     private ViolinPlotViewModel? _violinPlotViewModel;
 
     [ObservableProperty]
+    private CorrelationPlotViewModel? _correlationPlotViewModel;
+
+    [ObservableProperty]
+    private PlotTabContainerViewModel? _plotTabContainerViewModel;
+
+    [ObservableProperty]
     private bool _hasUnsavedChanges;
 
     [ObservableProperty]
@@ -117,13 +123,21 @@ public partial class MainWindowViewModel : ViewModelBase
         
     }
     
-    public MainWindowViewModel(IMessenger messenger, ViolinPlotViewModel violinPlotViewModel, HoverDelayService hoverDelayService)
+    public MainWindowViewModel(
+        IMessenger messenger,
+        ViolinPlotViewModel violinPlotViewModel,
+        CorrelationPlotViewModel correlationPlotViewModel,
+        HoverDelayService hoverDelayService)
     {
         Log("MainWindowViewModel: Constructor started");
 
         _messenger = messenger;
         _violinPlotViewModel = violinPlotViewModel;
+        _correlationPlotViewModel = correlationPlotViewModel;
         _hoverDelayService = hoverDelayService;
+
+        // Create the tab container ViewModel
+        _plotTabContainerViewModel = new PlotTabContainerViewModel(violinPlotViewModel, correlationPlotViewModel);
 
         Log("MainWindowViewModel: Creating calculators");
         _cutoffCountCalculator = new CutoffCountCalculator();
@@ -293,6 +307,60 @@ public partial class MainWindowViewModel : ViewModelBase
             });
 
             Log("MainWindowViewModel: Violin plot initialization completed");
+        });
+    }
+
+    /// <summary>
+    /// Initializes the correlation plot asynchronously after the UI is loaded.
+    /// Call this from MainWindow.Loaded event to avoid blocking startup.
+    /// </summary>
+    public void InitializeCorrelationPlotAsync()
+    {
+        Log("MainWindowViewModel: Starting async correlation plot initialization");
+        Task.Run(async () =>
+        {
+            Log("MainWindowViewModel: Calling InitializeCorrelationPlot on background thread");
+
+            if (CorrelationPlotViewModel == null)
+            {
+                Log("MainWindowViewModel: CorrelationPlotViewModel is null, skipping");
+                return;
+            }
+
+            // Transform student assessment data into correlation plot series format (CPU work)
+            var seriesData = new List<(string SeriesName, Dictionary<string, double> Scores)>();
+            var firstStudent = ClassAssessment.Assessments.First();
+
+            foreach (var score in firstStudent.Scores)
+            {
+                var seriesName = score.Index.HasValue ? $"{score.Name} {score.Index}" : score.Name;
+                var seriesScores = new Dictionary<string, double>();
+
+                foreach (var assessment in ClassAssessment.Assessments)
+                {
+                    var studentScore = assessment.Scores.FirstOrDefault(s =>
+                        s.Name == score.Name && s.Index == score.Index);
+
+                    if (studentScore != null)
+                    {
+                        seriesScores[$"S{assessment.Id:D3}"] = studentScore.Value;
+                    }
+                }
+
+                seriesData.Add((seriesName, seriesScores));
+            }
+
+            // Build muppet name map: student ID -> muppet name
+            var muppetNameMap = ClassAssessment.MuppetNameMap
+                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Name);
+
+            // Update ViewModel on UI thread
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                CorrelationPlotViewModel.UpdateDataAndRegenerate(seriesData, muppetNameMap, 3.0);
+            });
+
+            Log("MainWindowViewModel: Correlation plot initialization completed");
         });
     }
 
