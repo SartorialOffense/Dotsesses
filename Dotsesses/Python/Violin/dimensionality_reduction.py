@@ -152,9 +152,22 @@ def create_pca_plot(
 
     t_rendering = time.perf_counter()
 
+    # Convert data coordinates to display coordinates BEFORE saving
+    # This captures the actual pixel positions in the SVG
+    fig.canvas.draw()
+    display_coords = ax.transData.transform(X_pca)
+
+    # Get the figure dimensions in pixels at current DPI
+    fig_dpi = fig.dpi  # Default is 100
+    save_dpi = 300  # DPI used when saving SVG
+    dpi_scale = save_dpi / fig_dpi
+
+    # SVG viewBox dimensions are scaled by the save DPI
+    fig_height_px = fig.get_figheight() * save_dpi
+
     # Save as SVG
     svg_buffer = io.BytesIO()
-    plt.savefig(svg_buffer, format='svg', dpi=300, transparent=True)
+    plt.savefig(svg_buffer, format='svg', dpi=save_dpi, transparent=True)
     svg_buffer.seek(0)
     svg_content = svg_buffer.read().decode('utf-8')
     svg_buffer.close()
@@ -162,12 +175,13 @@ def create_pca_plot(
 
     t_svg_save = time.perf_counter()
 
-    # Build point data for C# overlay
+    # Build point data for C# overlay using display coordinates
+    # Scale coordinates from figure DPI to SVG DPI, and flip Y for SVG coordinate system
     point_data_list = []
     for i, sid in enumerate(common_ids):
         point_data_list.append({
-            'x': float(X_pca[i, 0]),
-            'y': float(X_pca[i, 1]),
+            'x': float(display_coords[i, 0] * dpi_scale),
+            'y': float(fig_height_px - display_coords[i, 1] * dpi_scale),  # Flip Y for SVG
             'id': sid,
             'total_score': totals[i],
             'color': colors[i]
@@ -283,9 +297,21 @@ def create_umap_plot(
 
     t_rendering = time.perf_counter()
 
+    # Convert data coordinates to display coordinates BEFORE saving
+    fig.canvas.draw()
+    display_coords = ax.transData.transform(X_umap)
+
+    # Get the figure dimensions in pixels at current DPI
+    fig_dpi = fig.dpi  # Default is 100
+    save_dpi = 300  # DPI used when saving SVG
+    dpi_scale = save_dpi / fig_dpi
+
+    # SVG viewBox dimensions are scaled by the save DPI
+    fig_height_px = fig.get_figheight() * save_dpi
+
     # Save as SVG
     svg_buffer = io.BytesIO()
-    plt.savefig(svg_buffer, format='svg', dpi=300, transparent=True)
+    plt.savefig(svg_buffer, format='svg', dpi=save_dpi, transparent=True)
     svg_buffer.seek(0)
     svg_content = svg_buffer.read().decode('utf-8')
     svg_buffer.close()
@@ -293,12 +319,13 @@ def create_umap_plot(
 
     t_svg_save = time.perf_counter()
 
-    # Build point data
+    # Build point data using display coordinates
+    # Scale coordinates from figure DPI to SVG DPI, and flip Y for SVG coordinate system
     point_data_list = []
     for i, sid in enumerate(common_ids):
         point_data_list.append({
-            'x': float(X_umap[i, 0]),
-            'y': float(X_umap[i, 1]),
+            'x': float(display_coords[i, 0] * dpi_scale),
+            'y': float(fig_height_px - display_coords[i, 1] * dpi_scale),  # Flip Y for SVG
             'id': sid,
             'total_score': totals[i],
             'color': colors[i]
@@ -414,9 +441,21 @@ def create_tsne_plot(
 
     t_rendering = time.perf_counter()
 
+    # Convert data coordinates to display coordinates BEFORE saving
+    fig.canvas.draw()
+    display_coords = ax.transData.transform(X_tsne)
+
+    # Get the figure dimensions in pixels at current DPI
+    fig_dpi = fig.dpi  # Default is 100
+    save_dpi = 300  # DPI used when saving SVG
+    dpi_scale = save_dpi / fig_dpi
+
+    # SVG viewBox dimensions are scaled by the save DPI
+    fig_height_px = fig.get_figheight() * save_dpi
+
     # Save as SVG
     svg_buffer = io.BytesIO()
-    plt.savefig(svg_buffer, format='svg', dpi=300, transparent=True)
+    plt.savefig(svg_buffer, format='svg', dpi=save_dpi, transparent=True)
     svg_buffer.seek(0)
     svg_content = svg_buffer.read().decode('utf-8')
     svg_buffer.close()
@@ -424,12 +463,13 @@ def create_tsne_plot(
 
     t_svg_save = time.perf_counter()
 
-    # Build point data
+    # Build point data using display coordinates
+    # Scale coordinates from figure DPI to SVG DPI, and flip Y for SVG coordinate system
     point_data_list = []
     for i, sid in enumerate(common_ids):
         point_data_list.append({
-            'x': float(X_tsne[i, 0]),
-            'y': float(X_tsne[i, 1]),
+            'x': float(display_coords[i, 0] * dpi_scale),
+            'y': float(fig_height_px - display_coords[i, 1] * dpi_scale),  # Flip Y for SVG
             'id': sid,
             'total_score': totals[i],
             'color': colors[i]
