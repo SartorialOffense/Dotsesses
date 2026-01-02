@@ -208,6 +208,47 @@ public partial class MainWindow : Window
     {
         if (DataContext is not MainWindowViewModel vm) return;
 
+        // Initialize hover delay service if needed
+        _hoverDelayService ??= App.Services?.GetService<HoverDelayService>();
+
+        // Check if a student is currently selected
+        if (vm.HoveredStudentId.HasValue)
+        {
+            var choiceBox = MessageBoxManager.GetMessageBoxCustom(new MessageBoxCustomParams
+            {
+                ContentTitle = "Student Selected",
+                ContentMessage = "A student is currently selected. What would you like to do?",
+                Icon = MsBoxIcon.Question,
+                ButtonDefinitions =
+                [
+                    new ButtonDefinition { Name = "Clear selection" },
+                    new ButtonDefinition { Name = "Keep selection", IsDefault = true },
+                    new ButtonDefinition { Name = "Cancel", IsCancel = true }
+                ],
+                WindowStartupLocation = WindowStartupLocation.CenterOwner
+            });
+
+            var choice = await choiceBox.ShowWindowDialogAsync(this);
+
+            switch (choice)
+            {
+                case "Clear selection":
+                    _hoverDelayService?.ClearHover();
+                    break;
+                case "Keep selection":
+                    break;
+                case "Cancel":
+                case null:
+                    return;
+            }
+        }
+
+        // Block hover interactions during export
+        if (_hoverDelayService != null)
+        {
+            _hoverDelayService.IsExporting = true;
+        }
+
         var storageProvider = StorageProvider;
 
         // Default to same directory as source file
@@ -238,7 +279,15 @@ public partial class MainWindow : Window
             }
         });
 
-        if (result == null) return;
+        if (result == null)
+        {
+            // Reset export flag if user cancels file picker
+            if (_hoverDelayService != null)
+            {
+                _hoverDelayService.IsExporting = false;
+            }
+            return;
+        }
 
         var outputPath = result.Path.LocalPath;
 
@@ -329,6 +378,14 @@ public partial class MainWindow : Window
                 ButtonEnum.Ok,
                 MsBoxIcon.Error);
             await errorBox.ShowWindowDialogAsync(this);
+        }
+        finally
+        {
+            // Re-enable hover interactions after export completes
+            if (_hoverDelayService != null)
+            {
+                _hoverDelayService.IsExporting = false;
+            }
         }
     }
 

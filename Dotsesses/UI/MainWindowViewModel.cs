@@ -391,10 +391,11 @@ public partial class MainWindowViewModel : ViewModelBase
         var scoreRange = maxScore - minScore;
         var xPadding = scoreRange * 0.2;
 
-        // Calculate Y-axis padding for Dot Display based on max students in a bin
+        // Calculate Y-axis range for Dot Display based on max students in a bin
+        // Use fixed buffer of 2 units on each side to handle single-student bins
         var scoreGroups = ClassAssessment.Assessments.GroupBy(a => a.AggregateGrade);
         var maxStudentsInBin = scoreGroups.Max(g => g.Count());
-        var yPadding = maxStudentsInBin * 0.1;
+        var yMax = (maxStudentsInBin - 1) * 2;
 
         // Three-part layout with positioning (0=bottom, 1=top in OxyPlot)
         // Grade Cursors: bottom 25%
@@ -451,8 +452,8 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             Position = AxisPosition.Left,
             Key = "DotY",
-            Minimum = -yPadding,
-            Maximum = (maxStudentsInBin - 1) * 2 + yPadding,
+            Minimum = -2,
+            Maximum = yMax + 2,
             AxislineStyle = LineStyle.None,
             TickStyle = TickStyle.None,
             MajorGridlineStyle = LineStyle.None,
@@ -991,34 +992,34 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         // Second pass: position grades without defined percentages (C-, D+, D, F)
-        // Place them 2 barbell heights below the previous grade
-        var gradesWithoutRanges = allGrades.Where(g => !gradesWithRanges.Contains(g)).OrderBy(g => g.Order);
+        // Start at -0.25 of score range and stack upward, with lowest grade (F) at bottom
+        var gradesWithoutRanges = allGrades.Where(g => !gradesWithRanges.Contains(g)).ToList();
 
         if (gradesWithoutRanges.Any())
         {
             // Calculate cursor spacing: 2x barbell handle size (8px * 2 = 16px) converted to score units
             const double barbellHandlePixels = 8.0;
             const double spacingPixels = barbellHandlePixels * 2;
-            var scoreRange = ClassAssessment.Assessments.Max(a => a.AggregateGrade) -
-                            ClassAssessment.Assessments.Min(a => a.AggregateGrade);
+            var minScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade);
+            var maxScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade);
+            var scoreRange = maxScore - minScore;
             // Use a reasonable default plot height estimate
             const double estimatedPlotHeight = 400.0 * 0.8; // 80% of 400px
             var cursorSpacing = (int)Math.Ceiling(spacingPixels * scoreRange / Math.Max(1, estimatedPlotHeight));
 
-            foreach (var grade in gradesWithoutRanges)
+            // Calculate base position at -0.25 of score range (below minimum score)
+            var basePosition = minScore - (scoreRange * 0.25);
+
+            // Sort grades by Order descending (F=10 first, then D=9, D+=8, C-=7, etc.)
+            // This puts lowest grade at the bottom position
+            var sortedGrades = gradesWithoutRanges.OrderByDescending(g => g.Order).ToList();
+
+            // Position each grade starting from base, stacking upward
+            for (int i = 0; i < sortedGrades.Count; i++)
             {
+                var grade = sortedGrades[i];
                 var cursor = Cursors.First(c => c.Grade.Equals(grade));
-
-                // Find the cursor immediately above this one (lower Order = higher grade)
-                var higherCursor = Cursors
-                    .Where(c => c.Grade.Order < grade.Order)
-                    .OrderByDescending(c => c.Grade.Order)
-                    .FirstOrDefault();
-
-                if (higherCursor != null)
-                {
-                    cursor.Score = higherCursor.Score - cursorSpacing;
-                }
+                cursor.Score = (int)Math.Round(basePosition + (i * cursorSpacing));
             }
         }
 

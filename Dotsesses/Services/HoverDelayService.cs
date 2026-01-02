@@ -43,6 +43,12 @@ public partial class HoverDelayService : ObservableObject
     private int? _activeHoveredStudentId;
 
     /// <summary>
+    /// Flag to block hover activation during operations like PPT export.
+    /// When true, hover candidates are ignored and no hover activation occurs.
+    /// </summary>
+    public bool IsExporting { get; set; }
+
+    /// <summary>
     /// Event fired when hover is activated (after delay and stability check).
     /// </summary>
     public event Action<int?>? OnHoverActivated;
@@ -83,6 +89,12 @@ public partial class HoverDelayService : ObservableObject
     /// </summary>
     public void ReportHoverCandidate(int? studentId, Point position)
     {
+        // Block hover during export operations
+        if (IsExporting)
+        {
+            return;
+        }
+
         // If mouse moved to blank area, cancel any pending hover
         if (studentId == null)
         {
@@ -131,6 +143,13 @@ public partial class HoverDelayService : ObservableObject
     private void OnTimerTick(object? sender, EventArgs e)
     {
         _timer?.Stop();
+
+        // Don't activate hover during export operations
+        if (IsExporting)
+        {
+            _pendingStudentId = null;
+            return;
+        }
 
         // Activate the pending hover - the velocity-based delay already ensured deliberate intent.
         // If mouse moved to a different student during the delay, a new candidate would have
