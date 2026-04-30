@@ -1,0 +1,196 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Dotsesses.UI"
+        x:Class="Dotsesses.UI.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Title="Settings"
+        Width="600" Height="500"
+        MinWidth="480" MinHeight="360"
+        WindowStartupLocation="CenterOwner"
+        CanResize="True">
+    <Grid RowDefinitions="*,Auto" Margin="20">
+
+        <!-- Tabbed settings surface (Score Selection is the first/only tab today). -->
+        <TabControl Grid.Row="0">
+            <TabItem Header="Score Selection">
+                <Grid RowDefinitions="Auto,*">
+
+                    <!-- Header row: column titles + per-column All/None bulk-toggle buttons.
+                         Column widths must match the row DataTemplate's columns below. -->
+                    <Grid Grid.Row="0"
+                          ColumnDefinitions="*,100,100,100"
+                          Margin="0,0,0,8">
+                        <TextBlock Grid.Column="0"
+                                   Text="Score"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"/>
+
+                        <StackPanel Grid.Column="1"
+                                    Orientation="Vertical"
+                                    HorizontalAlignment="Center">
+                            <TextBlock Text="Display"
+                                       FontWeight="SemiBold"
+                                       HorizontalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal"
+                                        Spacing="4"
+                                        HorizontalAlignment="Center"
+                                        Margin="0,4,0,0">
+                                <Button Content="All"
+                                        Command="{Binding DisplayAllCommand}"
+                                        Padding="6,2"
+                                        FontSize="10"/>
+                                <Button Content="None"
+                                        Command="{Binding DisplayNoneCommand}"
+                                        Padding="6,2"
+                                        FontSize="10"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2"
+                                    Orientation="Vertical"
+                                    HorizontalAlignment="Center">
+                            <TextBlock Text="Aggregate"
+                                       FontWeight="SemiBold"
+                                       HorizontalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal"
+                                        Spacing="4"
+                                        HorizontalAlignment="Center"
+                                        Margin="0,4,0,0">
+                                <Button Content="All"
+                                        Command="{Binding AggregateAllCommand}"
+                                        Padding="6,2"
+                                        FontSize="10"/>
+                                <!-- AggregateNoneCommand is permanently disabled (canExecute:false)
+                                     because clearing every Aggregate row is structurally invalid. -->
+                                <Button Content="None"
+                                        Command="{Binding AggregateNoneCommand}"
+                                        Padding="6,2"
+                                        FontSize="10"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="3"
+                                    Orientation="Vertical"
+                                    HorizontalAlignment="Center">
+                            <TextBlock Text="Correlation"
+                                       FontWeight="SemiBold"
+                                       HorizontalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal"
+                                        Spacing="4"
+                                        HorizontalAlignment="Center"
+                                        Margin="0,4,0,0">
+                                <Button Content="All"
+                                        Command="{Binding CorrelationAllCommand}"
+                                        Padding="6,2"
+                                        FontSize="10"/>
+                                <Button Content="None"
+                                        Command="{Binding CorrelationNoneCommand}"
+                                        Padding="6,2"
+                                        FontSize="10"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Data rows. Per-row checkboxes bind into the row VM directly;
+                         the Aggregate column disables itself for locked (Total) rows
+                         via the IsAggregateLocked-> negated binding. -->
+                    <ScrollViewer Grid.Row="1">
+                        <ItemsControl ItemsSource="{Binding Rows}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ScoreSelectionRowViewModel">
+                                    <Grid ColumnDefinitions="*,100,100,100"
+                                          Margin="0,2">
+                                        <TextBlock Grid.Column="0"
+                                                   Text="{Binding DisplayName}"
+                                                   VerticalAlignment="Center"/>
+                                        <CheckBox Grid.Column="1"
+                                                  IsChecked="{Binding Display}"
+                                                  HorizontalAlignment="Center"/>
+                                        <CheckBox Grid.Column="2"
+                                                  IsChecked="{Binding Aggregate}"
+                                                  IsEnabled="{Binding !IsAggregateLocked}"
+                                                  HorizontalAlignment="Center"/>
+                                        <CheckBox Grid.Column="3"
+                                                  IsChecked="{Binding Correlation}"
+                                                  HorizontalAlignment="Center"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <!-- Apply / Cancel / Close button row. Mirrors CommentEditorWindow's button styling. -->
+        <StackPanel Grid.Row="1"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Spacing="10"
+                    Margin="0,15,0,0">
+            <Button Content="Apply"
+                    Click="OnApplyClick"
+                    Width="100"
+                    Height="32"
+                    Background="#0A84FF"
+                    Foreground="White"
+                    BorderThickness="0"
+                    CornerRadius="6"
+                    FontWeight="SemiBold"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
+                    Cursor="Hand">
+                <Button.Styles>
+                    <Style Selector="Button:pointerover">
+                        <Setter Property="Background" Value="#409CFF"/>
+                    </Style>
+                    <Style Selector="Button:pressed">
+                        <Setter Property="Background" Value="#006FDB"/>
+                    </Style>
+                </Button.Styles>
+            </Button>
+            <Button Content="Cancel"
+                    Click="OnCancelClick"
+                    Width="100"
+                    Height="32"
+                    Background="#3A3A3C"
+                    Foreground="White"
+                    BorderThickness="0"
+                    CornerRadius="6"
+                    FontWeight="SemiBold"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
+                    Cursor="Hand">
+                <Button.Styles>
+                    <Style Selector="Button:pointerover">
+                        <Setter Property="Background" Value="#48484A"/>
+                    </Style>
+                    <Style Selector="Button:pressed">
+                        <Setter Property="Background" Value="#2C2C2E"/>
+                    </Style>
+                </Button.Styles>
+            </Button>
+            <Button Content="Close"
+                    Click="OnCloseClick"
+                    Width="100"
+                    Height="32"
+                    Background="#3A3A3C"
+                    Foreground="White"
+                    BorderThickness="0"
+                    CornerRadius="6"
+                    FontWeight="SemiBold"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
+                    Cursor="Hand">
+                <Button.Styles>
+                    <Style Selector="Button:pointerover">
+                        <Setter Property="Background" Value="#48484A"/>
+                    </Style>
+                    <Style Selector="Button:pressed">
+                        <Setter Property="Background" Value="#2C2C2E"/>
+                    </Style>
+                </Button.Styles>
+            </Button>
+        </StackPanel>
+    </Grid>
+</Window>

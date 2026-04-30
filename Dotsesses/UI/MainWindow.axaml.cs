@@ -42,6 +42,7 @@ public partial class MainWindow : Window
         Loaded += OnWindowLoaded;
         Closing += OnWindowClosing;
         PointerMoved += OnGlobalPointerMoved;
+        KeyDown += OnGlobalKeyDown;
 
         // Subscribe to edit student messages
         WeakReferenceMessenger.Default.Register<EditStudentMessage>(this, async (r, m) =>
@@ -665,6 +666,27 @@ public partial class MainWindow : Window
         Canvas.SetTop(tooltipBorder, screenY - 10);
 
         DotPlotHoverOverlay.Children.Add(tooltipBorder);
+    }
+
+    /// <summary>
+    /// Cmd+, (macOS) opens the Settings dialog. S02 stub: the commit callback
+    /// just writes to Debug.WriteLine — the real recompute pipeline lands in S04.
+    /// Wires through MainWindow code-behind because the dialog needs the parent
+    /// Window reference for ShowDialog, and the VM cannot reach it.
+    /// </summary>
+    private async void OnGlobalKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.OemComma && (e.KeyModifiers & KeyModifiers.Meta) != 0)
+        {
+            var current = (DataContext as MainWindowViewModel)?.ClassAssessment?.ScoreSelections
+                ?? Array.Empty<ScoreSelection>();
+            Action<IReadOnlyList<ScoreSelection>> stub = list =>
+                Debug.WriteLine($"[S02 stub] SettingsViewModel applied {list.Count} selections");
+            var settingsVm = new SettingsViewModel(current, stub);
+            var dlg = new SettingsWindow(settingsVm);
+            await dlg.ShowDialog(this);
+            e.Handled = true;
+        }
     }
 
     private async Task HandleEditStudentRequest(EditStudentMessage message)
