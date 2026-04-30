@@ -30,28 +30,29 @@ public class StudentAssessment
         IReadOnlyCollection<Score> scores,
         IReadOnlyCollection<StudentAttribute> attributes,
         string muppetName,
-        string aggregateScoreName = "Total")
+        IReadOnlyCollection<(string Name, int? Index)>? aggregateSelection = null)
     {
         ArgumentNullException.ThrowIfNull(scores);
         ArgumentNullException.ThrowIfNull(attributes);
         ArgumentNullException.ThrowIfNull(muppetName);
-        ArgumentNullException.ThrowIfNull(aggregateScoreName);
 
         Id = id;
         Scores = scores.ToList();
         Attributes = attributes.ToList();
         MuppetName = muppetName;
 
-        // Look up aggregate grade by name (default "Total")
-        RecalculateAggregate(aggregateScoreName);
+        RecalculateAggregate(aggregateSelection);
     }
 
     /// <summary>
-    /// Recalculates the aggregate grade from scores.
+    /// Recalculates the aggregate grade by summing scores whose (Name, Index) is in the selection set.
+    /// A null selection falls back to <c>[("Total", null)]</c> for back-compat.
+    /// Sum-then-truncate ordering preserves the v1 single-score behavior on the typical case.
     /// </summary>
-    public void RecalculateAggregate(string aggregateScoreName = "Total")
+    public void RecalculateAggregate(IReadOnlyCollection<(string Name, int? Index)>? aggregateSelection = null)
     {
-        var aggregateScore = Scores.FirstOrDefault(s => s.Name == aggregateScoreName);
-        _aggregateGrade = aggregateScore != null ? (int)aggregateScore.Value : 0;
+        var selection = aggregateSelection ?? new[] { ("Total", (int?)null) };
+        var keys = selection.ToHashSet();
+        _aggregateGrade = (int)Scores.Where(s => keys.Contains((s.Name, s.Index))).Sum(s => s.Value);
     }
 }

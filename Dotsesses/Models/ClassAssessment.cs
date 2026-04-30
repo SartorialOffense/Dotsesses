@@ -12,6 +12,7 @@ public class ClassAssessment
     public Dictionary<string, IReadOnlyCollection<GradeCutoff>> SavedCutoffs { get; }
     public Dictionary<int, MuppetNameInfo> MuppetNameMap { get; }
     public Dictionary<string, string> SeriesColorMap { get; }
+    public IReadOnlyList<ScoreSelection> ScoreSelections { get; set; } = Array.Empty<ScoreSelection>();
 
     public ClassAssessment(
         IReadOnlyCollection<StudentAssessment> assessments,
