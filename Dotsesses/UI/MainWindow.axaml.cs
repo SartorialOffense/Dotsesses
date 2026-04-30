@@ -669,20 +669,22 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Cmd+, (macOS) opens the Settings dialog. S02 stub: the commit callback
-    /// just writes to Debug.WriteLine — the real recompute pipeline lands in S04.
-    /// Wires through MainWindow code-behind because the dialog needs the parent
-    /// Window reference for ShowDialog, and the VM cannot reach it.
+    /// Cmd+, (macOS) opens the Settings dialog. The Apply commit callback dispatches
+    /// to <see cref="MainWindowViewModel.ApplyScoreSelections"/> which mutates
+    /// ClassAssessment.ScoreSelections, recomputes per-student aggregates, refreshes
+    /// the dotplot/violin/correlation, and rebuilds the drill-down card. Wires through
+    /// MainWindow code-behind because the dialog needs the parent Window reference for
+    /// ShowDialog, and the VM cannot reach it.
     /// </summary>
     private async void OnGlobalKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.OemComma && (e.KeyModifiers & KeyModifiers.Meta) != 0)
         {
-            var current = (DataContext as MainWindowViewModel)?.ClassAssessment?.ScoreSelections
-                ?? Array.Empty<ScoreSelection>();
-            Action<IReadOnlyList<ScoreSelection>> stub = list =>
-                Debug.WriteLine($"[S02 stub] SettingsViewModel applied {list.Count} selections");
-            var settingsVm = new SettingsViewModel(current, stub);
+            var vm = DataContext as MainWindowViewModel;
+            if (vm == null) return;
+            var current = vm.ClassAssessment?.ScoreSelections ?? Array.Empty<ScoreSelection>();
+            Action<IReadOnlyList<ScoreSelection>> commit = list => vm.ApplyScoreSelections(list);
+            var settingsVm = new SettingsViewModel(current, commit);
             var dlg = new SettingsWindow(settingsVm);
             await dlg.ShowDialog(this);
             e.Handled = true;

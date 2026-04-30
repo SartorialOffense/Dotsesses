@@ -272,6 +272,29 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Compute the filtered score list shown in the drill-down panel for one student.
+    /// Honors <see cref="ClassAssessment.ScoreSelections"/>'s Display flag using the same
+    /// (Name, Index?) tuple HashSet pattern as <see cref="BuildSeriesData"/>. When the
+    /// selection list is empty (not yet seeded), passes through the full score list
+    /// unchanged so behavior matches pre-S04.
+    /// </summary>
+    private List<Score> BuildDisplayScores(StudentAssessment student)
+    {
+        ArgumentNullException.ThrowIfNull(student);
+        if (ClassAssessment.ScoreSelections.Count == 0)
+        {
+            return student.Scores.ToList();
+        }
+        var displaySet = ClassAssessment.ScoreSelections
+            .Where(s => s.Display)
+            .Select(s => (s.Name, s.Index))
+            .ToHashSet();
+        return student.Scores
+            .Where(s => displaySet.Contains((s.Name, s.Index)))
+            .ToList();
+    }
+
+    /// <summary>
     /// Build the (SeriesName, Scores) seriesData payload shared by the violin and correlation plot
     /// initializers, filtered by a <see cref="ScoreSelection"/> predicate (typically <c>s =&gt; s.Display</c>
     /// or <c>s =&gt; s.Correlation</c>). Public + static so it can be unit-tested without spinning up the
@@ -1495,7 +1518,7 @@ public partial class MainWindowViewModel : ViewModelBase
             if (student != null)
             {
                 var grade = GetGradeForStudent(student);
-                HoveredStudent = new StudentCardViewModel(student, grade, ClassAssessment.SeriesColorMap, () => _hoverDelayService.ClearHover());
+                HoveredStudent = new StudentCardViewModel(student, grade, ClassAssessment.SeriesColorMap, () => _hoverDelayService.ClearHover(), BuildDisplayScores(student));
             }
             else
             {

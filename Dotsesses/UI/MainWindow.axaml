@@ -175,7 +175,7 @@
                                                             <!-- Single merged table: Scores first, then Attributes -->
                                                             <StackPanel Grid.Row="1">
                                                                 <!-- Scores with per-score comments -->
-                                                                <ItemsControl ItemsSource="{Binding Assessment.Scores}">
+                                                                <ItemsControl ItemsSource="{Binding DisplayScores}">
                                                                     <ItemsControl.ItemTemplate>
                                                                         <DataTemplate x:DataType="models:Score">
                                                                             <StackPanel Margin="0,2,0,6">

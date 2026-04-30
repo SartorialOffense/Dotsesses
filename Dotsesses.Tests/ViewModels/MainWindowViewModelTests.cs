@@ -445,4 +445,32 @@ public class MainWindowViewModelTests
         // Assert
         Assert.Empty(result);
     }
+
+    [Fact]
+    public void OnHoveredStudentIdChanged_FilteredScores_PassedToCard()
+    {
+        // Arrange — flip Display=false on the first score in the seeded selections so
+        // BuildDisplayScores excludes it from the drill-down card.
+        var vm = CreateViewModel();
+        var firstStudent = vm.ClassAssessment.Assessments.First();
+        Assert.True(firstStudent.Scores.Count >= 2, "Fixture must have ≥2 scores for this test.");
+
+        var excluded = firstStudent.Scores[0];
+        var newSelections = vm.ClassAssessment.ScoreSelections
+            .Select(s => (s.Name == excluded.Name && s.Index == excluded.Index)
+                ? s with { Display = false }
+                : s)
+            .ToList();
+        vm.ClassAssessment.ScoreSelections = newSelections;
+
+        // Act — assigning HoveredStudentId triggers OnHoveredStudentIdChanged which
+        // must construct a StudentCardViewModel with the filtered DisplayScores.
+        vm.HoveredStudentId = firstStudent.Id;
+
+        // Assert
+        Assert.NotNull(vm.HoveredStudent);
+        Assert.Equal(firstStudent.Scores.Count - 1, vm.HoveredStudent!.DisplayScores.Count);
+        Assert.DoesNotContain(vm.HoveredStudent.DisplayScores,
+            s => s.Name == excluded.Name && s.Index == excluded.Index);
+    }
 }

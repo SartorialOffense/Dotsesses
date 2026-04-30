@@ -31,14 +31,26 @@ public partial class StudentCardViewModel : ObservableObject, IDisposable
     /// </summary>
     public Dictionary<string, string> SeriesColorMap { get; }
 
-    public StudentCardViewModel(StudentAssessment assessment, string assignedGrade, Dictionary<string, string> seriesColorMap, Action? clearAction = null)
+    /// <summary>
+    /// The score list shown in the drill-down score table. May be a filtered subset
+    /// of <c>Assessment.Scores</c> (S04: respects Display selections from the Settings
+    /// dialog). When the constructor receives a null filter, defaults to the full
+    /// score list for backward-compat. Note: PropertyChanged subscriptions cover the
+    /// full <c>Assessment.Scores</c> list so hidden-but-still-comment-editable scores
+    /// continue to fire StudentEditedMessage.
+    /// </summary>
+    public IReadOnlyList<Score> DisplayScores { get; }
+
+    public StudentCardViewModel(StudentAssessment assessment, string assignedGrade, Dictionary<string, string> seriesColorMap, Action? clearAction = null, IReadOnlyList<Score>? displayScores = null)
     {
         _assessment = assessment;
         _assignedGrade = assignedGrade;
         SeriesColorMap = seriesColorMap;
         _clearAction = clearAction;
+        DisplayScores = displayScores ?? assessment.Scores;
 
-        // Subscribe to comment changes on all scores
+        // Subscribe to comment changes on ALL scores (not just DisplayScores) — hidden
+        // scores must still trigger StudentEditedMessage when their comment is edited.
         foreach (var score in assessment.Scores)
         {
             score.PropertyChanged += OnScorePropertyChanged;
