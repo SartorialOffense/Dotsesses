@@ -73,7 +73,7 @@ public class StateServiceTests : IDisposable
 
         // Assert
         Assert.NotNull(loadedState);
-        Assert.Equal(1, loadedState.Version);
+        Assert.Equal(2, loadedState.Version);
         Assert.Equal("original_source.xlsx", loadedState.SourceFile);
         Assert.Equal(2, loadedState.Students.Count);
         Assert.Equal(2, loadedState.Cursors.Count);
@@ -202,6 +202,71 @@ public class StateServiceTests : IDisposable
 
         // Act & Assert
         await Assert.ThrowsAsync<JsonException>(() => _stateService.LoadAsync(filePath));
+    }
+
+    [Fact]
+    public async Task SaveAsync_WritesVersion2()
+    {
+        var filePath = Path.Combine(_testDirectory, "v2_check.json");
+        await _stateService.SaveAsync(filePath, CreateTestStudents(), CreateTestCursors(), Array.Empty<ScoreSelection>());
+        var json = await File.ReadAllTextAsync(filePath);
+        Assert.Contains("\"version\": 2", json);
+    }
+
+    [Fact]
+    public async Task RoundTrip_PreservesScoreSelections()
+    {
+        var filePath = Path.Combine(_testDirectory, "selection_roundtrip.json");
+        var originalSelections = CreateTestScoreSelections();
+        await _stateService.SaveAsync(filePath, CreateTestStudents(), CreateTestCursors(), originalSelections);
+        var loadedState = await _stateService.LoadAsync(filePath);
+        var converted = _stateService.ConvertToScoreSelections(loadedState);
+        Assert.Equal(originalSelections.Count, converted.Count);
+        for (int i = 0; i < originalSelections.Count; i++)
+        {
+            Assert.Equal(originalSelections[i].Name,        converted[i].Name);
+            Assert.Equal(originalSelections[i].Index,       converted[i].Index);
+            Assert.Equal(originalSelections[i].Display,     converted[i].Display);
+            Assert.Equal(originalSelections[i].Aggregate,   converted[i].Aggregate);
+            Assert.Equal(originalSelections[i].Correlation, converted[i].Correlation);
+        }
+    }
+
+    [Fact]
+    public async Task LoadAsync_V1ExampleFile_ReturnsEmptyScoreSelections()
+    {
+        var examplePath = ResolveRepoFile(Path.Combine("Dotsesses", "example", "IP exam scores 2025.dots"));
+        Assert.True(File.Exists(examplePath), $"Expected example file at {examplePath}");
+        var state = await _stateService.LoadAsync(examplePath);
+        Assert.NotNull(state);
+        Assert.Equal(1, state.Version);
+        Assert.NotNull(state.ScoreSelections);
+        Assert.Empty(state.ScoreSelections);
+        Assert.NotEmpty(state.Students);
+    }
+
+    private static string ResolveRepoFile(string relativePath)
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "Dotsesses.sln")))
+        {
+            dir = dir.Parent;
+        }
+        if (dir == null)
+        {
+            throw new InvalidOperationException("Could not locate Dotsesses.sln walking up from " + AppContext.BaseDirectory);
+        }
+        return Path.Combine(dir.FullName, relativePath);
+    }
+
+    private static List<ScoreSelection> CreateTestScoreSelections()
+    {
+        return new List<ScoreSelection>
+        {
+            new ScoreSelection("Total", null, Display: true,  Aggregate: false, Correlation: true),
+            new ScoreSelection("Q",     1,    Display: true,  Aggregate: true,  Correlation: true),
+            new ScoreSelection("Q",     2,    Display: false, Aggregate: true,  Correlation: false)
+        };
     }
 
     private List<StudentAssessment> CreateTestStudents()
