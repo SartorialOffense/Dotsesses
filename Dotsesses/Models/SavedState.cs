@@ -7,11 +7,12 @@ namespace Dotsesses.Models;
 /// </summary>
 public class SavedState
 {
-    public int Version { get; set; } = 1;
+    public int Version { get; set; } = 2;
     public DateTime SavedAt { get; set; }
     public string? SourceFile { get; set; }
     public List<SavedStudent> Students { get; set; } = new();
     public List<SavedCursor> Cursors { get; set; } = new();
+    public List<SavedScoreSelection> ScoreSelections { get; set; } = new();
 }
 
 /// <summary>
@@ -54,4 +55,16 @@ public class SavedCursor
     public string Grade { get; set; } = string.Empty;
     public int Score { get; set; }
     public bool Enabled { get; set; } = true;
+}
+
+/// <summary>
+/// Persistence DTO mirror of <see cref="ScoreSelection"/>.
+/// </summary>
+public class SavedScoreSelection
+{
+    public string Name { get; set; } = string.Empty;
+    public int? Index { get; set; }
+    public bool Display { get; set; }
+    public bool Aggregate { get; set; }
+    public bool Correlation { get; set; }
 }
