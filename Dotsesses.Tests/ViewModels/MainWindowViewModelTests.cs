@@ -10,8 +10,22 @@ public class MainWindowViewModelTests
 {
     private static MainWindowViewModel CreateViewModel()
     {
-        var hoverDelayService = new HoverDelayService();
-        return new MainWindowViewModel(WeakReferenceMessenger.Default, null!, null!, hoverDelayService);
+        return MainWindowViewModel.CreateForTesting(
+            ResolveRepoFile(Path.Combine("Dotsesses", "example", "IP exam scores 2025.xlsx")));
+    }
+
+    private static string ResolveRepoFile(string relativePath)
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "Dotsesses.sln")))
+        {
+            dir = dir.Parent;
+        }
+        if (dir == null)
+        {
+            throw new InvalidOperationException("Could not locate Dotsesses.sln walking up from " + AppContext.BaseDirectory);
+        }
+        return Path.Combine(dir.FullName, relativePath);
     }
 
     [Fact]

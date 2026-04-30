@@ -173,6 +173,24 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Test factory: constructs a MainWindowViewModel with null plot view-models and immediately loads
+    /// the supplied Excel fixture so ClassAssessment is non-null. The violin/correlation init paths
+    /// guard against null plot VMs, so this yields a working unit-test target without requiring the
+    /// full Avalonia/OxyPlot UI graph. Production callers must use the parameterized constructor.
+    /// </summary>
+    /// <param name="excelFilePath">Absolute path to an .xlsx fixture (e.g. example/IP exam scores 2025.xlsx).</param>
+    public static MainWindowViewModel CreateForTesting(string excelFilePath)
+    {
+        var vm = new MainWindowViewModel(
+            WeakReferenceMessenger.Default,
+            null!,
+            null!,
+            new HoverDelayService());
+        vm.LoadFromExcelFile(excelFilePath);
+        return vm;
+    }
+
+    /// <summary>
     /// Loads student data from an Excel file and initializes all UI components.
     /// </summary>
     /// <param name="excelFilePath">Path to the Excel file containing scores</param>
