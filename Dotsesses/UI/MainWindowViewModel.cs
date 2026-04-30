@@ -181,13 +181,25 @@ public partial class MainWindowViewModel : ViewModelBase
     /// <param name="excelFilePath">Absolute path to an .xlsx fixture (e.g. example/IP exam scores 2025.xlsx).</param>
     public static MainWindowViewModel CreateForTesting(string excelFilePath)
     {
-        var vm = new MainWindowViewModel(
+        var vm = CreateForTesting();
+        vm.LoadFromExcelFile(excelFilePath);
+        return vm;
+    }
+
+    /// <summary>
+    /// Test factory overload that builds a fresh, unloaded VM. The caller is responsible for
+    /// invoking <see cref="LoadFromExcelFile"/> or the LoadStateAsync command. Useful for tests
+    /// that need to load a v1/.dots file directly on a clean VM without first loading xlsx
+    /// (loading twice would double-add cursors and compliance rows because neither path clears
+    /// those collections — that is a separate pre-existing bug).
+    /// </summary>
+    public static MainWindowViewModel CreateForTesting()
+    {
+        return new MainWindowViewModel(
             WeakReferenceMessenger.Default,
             null!,
             null!,
             new HoverDelayService());
-        vm.LoadFromExcelFile(excelFilePath);
-        return vm;
     }
 
     /// <summary>
@@ -233,6 +245,8 @@ public partial class MainWindowViewModel : ViewModelBase
             muppetNameMap,
             seriesColorMap
         );
+
+        SeedDefaultSelectionsIfEmpty();
 
         _gradeAssigner = new GradeAssigner(initialCutoffs);
 
@@ -1321,6 +1335,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 muppetMap,
                 seriesColorMap);
 
+            SeedDefaultSelectionsIfEmpty();
+
             _currentSourceFile = state.SourceFile;
             CurrentSaveFilePath = filePath;
 
@@ -1359,6 +1375,77 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             Log($"Error loading state: {ex.Message}");
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Builds the (Name, Index?) aggregate-set tuple list from a selection list.
+    /// Only entries with <see cref="ScoreSelection.Aggregate"/> == true contribute.
+    /// </summary>
+    private static List<(string Name, int? Index)> BuildAggregateSet(IReadOnlyList<ScoreSelection> selections)
+        => selections.Where(s => s.Aggregate).Select(s => (s.Name, s.Index)).ToList();
+
+    /// <summary>
+    /// If <see cref="ClassAssessment.ScoreSelections"/> is empty (fresh .xlsx load or v1 .dots load
+    /// that pre-dates the selections feature), populate it via
+    /// <see cref="ScoreSelectionDefaults.GenerateDefaults"/> and recompute every student's
+    /// aggregate cache against the new selection set. Closes R012's open half.
+    /// </summary>
+    private void SeedDefaultSelectionsIfEmpty()
+    {
+        if (ClassAssessment == null) return;
+        if (ClassAssessment.ScoreSelections.Count > 0) return;
+        if (!ClassAssessment.Assessments.Any()) return;
+
+        var firstStudent = ClassAssessment.Assessments.First();
+        ClassAssessment.ScoreSelections = ScoreSelectionDefaults.GenerateDefaults(firstStudent.Scores);
+
+        var aggregateSet = BuildAggregateSet(ClassAssessment.ScoreSelections);
+        foreach (var assessment in ClassAssessment.Assessments)
+        {
+            assessment.RecalculateAggregate(aggregateSet);
+        }
+    }
+
+    /// <summary>
+    /// Orchestrates a recompute of all selection-derived state in response to the user
+    /// pressing Apply in the Settings dialog. Mutates <see cref="ClassAssessment.ScoreSelections"/>,
+    /// recalculates per-student aggregate caches, refreshes grade counts and dotplot points,
+    /// kicks off async violin/correlation regen (filtered by selection in T03), sets
+    /// <see cref="HasUnsavedChanges"/>, and rebuilds the drill-down card if a student is hovered.
+    /// </summary>
+    public void ApplyScoreSelections(IReadOnlyList<ScoreSelection> newSelections)
+    {
+        ArgumentNullException.ThrowIfNull(newSelections);
+
+        Log($"MainWindowViewModel: ApplyScoreSelections — {newSelections.Count} selections");
+
+        ClassAssessment.ScoreSelections = newSelections;
+
+        var aggregateSet = BuildAggregateSet(newSelections);
+        foreach (var assessment in ClassAssessment.Assessments)
+        {
+            assessment.RecalculateAggregate(aggregateSet);
+        }
+
+        RecalculateGradeCounts();
+        UpdateDotplotPoints();
+
+        // Fire-and-forget: violin/correlation regen runs on a background task internally
+        // (T03 will make these methods filter their seriesData by Display/Correlation).
+        InitializeViolinPlotAsync();
+        InitializeCorrelationPlotAsync();
+
+        HasUnsavedChanges = true;
+
+        // Rebuild the drill-down card so it reflects the new Display filter (T04 will wire
+        // StudentCardViewModel.DisplayScores to honor the filter; the rebuild path is a no-op
+        // today but is necessary so the hovered card refreshes when ScoreSelections change).
+        if (HoveredStudent != null)
+        {
+            var hoveredId = HoveredStudentId;
+            OnHoveredStudentIdChanged(null);
+            OnHoveredStudentIdChanged(hoveredId);
         }
     }
 
