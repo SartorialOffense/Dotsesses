@@ -1246,6 +1246,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 filePath,
                 ClassAssessment.Assessments,
                 Cursors,
+                ClassAssessment.ScoreSelections,
                 _currentSourceFile);
 
             CurrentSaveFilePath = filePath;

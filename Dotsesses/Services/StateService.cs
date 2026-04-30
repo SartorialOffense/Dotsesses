@@ -31,11 +31,12 @@ public class StateService
         string filePath,
         IEnumerable<StudentAssessment> students,
         IEnumerable<CursorViewModel> cursors,
+        IEnumerable<ScoreSelection> selections,
         string? sourceFile = null)
     {
         var state = new SavedState
         {
-            Version = 1,
+            Version = 2,
             SavedAt = DateTime.UtcNow,
             SourceFile = sourceFile,
             Students = students.Select(s => new SavedStudent
@@ -61,6 +62,14 @@ public class StateService
                 Grade = c.Grade.DisplayName,
                 Score = c.Score,
                 Enabled = c.IsEnabled
+            }).ToList(),
+            ScoreSelections = selections.Select(s => new SavedScoreSelection
+            {
+                Name = s.Name,
+                Index = s.Index,
+                Display = s.Display,
+                Aggregate = s.Aggregate,
+                Correlation = s.Correlation
             }).ToList()
         };
 
@@ -115,6 +124,16 @@ public class StateService
         }
 
         return (students, muppetMap);
+    }
+
+    /// <summary>
+    /// Converts saved score selections back to domain models.
+    /// </summary>
+    public IReadOnlyList<ScoreSelection> ConvertToScoreSelections(SavedState state)
+    {
+        return state.ScoreSelections
+            .Select(s => new ScoreSelection(s.Name, s.Index, s.Display, s.Aggregate, s.Correlation))
+            .ToList();
     }
 
     /// <summary>

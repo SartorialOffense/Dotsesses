@@ -34,7 +34,7 @@ public class StateServiceTests : IDisposable
         var cursors = CreateTestCursors();
 
         // Act
-        await _stateService.SaveAsync(filePath, students, cursors, "test_source.xlsx");
+        await _stateService.SaveAsync(filePath, students, cursors, Array.Empty<ScoreSelection>(), "test_source.xlsx");
 
         // Assert
         Assert.True(File.Exists(filePath));
@@ -53,7 +53,7 @@ public class StateServiceTests : IDisposable
         var cursors = CreateTestCursors();
 
         // Act
-        await _stateService.SaveAsync(filePath, students, cursors);
+        await _stateService.SaveAsync(filePath, students, cursors, Array.Empty<ScoreSelection>());
 
         // Assert
         Assert.Equal(_testDirectory, _stateService.LastUsedDirectory);
@@ -66,7 +66,7 @@ public class StateServiceTests : IDisposable
         var filePath = Path.Combine(_testDirectory, "test_state.json");
         var students = CreateTestStudents();
         var cursors = CreateTestCursors();
-        await _stateService.SaveAsync(filePath, students, cursors, "original_source.xlsx");
+        await _stateService.SaveAsync(filePath, students, cursors, Array.Empty<ScoreSelection>(), "original_source.xlsx");
 
         // Act
         var loadedState = await _stateService.LoadAsync(filePath);
@@ -86,7 +86,7 @@ public class StateServiceTests : IDisposable
         var filePath = Path.Combine(_testDirectory, "test_state.json");
         var students = CreateTestStudents();
         var cursors = CreateTestCursors();
-        await _stateService.SaveAsync(filePath, students, cursors);
+        await _stateService.SaveAsync(filePath, students, cursors, Array.Empty<ScoreSelection>());
         _stateService.LastUsedDirectory = null; // Reset
 
         // Act
@@ -106,7 +106,7 @@ public class StateServiceTests : IDisposable
         var cursors = CreateTestCursors();
 
         // Act - Save then load
-        await _stateService.SaveAsync(filePath, originalStudents, cursors);
+        await _stateService.SaveAsync(filePath, originalStudents, cursors, Array.Empty<ScoreSelection>());
         var loadedState = await _stateService.LoadAsync(filePath);
         var (students, muppetMap) = _stateService.ConvertToStudents(loadedState);
 
@@ -129,7 +129,7 @@ public class StateServiceTests : IDisposable
         cursors[1].IsEnabled = false;
 
         // Act - Save then load
-        await _stateService.SaveAsync(filePath, students, cursors);
+        await _stateService.SaveAsync(filePath, students, cursors, Array.Empty<ScoreSelection>());
         var loadedState = await _stateService.LoadAsync(filePath);
 
         // Assert
