@@ -312,4 +312,137 @@ public class MainWindowViewModelTests
         Assert.Null(ex);
         Assert.All(vm.ClassAssessment.Assessments, st => Assert.Equal(0, st.AggregateGrade));
     }
+
+    // -------------------------------------------------------------------
+    // T03 — BuildSeriesData helper (filter violin/correlation seriesData by selection)
+    // -------------------------------------------------------------------
+
+    private static string DisplayName(Score score) =>
+        score.Index.HasValue ? $"{score.Name} {score.Index}" : score.Name;
+
+    [Fact]
+    public void BuildSeriesData_FiltersByDisplaySelector()
+    {
+        // Arrange — fixture-loaded VM has ScoreSelections seeded by T02 with all Display=true.
+        var vm = CreateViewModel();
+        var firstStudentScores = vm.ClassAssessment.Assessments.First().Scores.ToList();
+        var excluded = firstStudentScores.First();
+        var excludedDisplayName = DisplayName(excluded);
+
+        // Flip Display=false for exactly one score; leave the rest at Display=true.
+        var newSelections = vm.ClassAssessment.ScoreSelections
+            .Select(s => (s.Name == excluded.Name && s.Index == excluded.Index)
+                ? s with { Display = false }
+                : s)
+            .ToList();
+        vm.ClassAssessment.ScoreSelections = newSelections;
+
+        // Act
+        var result = MainWindowViewModel.BuildSeriesData(vm.ClassAssessment, s => s.Display);
+
+        // Assert — the excluded series is gone; every other score is still present.
+        Assert.DoesNotContain(result, t => t.SeriesName == excludedDisplayName);
+        foreach (var score in firstStudentScores.Where(s => !(s.Name == excluded.Name && s.Index == excluded.Index)))
+        {
+            Assert.Contains(result, t => t.SeriesName == DisplayName(score));
+        }
+    }
+
+    [Fact]
+    public void BuildSeriesData_FiltersByCorrelationSelector()
+    {
+        // Arrange — exclude a different score via Correlation=false to confirm the helper is selector-agnostic.
+        var vm = CreateViewModel();
+        var firstStudentScores = vm.ClassAssessment.Assessments.First().Scores.ToList();
+        var excluded = firstStudentScores.Last();
+        var excludedDisplayName = DisplayName(excluded);
+
+        var newSelections = vm.ClassAssessment.ScoreSelections
+            .Select(s => (s.Name == excluded.Name && s.Index == excluded.Index)
+                ? s with { Correlation = false }
+                : s)
+            .ToList();
+        vm.ClassAssessment.ScoreSelections = newSelections;
+
+        // Act
+        var result = MainWindowViewModel.BuildSeriesData(vm.ClassAssessment, s => s.Correlation);
+
+        // Assert
+        Assert.DoesNotContain(result, t => t.SeriesName == excludedDisplayName);
+        foreach (var score in firstStudentScores.Where(s => !(s.Name == excluded.Name && s.Index == excluded.Index)))
+        {
+            Assert.Contains(result, t => t.SeriesName == DisplayName(score));
+        }
+    }
+
+    [Fact]
+    public void BuildSeriesData_EmptySelectionsList_ReturnsAllScores()
+    {
+        // Arrange — defensive fallback: when no selections exist, every score on the first student is included.
+        var vm = CreateViewModel();
+        vm.ClassAssessment.ScoreSelections = Array.Empty<ScoreSelection>();
+        var firstStudentScores = vm.ClassAssessment.Assessments.First().Scores.ToList();
+
+        // Act
+        var result = MainWindowViewModel.BuildSeriesData(vm.ClassAssessment, s => s.Display);
+
+        // Assert — every score appears exactly once.
+        Assert.Equal(firstStudentScores.Count, result.Count);
+        foreach (var score in firstStudentScores)
+        {
+            Assert.Contains(result, t => t.SeriesName == DisplayName(score));
+        }
+    }
+
+    [Fact]
+    public void BuildSeriesData_PreservesScoreValuesForIncludedScores()
+    {
+        // Arrange — exclude one score and pick a different one to spot-check value preservation.
+        var vm = CreateViewModel();
+        var firstStudentScores = vm.ClassAssessment.Assessments.First().Scores.ToList();
+        Assert.True(firstStudentScores.Count >= 2, "Fixture must have at least 2 scores for this test.");
+
+        var excluded = firstStudentScores[0];
+        var sampled = firstStudentScores[1];
+
+        var newSelections = vm.ClassAssessment.ScoreSelections
+            .Select(s => (s.Name == excluded.Name && s.Index == excluded.Index)
+                ? s with { Display = false }
+                : s)
+            .ToList();
+        vm.ClassAssessment.ScoreSelections = newSelections;
+
+        // Act
+        var result = MainWindowViewModel.BuildSeriesData(vm.ClassAssessment, s => s.Display);
+
+        // Assert — every (assessment, sampled-score) pair is present and the value is verbatim.
+        var sampledTuple = result.Single(t => t.SeriesName == DisplayName(sampled));
+        foreach (var assessment in vm.ClassAssessment.Assessments)
+        {
+            var expected = assessment.Scores.FirstOrDefault(s => s.Name == sampled.Name && s.Index == sampled.Index);
+            if (expected != null)
+            {
+                var key = $"S{assessment.Id:D3}";
+                Assert.True(sampledTuple.Scores.ContainsKey(key), $"Missing student key {key} for {sampled.Name}");
+                Assert.Equal(expected.Value, sampledTuple.Scores[key]);
+            }
+        }
+    }
+
+    [Fact]
+    public void BuildSeriesData_AllScoresExcluded_ReturnsEmptyList()
+    {
+        // Arrange — every selection has Display=false, so the predicate matches nothing.
+        var vm = CreateViewModel();
+        var newSelections = vm.ClassAssessment.ScoreSelections
+            .Select(s => s with { Display = false })
+            .ToList();
+        vm.ClassAssessment.ScoreSelections = newSelections;
+
+        // Act
+        var result = MainWindowViewModel.BuildSeriesData(vm.ClassAssessment, s => s.Display);
+
+        // Assert
+        Assert.Empty(result);
+    }
 }

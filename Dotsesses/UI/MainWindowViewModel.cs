@@ -272,6 +272,51 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Build the (SeriesName, Scores) seriesData payload shared by the violin and correlation plot
+    /// initializers, filtered by a <see cref="ScoreSelection"/> predicate (typically <c>s =&gt; s.Display</c>
+    /// or <c>s =&gt; s.Correlation</c>). Public + static so it can be unit-tested without spinning up the
+    /// async background thread that wraps it. Defensive empty-selection-set fallback: if
+    /// <see cref="ClassAssessment.ScoreSelections"/> is empty, every score on the first student passes
+    /// through unchanged — this preserves pre-S04 behavior on datasets that have not been seeded.
+    /// </summary>
+    public static List<(string SeriesName, Dictionary<string, double> Scores)> BuildSeriesData(
+        ClassAssessment classAssessment,
+        Func<ScoreSelection, bool> selector)
+    {
+        ArgumentNullException.ThrowIfNull(classAssessment);
+        ArgumentNullException.ThrowIfNull(selector);
+
+        var hasSelections = classAssessment.ScoreSelections.Count > 0;
+        var keySet = classAssessment.ScoreSelections
+            .Where(selector)
+            .Select(s => (s.Name, s.Index))
+            .ToHashSet();
+
+        var result = new List<(string SeriesName, Dictionary<string, double> Scores)>();
+        var firstStudent = classAssessment.Assessments.First();
+
+        foreach (var score in firstStudent.Scores)
+        {
+            // Defensive empty-selection-set fallback: if no selections exist, pass through unchanged.
+            if (hasSelections && !keySet.Contains((score.Name, score.Index))) continue;
+
+            var seriesName = score.Index.HasValue ? $"{score.Name} {score.Index}" : score.Name;
+            var seriesScores = new Dictionary<string, double>();
+            foreach (var assessment in classAssessment.Assessments)
+            {
+                var studentScore = assessment.Scores.FirstOrDefault(s =>
+                    s.Name == score.Name && s.Index == score.Index);
+                if (studentScore != null)
+                {
+                    seriesScores[$"S{assessment.Id:D3}"] = studentScore.Value;
+                }
+            }
+            result.Add((seriesName, seriesScores));
+        }
+        return result;
+    }
+
+    /// <summary>
     /// Initializes the violin plot asynchronously after the UI is loaded.
     /// Call this from MainWindow.Loaded event to avoid blocking startup.
     /// </summary>
@@ -290,28 +335,9 @@ public partial class MainWindowViewModel : ViewModelBase
                 return;
             }
 
-            // Transform student assessment data into violin plot series format (CPU work, can be on background thread)
-            var seriesData = new List<(string SeriesName, Dictionary<string, double> Scores)>();
-            var firstStudent = ClassAssessment.Assessments.First();
-
-            foreach (var score in firstStudent.Scores)
-            {
-                var seriesName = score.Index.HasValue ? $"{score.Name} {score.Index}" : score.Name;
-                var seriesScores = new Dictionary<string, double>();
-
-                foreach (var assessment in ClassAssessment.Assessments)
-                {
-                    var studentScore = assessment.Scores.FirstOrDefault(s =>
-                        s.Name == score.Name && s.Index == score.Index);
-
-                    if (studentScore != null)
-                    {
-                        seriesScores[$"S{assessment.Id:D3}"] = studentScore.Value;
-                    }
-                }
-
-                seriesData.Add((seriesName, seriesScores));
-            }
+            // Transform student assessment data into violin plot series format (CPU work, can be on background thread).
+            // Filter by Display selection so toggling a Display checkbox in Settings hides the series after Apply.
+            var seriesData = BuildSeriesData(ClassAssessment, s => s.Display);
 
             // Build comment map: (student ID, series name) -> score comment
             var commentMap = new Dictionary<(int StudentId, string SeriesName), string>();
@@ -359,28 +385,9 @@ public partial class MainWindowViewModel : ViewModelBase
                 return;
             }
 
-            // Transform student assessment data into correlation plot series format (CPU work)
-            var seriesData = new List<(string SeriesName, Dictionary<string, double> Scores)>();
-            var firstStudent = ClassAssessment.Assessments.First();
-
-            foreach (var score in firstStudent.Scores)
-            {
-                var seriesName = score.Index.HasValue ? $"{score.Name} {score.Index}" : score.Name;
-                var seriesScores = new Dictionary<string, double>();
-
-                foreach (var assessment in ClassAssessment.Assessments)
-                {
-                    var studentScore = assessment.Scores.FirstOrDefault(s =>
-                        s.Name == score.Name && s.Index == score.Index);
-
-                    if (studentScore != null)
-                    {
-                        seriesScores[$"S{assessment.Id:D3}"] = studentScore.Value;
-                    }
-                }
-
-                seriesData.Add((seriesName, seriesScores));
-            }
+            // Transform student assessment data into correlation plot series format (CPU work).
+            // Filter by Correlation selection so toggling a Correlation checkbox hides the row/column after Apply.
+            var seriesData = BuildSeriesData(ClassAssessment, s => s.Correlation);
 
             // Build muppet name map: student ID -> muppet name
             var muppetNameMap = ClassAssessment.MuppetNameMap
