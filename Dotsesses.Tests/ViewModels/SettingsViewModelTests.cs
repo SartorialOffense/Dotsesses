@@ -1,0 +1,268 @@
+namespace Dotsesses.Tests.ViewModels;
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Dotsesses.Models;
+using Dotsesses.UI;
+
+public class SettingsViewModelTests
+{
+    private static IReadOnlyList<ScoreSelection> MakeInput()
+    {
+        // Three non-locked rows + one locked Total row. Two Aggregates start enabled
+        // so the last-Aggregate guard does not fire on the first programmatic clear.
+        return new List<ScoreSelection>
+        {
+            new("Q#", 1, Display: true,  Aggregate: true,  Correlation: true),
+            new("Q#", 2, Display: true,  Aggregate: true,  Correlation: false),
+            new("Mid", null, Display: false, Aggregate: false, Correlation: true),
+            new("Total", null, Display: true, Aggregate: false, Correlation: false),
+        };
+    }
+
+    private static (SettingsViewModel vm, List<IReadOnlyList<ScoreSelection>> captures)
+        MakeVm(IReadOnlyList<ScoreSelection>? input = null)
+    {
+        var captures = new List<IReadOnlyList<ScoreSelection>>();
+        Action<IReadOnlyList<ScoreSelection>> cb = list => captures.Add(list);
+        var vm = new SettingsViewModel(input ?? MakeInput(), cb);
+        return (vm, captures);
+    }
+
+    [Fact]
+    public void Constructor_PopulatesRows_OneToOneWithInput()
+    {
+        // Arrange
+        var input = MakeInput();
+
+        // Act
+        var (vm, _) = MakeVm(input);
+
+        // Assert
+        Assert.Equal(input.Count, vm.Rows.Count);
+    }
+
+    [Fact]
+    public void Constructor_PreservesInputOrder()
+    {
+        // Arrange
+        var input = MakeInput();
+
+        // Act
+        var (vm, _) = MakeVm(input);
+
+        // Assert
+        for (int i = 0; i < input.Count; i++)
+        {
+            Assert.Equal(input[i].Name, vm.Rows[i].Name);
+            Assert.Equal(input[i].Index, vm.Rows[i].Index);
+        }
+    }
+
+    [Fact]
+    public void Constructor_DoesNotMutateInputList()
+    {
+        // Arrange — records are immutable, so capture references and verify they remain.
+        var input = MakeInput();
+        var snapshotRefs = input.ToArray();
+
+        // Act
+        _ = MakeVm(input);
+
+        // Assert — same references in the same positions, same field values.
+        for (int i = 0; i < input.Count; i++)
+        {
+            Assert.Same(snapshotRefs[i], input[i]);
+            Assert.Equal(snapshotRefs[i], input[i]);
+        }
+    }
+
+    [Fact]
+    public void ApplyCommand_InvokesCallback_WithCurrentDraftAsList()
+    {
+        // Arrange
+        var (vm, captures) = MakeVm();
+
+        // Act
+        vm.ApplyCommand.Execute(null);
+
+        // Assert
+        Assert.Single(captures);
+        Assert.NotNull(captures[0]);
+        Assert.Equal(vm.Rows.Count, captures[0].Count);
+    }
+
+    [Fact]
+    public void ApplyCommand_RowOrderPreserved()
+    {
+        // Arrange
+        var input = MakeInput();
+        var (vm, captures) = MakeVm(input);
+
+        // Act
+        vm.ApplyCommand.Execute(null);
+
+        // Assert
+        var captured = captures.Single();
+        for (int i = 0; i < input.Count; i++)
+        {
+            Assert.Equal(input[i].Name, captured[i].Name);
+            Assert.Equal(input[i].Index, captured[i].Index);
+        }
+    }
+
+    [Fact]
+    public void ApplyCommand_ReflectsToggles()
+    {
+        // Arrange
+        var (vm, captures) = MakeVm();
+        var firstRow = vm.Rows[0];
+        var originalDisplay = firstRow.Display;
+
+        // Act — flip Display on the first row, then commit.
+        firstRow.Display = !originalDisplay;
+        vm.ApplyCommand.Execute(null);
+
+        // Assert — the captured snapshot reflects the toggle.
+        var captured = captures.Single();
+        Assert.Equal(!originalDisplay, captured[0].Display);
+    }
+
+    [Fact]
+    public void CancelCommand_DoesNotInvokeCallback()
+    {
+        // Arrange
+        var (vm, captures) = MakeVm();
+
+        // Act
+        vm.CancelCommand.Execute(null);
+
+        // Assert
+        Assert.Empty(captures);
+    }
+
+    [Fact]
+    public void CloseCommand_DoesNotInvokeCallback()
+    {
+        // Arrange
+        var (vm, captures) = MakeVm();
+
+        // Act
+        vm.CloseCommand.Execute(null);
+
+        // Assert
+        Assert.Empty(captures);
+    }
+
+    [Fact]
+    public void DisplayAllCommand_SetsAllRowsTrue()
+    {
+        // Arrange
+        var (vm, _) = MakeVm();
+
+        // Act
+        vm.DisplayAllCommand.Execute(null);
+
+        // Assert
+        Assert.All(vm.Rows, r => Assert.True(r.Display));
+    }
+
+    [Fact]
+    public void DisplayNoneCommand_SetsAllRowsFalse()
+    {
+        // Arrange
+        var (vm, _) = MakeVm();
+
+        // Act
+        vm.DisplayNoneCommand.Execute(null);
+
+        // Assert
+        Assert.All(vm.Rows, r => Assert.False(r.Display));
+    }
+
+    [Fact]
+    public void CorrelationAllCommand_SetsAllRowsTrue()
+    {
+        // Arrange
+        var (vm, _) = MakeVm();
+
+        // Act
+        vm.CorrelationAllCommand.Execute(null);
+
+        // Assert
+        Assert.All(vm.Rows, r => Assert.True(r.Correlation));
+    }
+
+    [Fact]
+    public void CorrelationNoneCommand_SetsAllRowsFalse()
+    {
+        // Arrange
+        var (vm, _) = MakeVm();
+
+        // Act
+        vm.CorrelationNoneCommand.Execute(null);
+
+        // Assert
+        Assert.All(vm.Rows, r => Assert.False(r.Correlation));
+    }
+
+    [Fact]
+    public void AggregateAllCommand_SkipsLockedTotalRow()
+    {
+        // Arrange
+        var (vm, _) = MakeVm();
+
+        // Act
+        vm.AggregateAllCommand.Execute(null);
+
+        // Assert — every non-locked row is now true; the locked Total row stays false.
+        foreach (var row in vm.Rows)
+        {
+            if (row.IsAggregateLocked)
+            {
+                Assert.False(row.Aggregate);
+            }
+            else
+            {
+                Assert.True(row.Aggregate);
+            }
+        }
+    }
+
+    [Fact]
+    public void AggregateNoneCommand_AlwaysDisabled()
+    {
+        // Arrange
+        var (vm, _) = MakeVm();
+
+        // Act / Assert
+        Assert.False(vm.AggregateNoneCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void LastAggregateGuard_ProgrammaticallyClearAllInSequence_FinalCannotBeCleared()
+    {
+        // Arrange — a 3-row input where all three start with Aggregate=true so we can
+        // walk the clear sequence and observe the last-Aggregate guard fire.
+        var input = new List<ScoreSelection>
+        {
+            new("A", null, Display: true, Aggregate: true, Correlation: false),
+            new("B", null, Display: true, Aggregate: true, Correlation: false),
+            new("C", null, Display: true, Aggregate: true, Correlation: false),
+        };
+        var (vm, _) = MakeVm(input);
+
+        // Act / Assert — clearing the first two succeeds, the third is rejected by G1.
+        vm.Rows[0].Aggregate = false;
+        Assert.False(vm.Rows[0].Aggregate);
+
+        vm.Rows[1].Aggregate = false;
+        Assert.False(vm.Rows[1].Aggregate);
+
+        // Now only Rows[2] is true; the cross-row guard returns false and the
+        // setter must reject the clear.
+        vm.Rows[2].Aggregate = false;
+        Assert.True(vm.Rows[2].Aggregate);
+    }
+}
