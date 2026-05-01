@@ -358,4 +358,12 @@ public partial class App : Application
             await _mainWindow.TriggerSave();
         }
     }
+
+    private async void OnSettingsClicked(object? sender, EventArgs e)
+    {
+        if (_mainWindow != null)
+        {
+            await _mainWindow.TriggerOpenSettings();
+        }
+    }
 }

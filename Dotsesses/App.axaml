@@ -23,6 +23,11 @@
                     <NativeMenuItem Header="Save..." Click="OnSaveClicked" Gesture="Cmd+S"/>
                 </NativeMenu>
             </NativeMenuItem>
+            <NativeMenuItem Header="Settings">
+                <NativeMenu>
+                    <NativeMenuItem Header="Score Selection…" Click="OnSettingsClicked" Gesture="Cmd+,"/>
+                </NativeMenu>
+            </NativeMenuItem>
         </NativeMenu>
     </NativeMenu.Menu>
 

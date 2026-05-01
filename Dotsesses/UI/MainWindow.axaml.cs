@@ -160,10 +160,11 @@ public partial class MainWindow : Window
         // (OxyPlot captures events, so we need handledEventsToo=true)
         DotPlotView.AddHandler(PointerMovedEvent, OnDotPlotPointerMoved, Avalonia.Interactivity.RoutingStrategies.Tunnel | Avalonia.Interactivity.RoutingStrategies.Bubble, handledEventsToo: true);
 
-        // Wire up Save, Export, and Copy button click handlers
+        // Wire up Save, Export, Settings, and Copy button click handlers
         SaveButton.Click += OnSaveButtonClick;
         ExportButton.Click += OnExportButtonClick;
         ExportPptxButton.Click += OnExportPptxButtonClick;
+        SettingsButton.Click += OnSettingsButtonClick;
         CopyDotPlotButton.Click += OnCopyDotPlotClick;
 
         // Initialize plots asynchronously after window is displayed
@@ -184,6 +185,11 @@ public partial class MainWindow : Window
     private async void OnSaveButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         await SaveWithDialog();
+    }
+
+    private async void OnSettingsButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        await OpenSettingsDialogAsync();
     }
 
     private async void OnExportButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -669,27 +675,41 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Cmd+, (macOS) opens the Settings dialog. The Apply commit callback dispatches
-    /// to <see cref="MainWindowViewModel.ApplyScoreSelections"/> which mutates
-    /// ClassAssessment.ScoreSelections, recomputes per-student aggregates, refreshes
-    /// the dotplot/violin/correlation, and rebuilds the drill-down card. Wires through
-    /// MainWindow code-behind because the dialog needs the parent Window reference for
-    /// ShowDialog, and the VM cannot reach it.
+    /// Cmd+, (macOS) opens the Settings dialog. Delegates to <see cref="OpenSettingsDialogAsync"/>
+    /// so the keybinding, the toolbar Settings button, and the native menu item all share one path.
     /// </summary>
     private async void OnGlobalKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.OemComma && (e.KeyModifiers & KeyModifiers.Meta) != 0)
         {
-            var vm = DataContext as MainWindowViewModel;
-            if (vm == null) return;
-            var current = vm.ClassAssessment?.ScoreSelections ?? Array.Empty<ScoreSelection>();
-            Action<IReadOnlyList<ScoreSelection>> commit = list => vm.ApplyScoreSelections(list);
-            var settingsVm = new SettingsViewModel(current, commit);
-            var dlg = new SettingsWindow(settingsVm);
-            await dlg.ShowDialog(this);
+            await OpenSettingsDialogAsync();
             e.Handled = true;
         }
     }
+
+    /// <summary>
+    /// Opens the Settings dialog. The Apply commit callback dispatches to
+    /// <see cref="MainWindowViewModel.ApplyScoreSelections"/> which mutates
+    /// ClassAssessment.ScoreSelections, recomputes per-student aggregates, refreshes
+    /// the dotplot/violin/correlation, and rebuilds the drill-down card. Wires through
+    /// MainWindow code-behind because the dialog needs the parent Window reference for
+    /// ShowDialog, and the VM cannot reach it.
+    /// </summary>
+    private async Task OpenSettingsDialogAsync()
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+        var current = vm.ClassAssessment?.ScoreSelections ?? Array.Empty<ScoreSelection>();
+        Action<IReadOnlyList<ScoreSelection>> commit = list => vm.ApplyScoreSelections(list);
+        var settingsVm = new SettingsViewModel(current, commit);
+        var dlg = new SettingsWindow(settingsVm);
+        await dlg.ShowDialog(this);
+    }
+
+    /// <summary>
+    /// Public entry point invoked by the native menu item ("Settings → Score Selection…")
+    /// in App.axaml. Mirrors <see cref="TriggerSave"/>.
+    /// </summary>
+    public Task TriggerOpenSettings() => OpenSettingsDialogAsync();
 
     private async Task HandleEditStudentRequest(EditStudentMessage message)
     {

@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "savedAt": "2026-01-02T16:26:59.010582Z",
+  "version": 2,
+  "savedAt": "2026-05-01T01:50:20.808169Z",
   "sourceFile": "/Users/trumbjd/Dev/Dotsesses/Dotsesses/example/IP exam scores 2025.xlsx",
   "students": [
     {
@@ -1218,23 +1218,79 @@
     },
     {
       "grade": "C-",
-      "score": 152,
+      "score": 111,
       "enabled": true
     },
     {
       "grade": "D\u002B",
-      "score": 145,
+      "score": 104,
       "enabled": true
     },
     {
       "grade": "D",
-      "score": 138,
+      "score": 97,
       "enabled": true
     },
     {
       "grade": "F",
-      "score": 131,
+      "score": 90,
       "enabled": true
+    }
+  ],
+  "scoreSelections": [
+    {
+      "name": "MC",
+      "display": false,
+      "aggregate": true,
+      "correlation": true
+    },
+    {
+      "name": "Q1ab",
+      "display": true,
+      "aggregate": true,
+      "correlation": true
+    },
+    {
+      "name": "Q1c-e",
+      "display": true,
+      "aggregate": false,
+      "correlation": true
+    },
+    {
+      "name": "Q2a-c",
+      "display": true,
+      "aggregate": true,
+      "correlation": false
+    },
+    {
+      "name": "Q2-TM",
+      "display": true,
+      "aggregate": true,
+      "correlation": true
+    },
+    {
+      "name": "Q2-box",
+      "display": true,
+      "aggregate": true,
+      "correlation": true
+    },
+    {
+      "name": "Short",
+      "display": true,
+      "aggregate": true,
+      "correlation": true
+    },
+    {
+      "name": "Class",
+      "display": true,
+      "aggregate": true,
+      "correlation": true
+    },
+    {
+      "name": "Total",
+      "display": true,
+      "aggregate": false,
+      "correlation": true
     }
   ]
 }

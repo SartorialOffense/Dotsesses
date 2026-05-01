@@ -119,6 +119,16 @@
                                         BorderBrush="#3F3F46"
                                         CornerRadius="4"
                                         ToolTip.Tip="Export presentation with plots"/>
+                                <Button x:Name="SettingsButton"
+                                        Content="⚙ Settings"
+                                        FontSize="12"
+                                        Padding="12,3"
+                                        Background="#2D2D30"
+                                        Foreground="White"
+                                        BorderThickness="1"
+                                        BorderBrush="#3F3F46"
+                                        CornerRadius="4"
+                                        ToolTip.Tip="Configure score selections (Cmd+,)"/>
                             </StackPanel>
                         </Border>
 
