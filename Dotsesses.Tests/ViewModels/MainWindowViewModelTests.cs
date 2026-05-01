@@ -300,6 +300,91 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
+    public void ApplyScoreSelections_RebuildsDotplotPointsForNewAggregates()
+    {
+        // Regression test for the M001 S04 UAT Step 2 failure: toggling Aggregate off for
+        // a non-Total score recomputed AggregateGrade (visible in the details panel) but the
+        // dotplot didn't visually update. Verify that DotplotModel.Series points reflect the
+        // new AggregateGrade values after ApplyScoreSelections.
+        var vm = CreateViewModel();
+
+        // Snapshot dot x-coordinates before the change.
+        var seriesBefore = vm.DotplotModel.Series.OfType<OxyPlot.Series.ScatterSeries>().ToList();
+        var pointsBefore = seriesBefore.SelectMany(s => s.Points).Select(p => p.X).OrderBy(x => x).ToList();
+
+        // Build a selection set that excludes one non-Total score from Aggregate.
+        var firstStudent = vm.ClassAssessment.Assessments.First();
+        var nonTotalScore = firstStudent.Scores.First(s => !string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase) && s.Value > 0);
+        var modified = vm.ClassAssessment.ScoreSelections
+            .Select(s =>
+                s.Name == nonTotalScore.Name && s.Index == nonTotalScore.Index
+                    ? s with { Aggregate = false }
+                    : s)
+            .ToList();
+
+        // Act
+        vm.ApplyScoreSelections(modified);
+
+        // Assert — the per-student aggregate values reflected in the dotplot have changed.
+        var seriesAfter = vm.DotplotModel.Series.OfType<OxyPlot.Series.ScatterSeries>().ToList();
+        var pointsAfter = seriesAfter.SelectMany(s => s.Points).Select(p => p.X).OrderBy(x => x).ToList();
+
+        Assert.NotEqual(pointsBefore, pointsAfter);
+
+        // And the new x-positions match the actual AggregateGrade values of the students.
+        var aggregateValues = vm.ClassAssessment.Assessments.Select(a => (double)a.AggregateGrade).OrderBy(x => x).ToList();
+        var plottedX = pointsAfter.OrderBy(x => x).ToList();
+        Assert.Equal(aggregateValues, plottedX);
+    }
+
+    [Fact]
+    public async Task SaveStateAsync_LoadStateAsync_RestoresScoreSelections()
+    {
+        // Arrange — load fixture, mutate selections via ApplyScoreSelections, save, then load
+        // into a fresh VM and assert the selections survived the round trip. Regression test
+        // for the M001 S04 UAT Step 4 failure: LoadStateAsync was constructing a fresh
+        // ClassAssessment with empty ScoreSelections and immediately seeding defaults, dropping
+        // the persisted selections on the floor.
+        var vm = CreateViewModel();
+        var firstScore = vm.ClassAssessment.Assessments.First().Scores.First();
+        var firstScoreName = firstScore.Name;
+        var firstScoreIndex = firstScore.Index;
+
+        var modified = vm.ClassAssessment.ScoreSelections
+            .Select(s =>
+                s.Name == firstScoreName && s.Index == firstScoreIndex
+                    ? s with { Display = false, Correlation = false }
+                    : s)
+            .ToList();
+        vm.ApplyScoreSelections(modified);
+
+        var tempPath = Path.Combine(Path.GetTempPath(), $"dotsesses-roundtrip-{Guid.NewGuid():N}.dots");
+        try
+        {
+            await vm.SaveStateCommand.ExecuteAsync(tempPath);
+
+            var loaded = MainWindowViewModel.CreateForTesting();
+            await loaded.LoadStateCommand.ExecuteAsync(tempPath);
+
+            // Assert — the modified score's Display/Correlation are still false after reload.
+            var restored = loaded.ClassAssessment.ScoreSelections
+                .First(s => s.Name == firstScoreName && s.Index == firstScoreIndex);
+            Assert.False(restored.Display);
+            Assert.False(restored.Correlation);
+
+            // Other rows still default-on (specifically, second score should still be Display=true).
+            var secondScore = loaded.ClassAssessment.Assessments.First().Scores.Skip(1).First();
+            var secondRestored = loaded.ClassAssessment.ScoreSelections
+                .First(s => s.Name == secondScore.Name && s.Index == secondScore.Index);
+            Assert.True(secondRestored.Display);
+        }
+        finally
+        {
+            if (File.Exists(tempPath)) File.Delete(tempPath);
+        }
+    }
+
+    [Fact]
     public void ApplyScoreSelections_WithEmptySelections_DoesNotCrash()
     {
         // Arrange

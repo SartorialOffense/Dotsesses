@@ -1365,6 +1365,22 @@ public partial class MainWindowViewModel : ViewModelBase
                 muppetMap,
                 seriesColorMap);
 
+            // Restore saved score selections from v2 .dots files. v1 files (and brand-new v2
+            // files written before the selection feature shipped) deserialize as empty
+            // ScoreSelections, which falls through to SeedDefaultSelectionsIfEmpty below.
+            var savedSelections = _stateService.ConvertToScoreSelections(state);
+            if (savedSelections.Count > 0)
+            {
+                ClassAssessment.ScoreSelections = savedSelections;
+                // Recompute per-student aggregates against the loaded selection set so the
+                // dotplot/cursor pipeline below sees the correct AggregateGrade values.
+                var aggregateSet = BuildAggregateSet(savedSelections);
+                foreach (var assessment in ClassAssessment.Assessments)
+                {
+                    assessment.RecalculateAggregate(aggregateSet);
+                }
+            }
+
             SeedDefaultSelectionsIfEmpty();
 
             _currentSourceFile = state.SourceFile;
@@ -1448,7 +1464,11 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         ArgumentNullException.ThrowIfNull(newSelections);
 
-        Log($"MainWindowViewModel: ApplyScoreSelections — {newSelections.Count} selections");
+        var aggregateBefore = ClassAssessment.Assessments.FirstOrDefault()?.AggregateGrade ?? 0;
+
+        Log($"MainWindowViewModel: ApplyScoreSelections — {newSelections.Count} selections " +
+            $"(Display={newSelections.Count(s => s.Display)}, Aggregate={newSelections.Count(s => s.Aggregate)}, " +
+            $"Correlation={newSelections.Count(s => s.Correlation)}); first-student aggregate before={aggregateBefore}");
 
         ClassAssessment.ScoreSelections = newSelections;
 
@@ -1458,8 +1478,19 @@ public partial class MainWindowViewModel : ViewModelBase
             assessment.RecalculateAggregate(aggregateSet);
         }
 
+        var aggregateAfter = ClassAssessment.Assessments.FirstOrDefault()?.AggregateGrade ?? 0;
+        Log($"MainWindowViewModel: ApplyScoreSelections — first-student aggregate after={aggregateAfter} " +
+            $"(changed={aggregateBefore != aggregateAfter})");
+
         RecalculateGradeCounts();
         UpdateDotplotPoints();
+
+        // OxyPlot's PlotView does not auto-refresh when the model is mutated; InvalidatePlot
+        // alone is unreliable for compiled-binding scenarios. Force the view to re-bind by
+        // raising PropertyChanged on the bound model property — the [ObservableProperty]
+        // setter shortcut works because Avalonia treats a same-reference reassignment as a
+        // change notification when OnPropertyChanged is invoked explicitly.
+        OnPropertyChanged(nameof(DotplotModel));
 
         // Fire-and-forget: violin/correlation regen runs on a background task internally
         // (T03 will make these methods filter their seriesData by Display/Correlation).
