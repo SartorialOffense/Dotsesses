@@ -27,11 +27,13 @@ public partial class SettingsWindow : Window
 
     private void OnApplyClick(object? sender, RoutedEventArgs e)
     {
+        // Per R009: Apply commits the draft and runs the recompute pipeline but the
+        // dialog stays open so the user can iterate on toggles. Cancel and Close
+        // dismiss the dialog; Apply does not.
         if (DataContext is SettingsViewModel vm)
         {
             vm.ApplyCommand.Execute(null);
         }
-        Close();
     }
 
     private void OnCancelClick(object? sender, RoutedEventArgs e)
