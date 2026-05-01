@@ -125,4 +125,93 @@ public class StudentAssessmentTests
 
         Assert.Equal(0, sa.AggregateGrade);
     }
+
+    [Fact]
+    public void RecalculateAggregate_MirrorsAggregateIntoTotalScoreValue_WhenTotalNotSelected()
+    {
+        // Spreadsheet may carry a static "Total" column whose value is independent of the
+        // user-selected aggregate set. When the user toggles components on/off Aggregate,
+        // the Total Score's Value must follow the new sum so consumers (violin "Total"
+        // series, drill-down "Total" row) reflect the aggregate.
+        var scores = new List<Score>
+        {
+            new("Q", 1, 10.0),
+            new("Q", 2, 20.0),
+            new("Q", 3, 5.0),
+            new("Total", null, 50.0)  // stale spreadsheet value (intentionally wrong)
+        };
+        var sa = new StudentAssessment(1, scores, NoAttributes(), "Kermit");
+
+        // Aggregate set excludes Total (the realistic case after defaults seeding).
+        sa.RecalculateAggregate(new[] { ("Q", (int?)1), ("Q", (int?)2), ("Q", (int?)3) });
+
+        // AggregateGrade is the truncated sum.
+        Assert.Equal(35, sa.AggregateGrade);
+
+        // Total Score's Value was mirrored to the actual sum (preserving precision).
+        var totalScore = scores.First(s => s.Name == "Total");
+        Assert.Equal(35.0, totalScore.Value);
+    }
+
+    [Fact]
+    public void RecalculateAggregate_DoesNotMirror_WhenTotalIsItselfTheAggregate()
+    {
+        // When the selection set includes Total (e.g. the null fallback at construction
+        // time, or the deliberate "Total only" v1-style aggregation), mirroring would be
+        // a self-referential overwrite. The Total Score's Value must NOT be mutated.
+        var scores = new List<Score>
+        {
+            new("Q", 1, 10.0),
+            new("Total", null, 99.0)
+        };
+        var sa = new StudentAssessment(1, scores, NoAttributes(), "Kermit");
+
+        // Null selection -> falls back to [("Total", null)].
+        sa.RecalculateAggregate(null);
+
+        // Aggregate equals Total's value.
+        Assert.Equal(99, sa.AggregateGrade);
+
+        // Total Score's Value is unchanged.
+        var totalScore = scores.First(s => s.Name == "Total");
+        Assert.Equal(99.0, totalScore.Value);
+    }
+
+    [Fact]
+    public void RecalculateAggregate_PreservesTotalScoreComment_WhenMirroring()
+    {
+        // Total Score carries the student-level comment in this codebase. Mirroring
+        // must update Value only, never touch Comment.
+        var scores = new List<Score>
+        {
+            new("Q", 1, 10.0),
+            new("Q", 2, 20.0),
+            new("Total", null, 99.0, comment: "great work overall")
+        };
+        var sa = new StudentAssessment(1, scores, NoAttributes(), "Kermit");
+
+        sa.RecalculateAggregate(new[] { ("Q", (int?)1), ("Q", (int?)2) });
+
+        var totalScore = scores.First(s => s.Name == "Total");
+        Assert.Equal(30.0, totalScore.Value);
+        Assert.Equal("great work overall", totalScore.Comment);
+    }
+
+    [Fact]
+    public void RecalculateAggregate_NoTotalScore_DoesNothingExtra()
+    {
+        // Defensive: if the data doesn't include a Total Score (some imports don't),
+        // mirroring is silently skipped — no exception, AggregateGrade still set.
+        var scores = new List<Score>
+        {
+            new("Q", 1, 10.0),
+            new("Q", 2, 20.0)
+        };
+        var sa = new StudentAssessment(1, scores, NoAttributes(), "Kermit");
+
+        sa.RecalculateAggregate(new[] { ("Q", (int?)1), ("Q", (int?)2) });
+
+        Assert.Equal(30, sa.AggregateGrade);
+        Assert.Equal(2, scores.Count);  // no synthetic Total inserted
+    }
 }

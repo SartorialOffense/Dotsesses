@@ -48,11 +48,37 @@ public class StudentAssessment
     /// Recalculates the aggregate grade by summing scores whose (Name, Index) is in the selection set.
     /// A null selection falls back to <c>[("Total", null)]</c> for back-compat.
     /// Sum-then-truncate ordering preserves the v1 single-score behavior on the typical case.
+    /// <para>
+    /// When the selection set excludes the "Total" Score (case-insensitive), this method also
+    /// mirrors the computed aggregate sum into the Total Score's Value (preserving its Comment).
+    /// This makes the spreadsheet's static "Total" column behave as a live mirror of the
+    /// user-defined aggregate, so downstream consumers (violin plot's Total series, dotplot
+    /// tooltip, drill-down panel) reflect aggregate-toggle changes without needing a separate
+    /// derived-value channel. When the selection set INCLUDES Total (the null/default-Total
+    /// fallback used during construction or v1-style aggregation), the Total Score is NOT
+    /// mutated — that would be a self-referential overwrite.
+    /// </para>
     /// </summary>
     public void RecalculateAggregate(IReadOnlyCollection<(string Name, int? Index)>? aggregateSelection = null)
     {
         var selection = aggregateSelection ?? new[] { ("Total", (int?)null) };
         var keys = selection.ToHashSet();
-        _aggregateGrade = (int)Scores.Where(s => keys.Contains((s.Name, s.Index))).Sum(s => s.Value);
+        var sum = Scores.Where(s => keys.Contains((s.Name, s.Index))).Sum(s => s.Value);
+        _aggregateGrade = (int)sum;
+
+        // Mirror the computed aggregate into the Total Score's Value when Total is NOT itself
+        // an aggregate component. This keeps the visible "Total" series/column tied to the
+        // user-defined aggregate set rather than the original (now-stale) spreadsheet value.
+        var totalIsSelected = keys.Any(k =>
+            string.Equals(k.Name, "Total", StringComparison.OrdinalIgnoreCase) && k.Index == null);
+        if (!totalIsSelected)
+        {
+            var totalScore = Scores.FirstOrDefault(s =>
+                string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase) && s.Index == null);
+            if (totalScore != null)
+            {
+                totalScore.Value = sum;
+            }
+        }
     }
 }
