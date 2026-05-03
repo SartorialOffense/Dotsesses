@@ -39,5 +39,64 @@
                      </FluentTheme.Palettes>
                  </FluentTheme>
                  <StyleInclude Source="avares://OxyPlot.Avalonia/Themes/Default.axaml"/>
+
+                 <!-- Standard app button styles. Class-based opt-in; see .gsd/milestones/M002/slices/S04 for rationale. -->
+                 <Style Selector="Button.app">
+                     <Setter Property="Padding" Value="12,4"/>
+                     <Setter Property="FontSize" Value="12"/>
+                     <Setter Property="Background" Value="#2D2D30"/>
+                     <Setter Property="Foreground" Value="White"/>
+                     <Setter Property="BorderThickness" Value="1"/>
+                     <Setter Property="BorderBrush" Value="#3F3F46"/>
+                     <Setter Property="CornerRadius" Value="4"/>
+                 </Style>
+                 <Style Selector="Button.app:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                     <Setter Property="Background" Value="#3A3A3D"/>
+                     <Setter Property="BorderBrush" Value="#5A5A60"/>
+                 </Style>
+                 <Style Selector="Button.app:pressed /template/ ContentPresenter#PART_ContentPresenter">
+                     <Setter Property="Background" Value="#252527"/>
+                 </Style>
+                 <Style Selector="Button.app:disabled /template/ ContentPresenter#PART_ContentPresenter">
+                     <Setter Property="Opacity" Value="0.5"/>
+                 </Style>
+
+                 <Style Selector="Button.dialog-primary">
+                     <Setter Property="Background" Value="#0A84FF"/>
+                     <Setter Property="Foreground" Value="White"/>
+                     <Setter Property="BorderThickness" Value="0"/>
+                     <Setter Property="CornerRadius" Value="6"/>
+                     <Setter Property="FontWeight" Value="SemiBold"/>
+                     <Setter Property="Width" Value="100"/>
+                     <Setter Property="Height" Value="32"/>
+                     <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                     <Setter Property="VerticalContentAlignment" Value="Center"/>
+                     <Setter Property="Cursor" Value="Hand"/>
+                 </Style>
+                 <Style Selector="Button.dialog-primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                     <Setter Property="Background" Value="#409CFF"/>
+                 </Style>
+                 <Style Selector="Button.dialog-primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+                     <Setter Property="Background" Value="#006FDB"/>
+                 </Style>
+
+                 <Style Selector="Button.dialog-secondary">
+                     <Setter Property="Background" Value="#3A3A3C"/>
+                     <Setter Property="Foreground" Value="White"/>
+                     <Setter Property="BorderThickness" Value="0"/>
+                     <Setter Property="CornerRadius" Value="6"/>
+                     <Setter Property="FontWeight" Value="SemiBold"/>
+                     <Setter Property="Width" Value="100"/>
+                     <Setter Property="Height" Value="32"/>
+                     <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                     <Setter Property="VerticalContentAlignment" Value="Center"/>
+                     <Setter Property="Cursor" Value="Hand"/>
+                 </Style>
+                 <Style Selector="Button.dialog-secondary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                     <Setter Property="Background" Value="#48484A"/>
+                 </Style>
+                 <Style Selector="Button.dialog-secondary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+                     <Setter Property="Background" Value="#2C2C2E"/>
+                 </Style>
              </Application.Styles>
 </Application>
