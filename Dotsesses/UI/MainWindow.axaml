@@ -51,6 +51,7 @@
                 </Grid>
 
                 <!-- Copy button overlay -->
+                <!-- Special-case: fixed-size icon overlay over the dot plot, intentionally semi-transparent. Inline styling preserved. -->
                 <Button x:Name="CopyDotPlotButton"
                         HorizontalAlignment="Right"
                         VerticalAlignment="Top"
@@ -84,13 +85,7 @@
                         <Border Grid.Row="0" BorderBrush="#202020" BorderThickness="0,0,0,2" Padding="10,6,10,6">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <Button x:Name="SaveButton"
-                                        FontSize="12"
-                                        Padding="12,3"
-                                        Background="#2D2D30"
-                                        Foreground="White"
-                                        BorderThickness="1"
-                                        BorderBrush="#3F3F46"
-                                        CornerRadius="4"
+                                        Classes="app"
                                         ToolTip.Tip="Save state to file">
                                     <Grid ColumnDefinitions="Auto,Auto">
                                         <TextBlock Grid.Column="0" Text="💾" VerticalAlignment="Center" HorizontalAlignment="Center"/>
@@ -100,34 +95,16 @@
                                     </Grid>
                                 </Button>
                                 <Button x:Name="ExportButton"
+                                        Classes="app"
                                         Content="📊 Export"
-                                        FontSize="12"
-                                        Padding="12,3"
-                                        Background="#2D2D30"
-                                        Foreground="White"
-                                        BorderThickness="1"
-                                        BorderBrush="#3F3F46"
-                                        CornerRadius="4"
                                         ToolTip.Tip="Export grades to Excel"/>
                                 <Button x:Name="ExportPptxButton"
+                                        Classes="app"
                                         Content="📽️ PPTX"
-                                        FontSize="12"
-                                        Padding="12,3"
-                                        Background="#2D2D30"
-                                        Foreground="White"
-                                        BorderThickness="1"
-                                        BorderBrush="#3F3F46"
-                                        CornerRadius="4"
                                         ToolTip.Tip="Export presentation with plots"/>
                                 <Button x:Name="SettingsButton"
+                                        Classes="app"
                                         Content="⚙ Settings"
-                                        FontSize="12"
-                                        Padding="12,3"
-                                        Background="#2D2D30"
-                                        Foreground="White"
-                                        BorderThickness="1"
-                                        BorderBrush="#3F3F46"
-                                        CornerRadius="4"
                                         ToolTip.Tip="Configure score selections (Cmd+,)"/>
                             </StackPanel>
                         </Border>
@@ -170,6 +147,7 @@
                                                                              FontWeight="Bold"
                                                                              FontSize="14"/>
                                                                 </Border>
+                                                                <!-- Special-case: minimal in-card affordance, no chrome. Inline styling preserved. -->
                                                                 <Button Grid.Column="3"
                                                                        Content="X"
                                                                        Command="{Binding ClearCommand}"

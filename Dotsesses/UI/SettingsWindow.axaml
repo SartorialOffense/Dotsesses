@@ -31,6 +31,7 @@
                             <TextBlock Text="Display"
                                        FontWeight="SemiBold"
                                        HorizontalAlignment="Center"/>
+                            <!-- Special-case: tiny column-header bulk-toggle buttons, intentionally compact. Inline styling preserved. -->
                             <StackPanel Orientation="Horizontal"
                                         Spacing="4"
                                         HorizontalAlignment="Center"
@@ -52,6 +53,7 @@
                             <TextBlock Text="Aggregate"
                                        FontWeight="SemiBold"
                                        HorizontalAlignment="Center"/>
+                            <!-- Special-case: tiny column-header bulk-toggle buttons, intentionally compact. Inline styling preserved. -->
                             <StackPanel Orientation="Horizontal"
                                         Spacing="4"
                                         HorizontalAlignment="Center"
@@ -75,6 +77,7 @@
                             <TextBlock Text="Correlation"
                                        FontWeight="SemiBold"
                                        HorizontalAlignment="Center"/>
+                            <!-- Special-case: tiny column-header bulk-toggle buttons, intentionally compact. Inline styling preserved. -->
                             <StackPanel Orientation="Horizontal"
                                         Spacing="4"
                                         HorizontalAlignment="Center"
@@ -128,48 +131,12 @@
                     HorizontalAlignment="Right"
                     Spacing="10"
                     Margin="0,15,0,0">
-            <Button Content="Apply"
-                    Click="OnApplyClick"
-                    Width="100"
-                    Height="32"
-                    Background="#0A84FF"
-                    Foreground="White"
-                    BorderThickness="0"
-                    CornerRadius="6"
-                    FontWeight="SemiBold"
-                    HorizontalContentAlignment="Center"
-                    VerticalContentAlignment="Center"
-                    Cursor="Hand">
-                <Button.Styles>
-                    <Style Selector="Button:pointerover">
-                        <Setter Property="Background" Value="#409CFF"/>
-                    </Style>
-                    <Style Selector="Button:pressed">
-                        <Setter Property="Background" Value="#006FDB"/>
-                    </Style>
-                </Button.Styles>
-            </Button>
-            <Button Content="{Binding DismissButtonLabel}"
-                    Click="OnDismissClick"
-                    Width="100"
-                    Height="32"
-                    Background="#3A3A3C"
-                    Foreground="White"
-                    BorderThickness="0"
-                    CornerRadius="6"
-                    FontWeight="SemiBold"
-                    HorizontalContentAlignment="Center"
-                    VerticalContentAlignment="Center"
-                    Cursor="Hand">
-                <Button.Styles>
-                    <Style Selector="Button:pointerover">
-                        <Setter Property="Background" Value="#48484A"/>
-                    </Style>
-                    <Style Selector="Button:pressed">
-                        <Setter Property="Background" Value="#2C2C2E"/>
-                    </Style>
-                </Button.Styles>
-            </Button>
+            <Button Classes="dialog-primary"
+                    Content="Apply"
+                    Click="OnApplyClick"/>
+            <Button Classes="dialog-secondary"
+                    Content="{Binding DismissButtonLabel}"
+                    Click="OnDismissClick"/>
         </StackPanel>
     </Grid>
 </Window>
