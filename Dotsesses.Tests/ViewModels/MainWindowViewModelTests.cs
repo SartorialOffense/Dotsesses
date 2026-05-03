@@ -1,6 +1,7 @@
 namespace Dotsesses.Tests.ViewModels;
 
 using CommunityToolkit.Mvvm.Messaging;
+using Dotsesses.Calculators;
 using Dotsesses.Services;
 using Dotsesses.UI;
 using Dotsesses.Models;
@@ -396,6 +397,137 @@ public class MainWindowViewModelTests
         // Assert
         Assert.Null(ex);
         Assert.All(vm.ClassAssessment.Assessments, st => Assert.Equal(0, st.AggregateGrade));
+    }
+
+    // -------------------------------------------------------------------
+    // M002/S02/T02 — Cursor pinning semantics on ApplyScoreSelections
+    //
+    // When the AGGREGATE selection set changes, ApplyScoreSelections must re-seed
+    // the cursors from the default curve at the new aggregate range (per MEM035).
+    // Display-only and Correlation-only changes must NOT touch cursor positions.
+    // -------------------------------------------------------------------
+
+    [Fact]
+    public void ApplyScoreSelections_AggregateChange_ResetsCursorsToDefaults()
+    {
+        // Arrange — load fixture; pick a non-Total score currently in the Aggregate set.
+        var vm = CreateViewModel();
+        var firstStudent = vm.ClassAssessment.Assessments.First();
+        var nonTotalScore = firstStudent.Scores.First(s =>
+            !string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase) && s.Value > 0);
+
+        // Hand-set the B cursor to a deliberately off-default Score (mimics a user drag).
+        // Decrement by 1 so we stay within the valid B+ ≥ B ≥ B- ordering invariant
+        // (MEM023 — OnCursorPropertyChanged fires synchronously on assignment, and a value
+        // that breaks ordering throws "Cutoffs are out of order"). One unit off-default is
+        // enough to detect a reset because SeedCursorsFromDefaults computes via the
+        // InitialCutoffCalculator + barbell projection, which is deterministic for a fixed
+        // (assessments, midpointCurve) pair — so the post-Apply cursor value lands on the
+        // recomputed cutoff, not on the hand-set value.
+        var bCursor = vm.Cursors.First(c => c.Grade.LetterGrade == LetterGrade.B);
+        var handSetScore = bCursor.Score - 1;
+        bCursor.Score = handSetScore;
+        Assert.Equal(handSetScore, vm.Cursors.First(c => c.Grade.LetterGrade == LetterGrade.B).Score);
+
+        // Build a selection list that toggles Aggregate=false on the chosen non-Total score.
+        var modified = vm.ClassAssessment.ScoreSelections
+            .Select(s =>
+                s.Name == nonTotalScore.Name && s.Index == nonTotalScore.Index
+                    ? s with { Aggregate = false }
+                    : s)
+            .ToList();
+
+        // Act
+        vm.ApplyScoreSelections(modified);
+
+        // Assert — cursor moved off the hand-set value...
+        var bCursorAfter = vm.Cursors.First(c => c.Grade.LetterGrade == LetterGrade.B);
+        Assert.NotEqual(handSetScore, bCursorAfter.Score);
+
+        // ...and the new value matches what a fresh InitialCutoffCalculator would compute
+        // against the post-Apply Assessments. This mirrors the production projection in
+        // MainWindowViewModel.SeedCursorsFromDefaults: defaultCurve via GenerateRanges,
+        // midpointCurve filtered to entries with non-zero bounds, projected to CutoffCount(Midpoint).
+        var defaultCurve = new DefaultCurveGenerator().GenerateRanges(vm.ClassAssessment.Assessments.Count);
+        var midpointCurve = defaultCurve
+            .Where(r => r.LowerBound > 0 || r.UpperBound > 0)
+            .Select(r => new CutoffCount(r.Grade, r.Midpoint))
+            .ToList();
+        var expectedCutoffs = new InitialCutoffCalculator()
+            .Calculate(vm.ClassAssessment.Assessments, midpointCurve);
+        var expectedB = expectedCutoffs.First(c => c.Grade.LetterGrade == LetterGrade.B).Score;
+        Assert.Equal(expectedB, bCursorAfter.Score);
+    }
+
+    [Fact]
+    public void ApplyScoreSelections_DisplayOnlyChange_DoesNotResetCursors()
+    {
+        // Arrange — load fixture, hand-set two cursor Score values to off-default values
+        // (mimics a user dragging cursors), then snapshot every cursor's Score.
+        var vm = CreateViewModel();
+        var bCursor = vm.Cursors.First(c => c.Grade.LetterGrade == LetterGrade.B);
+        var cCursor = vm.Cursors.First(c => c.Grade.LetterGrade == LetterGrade.C);
+        bCursor.Score = bCursor.Score + 7; // deliberate off-default
+        cCursor.Score = cCursor.Score - 3; // deliberate off-default
+        var snapshot = vm.Cursors.ToDictionary(c => c.Grade, c => c.Score);
+
+        // Build a selection list that flips ONLY a Display flag (Aggregate, Correlation untouched).
+        // Pick a non-Total score so we don't accidentally drop the Total from Aggregate.
+        var firstStudent = vm.ClassAssessment.Assessments.First();
+        var target = firstStudent.Scores.First(s =>
+            !string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase) && s.Value > 0);
+        var modified = vm.ClassAssessment.ScoreSelections
+            .Select(s =>
+                s.Name == target.Name && s.Index == target.Index
+                    ? s with { Display = false }
+                    : s)
+            .ToList();
+
+        // Act
+        vm.ApplyScoreSelections(modified);
+
+        // Assert — every cursor's Score is identical to the snapshot.
+        foreach (var cursor in vm.Cursors)
+        {
+            Assert.True(snapshot.ContainsKey(cursor.Grade),
+                $"Cursor for {cursor.Grade.DisplayName} appeared after a Display-only change");
+            Assert.Equal(snapshot[cursor.Grade], cursor.Score);
+        }
+        Assert.Equal(snapshot.Count, vm.Cursors.Count);
+    }
+
+    [Fact]
+    public void ApplyScoreSelections_CorrelationOnlyChange_DoesNotResetCursors()
+    {
+        // Arrange — same shape as Display-only but flipping Correlation instead.
+        var vm = CreateViewModel();
+        var bCursor = vm.Cursors.First(c => c.Grade.LetterGrade == LetterGrade.B);
+        var cCursor = vm.Cursors.First(c => c.Grade.LetterGrade == LetterGrade.C);
+        bCursor.Score = bCursor.Score + 11;
+        cCursor.Score = cCursor.Score - 5;
+        var snapshot = vm.Cursors.ToDictionary(c => c.Grade, c => c.Score);
+
+        var firstStudent = vm.ClassAssessment.Assessments.First();
+        var target = firstStudent.Scores.First(s =>
+            !string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase) && s.Value > 0);
+        var modified = vm.ClassAssessment.ScoreSelections
+            .Select(s =>
+                s.Name == target.Name && s.Index == target.Index
+                    ? s with { Correlation = false }
+                    : s)
+            .ToList();
+
+        // Act
+        vm.ApplyScoreSelections(modified);
+
+        // Assert — no cursor moved.
+        foreach (var cursor in vm.Cursors)
+        {
+            Assert.True(snapshot.ContainsKey(cursor.Grade),
+                $"Cursor for {cursor.Grade.DisplayName} appeared after a Correlation-only change");
+            Assert.Equal(snapshot[cursor.Grade], cursor.Score);
+        }
+        Assert.Equal(snapshot.Count, vm.Cursors.Count);
     }
 
     // -------------------------------------------------------------------

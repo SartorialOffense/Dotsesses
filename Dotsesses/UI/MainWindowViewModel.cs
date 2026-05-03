@@ -1560,6 +1560,19 @@ public partial class MainWindowViewModel : ViewModelBase
         => selections.Where(s => s.Aggregate).Select(s => (s.Name, s.Index)).ToList();
 
     /// <summary>
+    /// Builds an unordered, equality-comparable set of (Name, Index?) keys for the
+    /// AGGREGATE-flagged subset of a selection list. Used by
+    /// <see cref="ApplyScoreSelections"/> to detect whether the aggregate composition
+    /// changed across an Apply, regardless of selection ordering or Display/Correlation
+    /// changes (MEM035 / S02 cursor-reset semantics).
+    ///
+    /// Equality is case-sensitive on the score Name — MEM008 confirms the codebase is
+    /// uniformly case-sensitive on score keys after defaults are seeded.
+    /// </summary>
+    private static HashSet<(string Name, int? Index)> BuildAggregateKeySet(IReadOnlyList<ScoreSelection> selections)
+        => selections.Where(s => s.Aggregate).Select(s => (s.Name, s.Index)).ToHashSet();
+
+    /// <summary>
     /// If <see cref="ClassAssessment.ScoreSelections"/> is empty (fresh .xlsx load or v1 .dots load
     /// that pre-dates the selections feature), populate it via
     /// <see cref="ScoreSelectionDefaults.GenerateDefaults"/> and recompute every student's
@@ -1598,6 +1611,14 @@ public partial class MainWindowViewModel : ViewModelBase
             $"(Display={newSelections.Count(s => s.Display)}, Aggregate={newSelections.Count(s => s.Aggregate)}, " +
             $"Correlation={newSelections.Count(s => s.Correlation)}); first-student aggregate before={aggregateBefore}");
 
+        // Capture the prior aggregate-key set BEFORE assigning the new selections so we can
+        // detect aggregate composition changes after the per-student aggregate recompute below
+        // (MEM035: aggregate-set change → re-seed cursors via SeedCursorsFromDefaults; Display-
+        // or Correlation-only changes leave cursors untouched).
+        var oldAggregateKeys = BuildAggregateKeySet(ClassAssessment.ScoreSelections);
+        var newAggregateKeys = BuildAggregateKeySet(newSelections);
+        var aggregateSetChanged = !oldAggregateKeys.SetEquals(newAggregateKeys);
+
         ClassAssessment.ScoreSelections = newSelections;
 
         var aggregateSet = BuildAggregateSet(newSelections);
@@ -1609,6 +1630,28 @@ public partial class MainWindowViewModel : ViewModelBase
         var aggregateAfter = ClassAssessment.Assessments.FirstOrDefault()?.AggregateGrade ?? 0;
         Log($"MainWindowViewModel: ApplyScoreSelections — first-student aggregate after={aggregateAfter} " +
             $"(changed={aggregateBefore != aggregateAfter})");
+
+        // Order matters: the per-student RecalculateAggregate loop above MUST run before
+        // SeedCursorsFromDefaults because the helper reads ClassAssessment.Assessments and
+        // computes new cutoffs against their freshly-updated AggregateGrade values.
+        // RecalculateGradeCounts (called below) MUST run AFTER the reset so it sees the
+        // freshly-seeded cursors, not the stale ones.
+        //
+        // Edge case: when newAggregateKeys is empty, every student's AggregateGrade collapses
+        // to 0. Running the seed helper in that state would have InitialCutoffCalculator
+        // produce a mix of zero cutoffs (for grades whose target count is filled by zero-
+        // aggregate students) and stepping-down catch-all cutoffs (-12, -24, …) for grades
+        // past the last student, which then violates the "better grade ≥ worse grade"
+        // ordering invariant inside GradeAssigner and throws "Cutoffs are out of order"
+        // (per ApplyScoreSelections_WithEmptySelections_DoesNotCrash). The empty-aggregate
+        // configuration is itself a degenerate state — there is no meaningful cursor placement
+        // to be made — so we skip the reset and leave the existing cursors in place. Cursors
+        // remain visible so the user can re-add aggregate components and recover.
+        if (aggregateSetChanged && newAggregateKeys.Count > 0)
+        {
+            Log("MainWindowViewModel: ApplyScoreSelections — aggregate set changed, re-seeding cursors from default curve");
+            SeedCursorsFromDefaults();
+        }
 
         RecalculateGradeCounts();
         UpdateDotplotPoints();
