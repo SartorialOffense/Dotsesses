@@ -130,29 +130,111 @@ public class SettingsViewModelTests
     }
 
     [Fact]
-    public void CancelCommand_DoesNotInvokeCallback()
+    public void DismissCommand_DoesNotInvokeCallback()
     {
-        // Arrange
+        // Arrange — the surviving dismiss command (replaces the old Cancel/Close pair).
         var (vm, captures) = MakeVm();
 
         // Act
-        vm.CancelCommand.Execute(null);
+        vm.DismissCommand.Execute(null);
 
         // Assert
         Assert.Empty(captures);
     }
 
     [Fact]
-    public void CloseCommand_DoesNotInvokeCallback()
+    public void Constructor_IsDirty_StartsFalse_AndLabelIsClose()
+    {
+        // Arrange / Act
+        var (vm, _) = MakeVm();
+
+        // Assert — fresh dialog has nothing to apply yet, so the dismiss button reads "Close".
+        Assert.False(vm.IsDirty);
+        Assert.Equal("Close", vm.DismissButtonLabel);
+    }
+
+    [Fact]
+    public void RowDisplayChange_FlipsIsDirty_AndDismissLabel()
     {
         // Arrange
-        var (vm, captures) = MakeVm();
+        var (vm, _) = MakeVm();
+
+        // Act — toggle Display on the first row.
+        vm.Rows[0].Display = !vm.Rows[0].Display;
+
+        // Assert — the row's PropertyChanged subscription must mark the VM dirty
+        // and surface the "Cancel" label so the user can back out.
+        Assert.True(vm.IsDirty);
+        Assert.Equal("Cancel", vm.DismissButtonLabel);
+    }
+
+    [Fact]
+    public void RowAggregateChange_FlipsIsDirty()
+    {
+        // Arrange — default input has Aggregate true on rows 0 and 1; row 2 ("Mid") is false
+        // and not locked, so flipping it is a clean legal change that should flip IsDirty.
+        var (vm, _) = MakeVm();
+        Assert.False(vm.Rows[2].Aggregate);
 
         // Act
-        vm.CloseCommand.Execute(null);
+        vm.Rows[2].Aggregate = true;
 
         // Assert
-        Assert.Empty(captures);
+        Assert.True(vm.Rows[2].Aggregate);
+        Assert.True(vm.IsDirty);
+    }
+
+    [Fact]
+    public void RowCorrelationChange_FlipsIsDirty()
+    {
+        // Arrange
+        var (vm, _) = MakeVm();
+
+        // Act
+        vm.Rows[0].Correlation = !vm.Rows[0].Correlation;
+
+        // Assert
+        Assert.True(vm.IsDirty);
+    }
+
+    [Fact]
+    public void ApplyCommand_ResetsIsDirty_AndDismissLabel()
+    {
+        // Arrange — make a real edit so the VM is dirty before Apply runs.
+        var (vm, _) = MakeVm();
+        vm.Rows[0].Display = !vm.Rows[0].Display;
+        Assert.True(vm.IsDirty);
+        Assert.Equal("Cancel", vm.DismissButtonLabel);
+
+        // Act — committing the draft must clear the dirty flag and revert the label.
+        vm.ApplyCommand.Execute(null);
+
+        // Assert
+        Assert.False(vm.IsDirty);
+        Assert.Equal("Close", vm.DismissButtonLabel);
+    }
+
+    [Fact]
+    public void RejectedAggregateClear_DoesNotFlipIsDirty()
+    {
+        // Arrange — single-Aggregate-true input. Clearing the only Aggregate row must be
+        // rejected by the cross-row guard, and because the row VM setter returns early
+        // before SetProperty (research §G1), no PropertyChanged fires and IsDirty stays false.
+        var input = new List<ScoreSelection>
+        {
+            new("A", null, Display: true, Aggregate: true,  Correlation: false),
+            new("B", null, Display: true, Aggregate: false, Correlation: false),
+        };
+        var (vm, _) = MakeVm(input);
+        Assert.False(vm.IsDirty);
+
+        // Act — attempt to clear the only Aggregate row.
+        vm.Rows[0].Aggregate = false;
+
+        // Assert — guard fires, value stays true, IsDirty stays false.
+        Assert.True(vm.Rows[0].Aggregate);
+        Assert.False(vm.IsDirty);
+        Assert.Equal("Close", vm.DismissButtonLabel);
     }
 
     [Fact]
