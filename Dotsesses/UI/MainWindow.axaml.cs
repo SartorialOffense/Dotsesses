@@ -35,6 +35,14 @@ public partial class MainWindow : Window
 {
     private HoverDelayService? _hoverDelayService;
 
+    /// <summary>
+    /// Single-instance gate for the modeless Settings window. Set on <see cref="OpenSettings"/>
+    /// before <see cref="Window.Show(Window)"/> is called, and cleared by the dialog's Closed
+    /// handler. The open path is fully synchronous so the null-check + assignment cannot
+    /// interleave with a second invocation on the dispatcher thread.
+    /// </summary>
+    private SettingsWindow? _settingsWindow;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -187,9 +195,9 @@ public partial class MainWindow : Window
         await SaveWithDialog();
     }
 
-    private async void OnSettingsButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void OnSettingsButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        await OpenSettingsDialogAsync();
+        OpenSettings();
     }
 
     private async void OnExportButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -675,41 +683,85 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Cmd+, (macOS) opens the Settings dialog. Delegates to <see cref="OpenSettingsDialogAsync"/>
+    /// Cmd+, (macOS) opens the Settings dialog. Delegates to <see cref="OpenSettings"/>
     /// so the keybinding, the toolbar Settings button, and the native menu item all share one path.
     /// </summary>
-    private async void OnGlobalKeyDown(object? sender, KeyEventArgs e)
+    private void OnGlobalKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.OemComma && (e.KeyModifiers & KeyModifiers.Meta) != 0)
         {
-            await OpenSettingsDialogAsync();
+            OpenSettings();
             e.Handled = true;
         }
     }
 
     /// <summary>
-    /// Opens the Settings dialog. The Apply commit callback dispatches to
-    /// <see cref="MainWindowViewModel.ApplyScoreSelections"/> which mutates
-    /// ClassAssessment.ScoreSelections, recomputes per-student aggregates, refreshes
-    /// the dotplot/violin/correlation, and rebuilds the drill-down card. Wires through
-    /// MainWindow code-behind because the dialog needs the parent Window reference for
-    /// ShowDialog, and the VM cannot reach it.
+    /// Opens the Settings dialog as a modeless window owned by MainWindow.
+    ///
+    /// <para>
+    /// <b>Modality:</b> uses <c>Show(this)</c> — NOT <c>ShowDialog</c> and NOT <c>Show()</c> with
+    /// no argument. <c>Show(this)</c> sets Owner=MainWindow, which on macOS maps to NSWindow
+    /// <c>addChildWindow:</c> giving (a) always-above-parent behavior and (b) automatic close
+    /// when MainWindow closes. <c>Show()</c> with no Owner would lose both semantics.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>Single-instance:</b> the private <see cref="_settingsWindow"/> field gates re-entry.
+    /// If a Settings window is already open, <see cref="Window.Activate"/> is called on it and
+    /// the method returns. The Closed handler clears the field. The method is fully synchronous
+    /// (no <c>await</c>) so the null-check and field assignment cannot interleave with a second
+    /// invocation on the dispatcher thread — even rapid double-clicks land sequentially.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>Three entry points</b> (all funnel here exactly once per invocation):
+    /// (1) <see cref="OnSettingsButtonClick"/> — toolbar Settings button;
+    /// (2) <see cref="OnGlobalKeyDown"/> — Cmd+, keybinding (macOS);
+    /// (3) <see cref="TriggerOpenSettings"/> — native menu item ("Settings → Score Selection…")
+    /// invoked from <c>App.axaml.cs</c>.
+    /// </para>
+    ///
+    /// <para>
+    /// The Apply commit callback dispatches to <see cref="MainWindowViewModel.ApplyScoreSelections"/>
+    /// which mutates ClassAssessment.ScoreSelections, recomputes per-student aggregates, refreshes
+    /// the dotplot/violin/correlation, and rebuilds the drill-down card. Modeless lets the user
+    /// keep Settings open while interacting with MainWindow.
+    /// </para>
     /// </summary>
-    private async Task OpenSettingsDialogAsync()
+    private void OpenSettings()
     {
         if (DataContext is not MainWindowViewModel vm) return;
+
+        // Single-instance gate: synchronous, race-free against rapid double-invocation.
+        if (_settingsWindow is { } existing)
+        {
+            existing.Activate();
+            return;
+        }
+
         var current = vm.ClassAssessment?.ScoreSelections ?? Array.Empty<ScoreSelection>();
         Action<IReadOnlyList<ScoreSelection>> commit = list => vm.ApplyScoreSelections(list);
         var settingsVm = new SettingsViewModel(current, commit);
         var dlg = new SettingsWindow(settingsVm);
-        await dlg.ShowDialog(this);
+
+        // Wire Closed handler BEFORE assigning the field so a fast close-then-reopen
+        // observes a cleared field rather than a stale reference to a closed window.
+        dlg.Closed += (_, _) => _settingsWindow = null;
+        _settingsWindow = dlg;
+        dlg.Show(this);
     }
 
     /// <summary>
     /// Public entry point invoked by the native menu item ("Settings → Score Selection…")
-    /// in App.axaml. Mirrors <see cref="TriggerSave"/>.
+    /// in App.axaml. Returns <see cref="Task.CompletedTask"/> to preserve the
+    /// <c>Task</c>-returning shape that <c>App.axaml.cs</c> awaits, even though the
+    /// underlying open is now synchronous and modeless.
     /// </summary>
-    public Task TriggerOpenSettings() => OpenSettingsDialogAsync();
+    public Task TriggerOpenSettings()
+    {
+        OpenSettings();
+        return Task.CompletedTask;
+    }
 
     private async Task HandleEditStudentRequest(EditStudentMessage message)
     {
