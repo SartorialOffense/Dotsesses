@@ -75,18 +75,6 @@ public sealed class SettingsViewModel : ViewModelBase
     /// </summary>
     public IRelayCommand DismissCommand { get; }
 
-    /// <summary>
-    /// Backwards-compatible alias for <see cref="DismissCommand"/>. The View's existing
-    /// code-behind still references this name; T02 collapses the View onto
-    /// <see cref="DismissCommand"/> directly and this property is then removed.
-    /// </summary>
-    public IRelayCommand CancelCommand => DismissCommand;
-
-    /// <summary>
-    /// Backwards-compatible alias for <see cref="DismissCommand"/>. See <see cref="CancelCommand"/>.
-    /// </summary>
-    public IRelayCommand CloseCommand => DismissCommand;
-
     // Per-column bulk-toggle commands.
     public IRelayCommand DisplayAllCommand { get; }
 

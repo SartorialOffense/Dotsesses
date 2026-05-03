@@ -122,7 +122,7 @@
             </TabItem>
         </TabControl>
 
-        <!-- Apply / Cancel / Close button row. Mirrors CommentEditorWindow's button styling. -->
+        <!-- Apply / Dismiss button row. Dismiss label is dynamic ('Cancel' when dirty, 'Close' when clean) per R009. -->
         <StackPanel Grid.Row="1"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
@@ -149,29 +149,8 @@
                     </Style>
                 </Button.Styles>
             </Button>
-            <Button Content="Cancel"
-                    Click="OnCancelClick"
-                    Width="100"
-                    Height="32"
-                    Background="#3A3A3C"
-                    Foreground="White"
-                    BorderThickness="0"
-                    CornerRadius="6"
-                    FontWeight="SemiBold"
-                    HorizontalContentAlignment="Center"
-                    VerticalContentAlignment="Center"
-                    Cursor="Hand">
-                <Button.Styles>
-                    <Style Selector="Button:pointerover">
-                        <Setter Property="Background" Value="#48484A"/>
-                    </Style>
-                    <Style Selector="Button:pressed">
-                        <Setter Property="Background" Value="#2C2C2E"/>
-                    </Style>
-                </Button.Styles>
-            </Button>
-            <Button Content="Close"
-                    Click="OnCloseClick"
+            <Button Content="{Binding DismissButtonLabel}"
+                    Click="OnDismissClick"
                     Width="100"
                     Height="32"
                     Background="#3A3A3C"
