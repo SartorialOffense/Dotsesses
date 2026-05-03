@@ -248,16 +248,12 @@ public partial class MainWindowViewModel : ViewModelBase
 
         SeedDefaultSelectionsIfEmpty();
 
-        _gradeAssigner = new GradeAssigner(initialCutoffs);
-
-        Log("MainWindowViewModel: Initializing cursors");
-        InitializeCursors();
-
-        Log("MainWindowViewModel: Wiring cursors to violin plot");
-        WireCursorsToViolinPlot();
-
-        Log("MainWindowViewModel: Initializing compliance grid");
-        InitializeComplianceGrid();
+        // Helper owns: recompute curves/cutoffs against post-seed aggregates, rebuild
+        // _gradeAssigner, reset Cursors + ComplianceRows safely, and rewire the violin
+        // plot. T02 will reuse the same helper from ApplyScoreSelections when an
+        // aggregate-set change requires a cursor reset.
+        Log("MainWindowViewModel: Seeding cursors from default curve");
+        SeedCursorsFromDefaults();
 
         Log("MainWindowViewModel: Recalculating grade counts");
         RecalculateGradeCounts();
@@ -1151,6 +1147,143 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Re-seeds cursor positions, compliance rows, and the supporting curve/cutoff/compliance
+    /// state from the default-curve pipeline at the current student aggregate range.
+    ///
+    /// Owns the full default-curve seeding sequence that is shared by initial load
+    /// (<see cref="LoadFromExcelFile"/>, <see cref="LoadStateAsync"/>) and — once T02 lands —
+    /// by the aggregate-set-changed branch of <see cref="ApplyScoreSelections"/>.
+    ///
+    /// Safe to call repeatedly on the same VM: it unsubscribes <see cref="OnCursorPropertyChanged"/>
+    /// from every existing cursor, clears <see cref="Cursors"/> and <see cref="ComplianceRows"/>,
+    /// then re-runs the seeding pipeline so MEM023's append-not-clear gotcha cannot fire on
+    /// repeated invocations. Mutation of cursors/compliance rows is guarded by
+    /// <see cref="_isUpdatingCursorsFromSubscription"/> so any PropertyChanged signal that does
+    /// slip through (e.g. during Score reassignment) does not re-enter <see cref="OnCursorPropertyChanged"/>
+    /// and throw "Cutoffs are out of order" while the collection is mid-rebuild.
+    ///
+    /// Pipeline order (matches the inline code that previously lived in LoadFromExcelFile/LoadStateAsync):
+    /// 1. Recompute defaultCurve via <see cref="DefaultCurveGenerator.GenerateRanges"/> for the
+    ///    current student count.
+    /// 2. Project to midpoint-targeted curve using <see cref="CutoffCount"/>.
+    /// 3. Compute initialCutoffs via <see cref="InitialCutoffCalculator.Calculate"/>.
+    /// 4. Compute current grade counts via <see cref="CutoffCountCalculator.Calculate"/>.
+    /// 5. Push CurrentCutoffs and Current onto <see cref="ClassAssessment"/>. (DefaultCurve is
+    ///    immutable once <see cref="ClassAssessment"/> is constructed; both load paths build it
+    ///    correctly via the constructor, so no update is needed here.)
+    /// 6. Rebuild <see cref="_gradeAssigner"/>.
+    /// 7. Reset cursors safely (unsubscribe -> clear -> re-add -> reposition non-range grades ->
+    ///    re-subscribe).
+    /// 8. Reset compliance rows (clear -> re-init).
+    /// 9. Rewire violin plot references / score range.
+    /// </summary>
+    private void SeedCursorsFromDefaults()
+    {
+        // 1-2: Default curve and midpoint projection.
+        var defaultCurve = new DefaultCurveGenerator().GenerateRanges(ClassAssessment.Assessments.Count);
+        var midpointCurve = defaultCurve
+            .Where(r => r.LowerBound > 0 || r.UpperBound > 0)
+            .Select(r => new CutoffCount(r.Grade, r.Midpoint))
+            .ToList();
+
+        // 3-4: Compute initialCutoffs and current grade distribution against the live
+        //      AggregateGrade values on ClassAssessment.Assessments.
+        var initialCutoffs = _initialCutoffCalculator.Calculate(ClassAssessment.Assessments, midpointCurve);
+        var current = _cutoffCountCalculator.Calculate(ClassAssessment.Assessments, initialCutoffs);
+
+        // 5: Push the recomputed grids back onto ClassAssessment. DefaultCurve is read-only
+        //    on the model and was already populated by the ClassAssessment constructor in
+        //    both load paths, so we leave it alone here. T02 will revisit if the
+        //    aggregate-set-changed branch needs to mutate it.
+        ClassAssessment.CurrentCutoffs = initialCutoffs;
+        ClassAssessment.Current = current;
+
+        // 6: Rebuild the grade assigner so any subsequent grade lookups see the new cutoffs.
+        _gradeAssigner = new GradeAssigner(initialCutoffs);
+
+        // 7: Reset cursors. Guard with _isUpdatingCursorsFromSubscription so no stray
+        //    PropertyChanged event re-enters OnCursorPropertyChanged while the collection
+        //    is being rebuilt (MEM023 — re-entrancy can throw "Cutoffs are out of order"
+        //    when a partially-rebuilt cursor list contains both old and new cursors for
+        //    the same grade).
+        var wasUpdating = _isUpdatingCursorsFromSubscription;
+        _isUpdatingCursorsFromSubscription = true;
+        try
+        {
+            // Unsubscribe BEFORE Clear so no late PropertyChanged on a removed cursor fires
+            // back into our handler.
+            foreach (var cursor in Cursors)
+            {
+                cursor.PropertyChanged -= OnCursorPropertyChanged;
+            }
+            Cursors.Clear();
+
+            // 8: Reset compliance rows up-front; InitializeComplianceGrid below appends and
+            //    is safe now that we cleared first.
+            ComplianceRows.Clear();
+
+            // Re-run the cursor seeding pipeline (the InitializeCursors body, inlined so the
+            // post-clear/pre-resubscribe sequencing stays inside this guard).
+            var allGrades = new DefaultCurveGenerator().GetAllGrades();
+
+            var gradesWithRanges = ClassAssessment.DefaultCurve
+                .Where(cc => cc.LowerBound > 0 || cc.UpperBound > 0)
+                .Select(cc => cc.Grade)
+                .ToHashSet();
+
+            foreach (var grade in allGrades)
+            {
+                var cutoff = ClassAssessment.CurrentCutoffs.FirstOrDefault(c => c.Grade.Equals(grade));
+                int score = cutoff?.Score ?? 0; // Will be repositioned below for non-default grades.
+                var cursor = new CursorViewModel(grade, score, isEnabled: true);
+                Cursors.Add(cursor);
+            }
+
+            // Second pass: position grades without defined percentages (C-, D+, D, F).
+            var gradesWithoutRanges = allGrades.Where(g => !gradesWithRanges.Contains(g)).ToList();
+            if (gradesWithoutRanges.Any())
+            {
+                const double barbellHandlePixels = 8.0;
+                const double spacingPixels = barbellHandlePixels * 2;
+                var minScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade);
+                var maxScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade);
+                var scoreRange = maxScore - minScore;
+                const double estimatedPlotHeight = 400.0 * 0.8;
+                var cursorSpacing = (int)Math.Ceiling(spacingPixels * scoreRange / Math.Max(1, estimatedPlotHeight));
+
+                var basePosition = minScore - (scoreRange * 0.25);
+                var sortedGrades = gradesWithoutRanges.OrderByDescending(g => g.Order).ToList();
+
+                for (int i = 0; i < sortedGrades.Count; i++)
+                {
+                    var grade = sortedGrades[i];
+                    var cursor = Cursors.First(c => c.Grade.Equals(grade));
+                    cursor.Score = (int)Math.Round(basePosition + (i * cursorSpacing));
+                }
+            }
+
+            // 8 (continued): rebuild the compliance grid from the freshly-cleared list.
+            InitializeComplianceGrid();
+
+            // Re-subscribe AFTER all positioning is complete and AFTER ComplianceRows
+            // is rebuilt, so the first PropertyChanged event from a user drag in the
+            // future doesn't try to recalculate against a half-formed grid.
+            foreach (var cursor in Cursors)
+            {
+                cursor.PropertyChanged += OnCursorPropertyChanged;
+            }
+        }
+        finally
+        {
+            _isUpdatingCursorsFromSubscription = wasUpdating;
+        }
+
+        // 9: Wire the (possibly new) Cursors / ComplianceRows references and refreshed
+        //    MinScore/MaxScore through to the violin plot.
+        WireCursorsToViolinPlot();
+    }
+
     private void OnComplianceCheckboxChanged()
     {
         UpdateCursorsFromComplianceGrid();
@@ -1386,20 +1519,15 @@ public partial class MainWindowViewModel : ViewModelBase
             _currentSourceFile = state.SourceFile;
             CurrentSaveFilePath = filePath;
 
-            // Initialize grade assigner
-            _gradeAssigner = new GradeAssigner(initialCutoffs);
+            // Helper owns: recompute curves/cutoffs against post-seed aggregates,
+            // build _gradeAssigner, reset Cursors + ComplianceRows safely, and rewire
+            // the violin plot. ApplyCursors below overlays any saved cursor positions
+            // on top of the freshly-seeded defaults so a .dots load keeps user state.
+            Log("LoadStateAsync: Seeding cursors from default curve");
+            SeedCursorsFromDefaults();
 
-            // Initialize UI components (same as LoadFromExcelFile)
-            Log("LoadStateAsync: Initializing cursors");
-            InitializeCursors();
-
-            Log("LoadStateAsync: Wiring cursors to violin plot");
-            WireCursorsToViolinPlot();
-
-            Log("LoadStateAsync: Initializing compliance grid");
-            InitializeComplianceGrid();
-
-            // Apply saved cursor positions (after cursors are initialized)
+            // Apply saved cursor positions AFTER the helper has populated Cursors
+            // with the default-seeded entries so saved positions overlay the defaults.
             _stateService.ApplyCursors(state, Cursors);
 
             Log("LoadStateAsync: Recalculating grade counts");
