@@ -94,6 +94,44 @@ public class CursorPlacementCalculator
     }
 
     /// <summary>
+    /// Public defensive fallback used by <c>SeedCursorsFromDefaults</c> when the default-curve
+    /// placement produces non-monotonic cutoffs on a narrow aggregate range
+    /// (M002/S05/T03 — mirrors MEM028's empty-aggregate guard for the single-narrow-component case).
+    /// </summary>
+    /// <remarks>
+    /// Best grade (Grade.Order = 0) is placed at <paramref name="maxScore"/>; worst grade is placed
+    /// at <paramref name="minScore"/>; intermediate grades are spread linearly between them.
+    /// Result is monotonic non-strict; ties are tolerated by GradeAssigner (which uses &lt;, not ≤,
+    /// for its ordering check). Sufficient for guaranteeing the GradeAssigner constructor does not
+    /// throw on narrow ranges.
+    /// </remarks>
+    public IReadOnlyCollection<GradeCutoff> ResetToEvenSpacingMonotonic(
+        IReadOnlyCollection<Grade> grades,
+        int minScore,
+        int maxScore)
+    {
+        ArgumentNullException.ThrowIfNull(grades);
+
+        var sorted = grades.OrderBy(g => g.Order).ToList();
+        var cutoffs = new List<GradeCutoff>();
+        if (sorted.Count == 0) return cutoffs;
+
+        int range = Math.Max(0, maxScore - minScore);
+        var divisor = Math.Max(1, sorted.Count - 1);
+
+        for (int i = 0; i < sorted.Count; i++)
+        {
+            // Best grade (Order=0, i=0) → maxScore; worst (i = count-1) → minScore.
+            // For count==1 we centre at maxScore (degenerate but defined).
+            var fraction = sorted.Count == 1 ? 1.0 : 1.0 - ((double)i / divisor);
+            int score = (int)Math.Round(minScore + (range * fraction));
+            cutoffs.Add(new GradeCutoff(sorted[i], score));
+        }
+
+        return cutoffs;
+    }
+
+    /// <summary>
     /// Checks if any cursors violate minimum spacing requirement.
     /// </summary>
     private bool HasOverlaps(List<GradeCutoff> cutoffs)

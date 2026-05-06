@@ -233,8 +233,53 @@ public partial class ViolinPlotControl : UserControl
 
         foreach (var cursor in vm.Cursors)
         {
+            // Idempotent: removing a non-subscribed handler is a no-op, so this is safe
+            // when called multiple times (e.g. from CollectionChanged after an in-place
+            // SeedCursorsFromDefaults rebuild).
+            cursor.PropertyChanged -= OnCursorPropertyChanged;
             cursor.PropertyChanged += OnCursorPropertyChanged;
         }
+
+        // Watch the collection itself for in-place mutations (Clear+Re-add cycle inside
+        // MainWindowViewModel.SeedCursorsFromDefaults reuses the same ObservableCollection
+        // reference, so the [ObservableProperty] PropertyChanged for Cursors does NOT fire
+        // — fixed by re-syncing subscriptions on every CollectionChanged event).
+        // M002/S05/T05 — Subscribed observed: violin barbell drag was no-op after an
+        // aggregate-change Apply because the cursor list was rebuilt in place and the
+        // PropertyChanged subscriptions were stranded on the old (removed) cursor instances.
+        if (vm.Cursors is INotifyCollectionChanged incc)
+        {
+            // Idempotent unsubscribe + subscribe so re-entry doesn't double-up.
+            incc.CollectionChanged -= OnCursorsCollectionChanged;
+            incc.CollectionChanged += OnCursorsCollectionChanged;
+        }
+    }
+
+    private void OnCursorsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (DataContext is not ViolinPlotViewModel vm) return;
+
+        // Detach handlers from removed cursors so we don't leak them and so the next
+        // sequence of Score writes on the removed instances is silent.
+        if (e.OldItems != null)
+        {
+            foreach (CursorViewModel removed in e.OldItems)
+            {
+                removed.PropertyChanged -= OnCursorPropertyChanged;
+            }
+        }
+
+        // Attach handlers to the current cursor instances. SubscribeToCursors uses the
+        // idempotent unsubscribe-before-subscribe pattern so calling it on a partial
+        // diff (e.NewItems only) versus the full list both work; using the full list
+        // here is safer because Reset events do not provide e.OldItems.
+        SubscribeToCursors(vm);
+
+        // Force a re-render so the new cursor positions land on screen even if no Score
+        // mutation fires (e.g. an Add of a freshly-created cursor at the same Score as
+        // the one it logically replaced does not raise Score-PropertyChanged on its own).
+        RenderRegionBands();
+        RenderCursorColumn();
     }
 
     private void SubscribeToComplianceRows(ViolinPlotViewModel vm)

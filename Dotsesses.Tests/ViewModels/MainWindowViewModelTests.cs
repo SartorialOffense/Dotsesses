@@ -400,6 +400,198 @@ public class MainWindowViewModelTests
     }
 
     // -------------------------------------------------------------------
+    // M002/S05/T03 — narrow-aggregate-range defensive fallback
+    //
+    // SC1 Case 7 of the M002 milestone walkthrough surfaced a crash: when the user
+    // reduces the Aggregate selection to a single non-Total component with a small
+    // value range (e.g. 'Q2-TM', max 4.5), every student's AggregateGrade collapses
+    // into a 0–~5 range. SeedCursorsFromDefaults then runs DefaultCurveGenerator +
+    // InitialCutoffCalculator against that narrow range, the result interleaves
+    // with the second-pass no-range catch-all positions, and the next
+    // RecalculateGradeCounts feeds non-monotonic cutoffs into GradeAssigner..ctor
+    // which throws "Cutoffs are out of order" and crashes the process.
+    //
+    // Same bug family as MEM028's empty-aggregate guard. The narrow-single-component
+    // case is the uncovered edge. Fix landed in MainWindowViewModel.
+    // SeedCursorsFromDefaults: detect non-monotonicity post-seed and fall back to
+    // CursorPlacementCalculator.ResetToEvenSpacingMonotonic over [minScore,maxScore].
+    // -------------------------------------------------------------------
+
+    [Fact]
+    public void ApplyScoreSelections_SingleNarrowAggregateComponent_DoesNotCrash()
+    {
+        // Arrange — load fixture; pin to "MC" specifically (matches the SC1 Case 7 user repro).
+        // The IP exam fixture exposes (per fixture probe used during T03):
+        //   MC=10, Q1ab=40, Q1c-e=6, Q2a-c=18, Q2-TM=4.5, Q2-box=10, Short=16,
+        //   Class=110.5, Total=215. The user-reported crash was with 'MC' as the
+        //   sole non-Total Aggregate (range collapsed to 0-10).
+        var vm = CreateViewModel();
+        var firstStudent = vm.ClassAssessment.Assessments.First();
+        var narrowComponent = firstStudent.Scores.First(s =>
+            string.Equals(s.Name, "MC", StringComparison.Ordinal));
+        Assert.True(narrowComponent.Value <= 10,
+            $"Expected MC ≤10; fixture gave MC={narrowComponent.Value}");
+
+        // Build selections where ONLY the narrow component is Aggregate=true.
+        var narrowOnlySelections = firstStudent.Scores
+            .Select(s => new ScoreSelection(
+                s.Name,
+                s.Index,
+                Display: true,
+                Aggregate: string.Equals(s.Name, narrowComponent.Name, StringComparison.Ordinal)
+                    && !string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase),
+                Correlation: true))
+            .ToList();
+
+        // Act — Apply the narrow-aggregate-only selections. This is the SC1 Case 7 repro.
+        // Pre-fix this throws InvalidOperationException("Cutoffs are out of order ...");
+        // post-fix the defensive fallback kicks in and Apply succeeds.
+        var ex = Record.Exception(() => vm.ApplyScoreSelections(narrowOnlySelections));
+
+        // Assert — no crash. ClassAssessment.Current populated. Cursors monotonic by Grade.Order.
+        Assert.Null(ex);
+        Assert.NotNull(vm.ClassAssessment.Current);
+
+        var cursorsByOrder = vm.Cursors.OrderBy(c => c.Grade.Order).ToList();
+        for (int i = 0; i < cursorsByOrder.Count - 1; i++)
+        {
+            Assert.True(
+                cursorsByOrder[i].Score >= cursorsByOrder[i + 1].Score,
+                $"Cursor for {cursorsByOrder[i].Grade.DisplayName} (score {cursorsByOrder[i].Score}) " +
+                $"must be ≥ cursor for {cursorsByOrder[i + 1].Grade.DisplayName} " +
+                $"(score {cursorsByOrder[i + 1].Score}) after narrow-aggregate Apply.");
+        }
+    }
+
+    // -------------------------------------------------------------------
+    // M002/S05/T04 — aggregate-change Apply refreshes downstream drag bounds
+    //
+    // The user reported during SC1 Case 7 that "when the ranges are recalculated, the
+    // cursors don't have their validation ranges updated so they can't be moved or
+    // they do strange things". Investigation confirmed two cursor-drag paths:
+    //
+    //   - Dotplot drag (MainWindowViewModel.OnDotplotMouseMove) reads
+    //     ClassAssessment.Assessments.Min/Max(a => a.AggregateGrade) directly at drag
+    //     time → always fresh, no caching. Not affected by aggregate-change staleness.
+    //   - Violin/cursor-column drag (ViolinPlotControl.axaml.cs) calls
+    //     ViolinPlotViewModel.NormalizedToScore which reads cached MinScore/MaxScore
+    //     from the VM. Those are written ONLY by WireCursorsToViolinPlot at the end
+    //     of SeedCursorsFromDefaults — already called from the aggregate-changed
+    //     branch of ApplyScoreSelections (line ~1300).
+    //
+    // Pre-T03 the GradeAssigner crash at RecalculateGradeCounts could fire AFTER the
+    // wire-through (so MinScore/MaxScore *were* refreshed) but the process died before
+    // the user could drag, so the user's "stale bounds" report was the symptom of the
+    // crash flow rather than a separate cache-staleness bug. Now that T03 prevents
+    // the crash, the existing wire-through path is provably exercised.
+    //
+    // These tests pin the contract at the readable seam: ClassAssessment.Assessments
+    // must reflect the new aggregate range immediately after ApplyScoreSelections. Any
+    // future change that breaks the freshness of WireCursorsToViolinPlot's input would
+    // fail here. Direct ViolinPlotViewModel.MinScore/MaxScore assertions are not
+    // possible at the unit level because CreateForTesting does not wire that VM (no
+    // Avalonia harness in this project per MEM030); the contract is asserted via
+    // the source values WireCursorsToViolinPlot reads.
+    // -------------------------------------------------------------------
+
+    [Fact]
+    public void ApplyScoreSelections_AggregateChange_NewAggregateRangeIsObservable()
+    {
+        // Arrange — load fixture (full Aggregate selection) and capture original range.
+        var vm = CreateViewModel();
+        var originalMin = vm.ClassAssessment.Assessments.Min(a => a.AggregateGrade);
+        var originalMax = vm.ClassAssessment.Assessments.Max(a => a.AggregateGrade);
+        Assert.True(originalMax > originalMin,
+            "Sanity: fixture must have a non-degenerate aggregate range on initial load.");
+
+        // Reduce Aggregate to MC only — narrow component so the new range is clearly different.
+        var firstStudent = vm.ClassAssessment.Assessments.First();
+        var narrowOnlySelections = firstStudent.Scores
+            .Select(s => new ScoreSelection(
+                s.Name,
+                s.Index,
+                Display: true,
+                Aggregate: string.Equals(s.Name, "MC", StringComparison.Ordinal)
+                    && !string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase),
+                Correlation: true))
+            .ToList();
+
+        // Act
+        vm.ApplyScoreSelections(narrowOnlySelections);
+
+        // Assert — the source values WireCursorsToViolinPlot reads are now narrow-range.
+        // After MC-only Aggregate, class min/max equals class min/max of the MC column
+        // (per FixtureProbe used during T04: MC class min=4, max=16).
+        var newMin = vm.ClassAssessment.Assessments.Min(a => a.AggregateGrade);
+        var newMax = vm.ClassAssessment.Assessments.Max(a => a.AggregateGrade);
+        Assert.True(newMax < 50,
+            $"After narrowing Aggregate to MC only, class max should be much less than the " +
+            $"original full-aggregate max; got {newMax} vs original max={originalMax}.");
+        Assert.True(newMin != originalMin || newMax != originalMax,
+            $"Aggregate-change Apply must shift the observable range. " +
+            $"original=({originalMin}, {originalMax}); new=({newMin}, {newMax}).");
+    }
+
+    [Fact]
+    public void ApplyScoreSelections_DisplayOnlyChange_AggregateRangeUnchanged()
+    {
+        // Arrange — capture original aggregate range, then build a Display-only-changed selection.
+        var vm = CreateViewModel();
+        var originalMin = vm.ClassAssessment.Assessments.Min(a => a.AggregateGrade);
+        var originalMax = vm.ClassAssessment.Assessments.Max(a => a.AggregateGrade);
+        var displayOnlyChanged = vm.ClassAssessment.ScoreSelections
+            .Select(sel => string.Equals(sel.Name, "MC", StringComparison.Ordinal)
+                ? new ScoreSelection(sel.Name, sel.Index, Display: !sel.Display, sel.Aggregate, sel.Correlation)
+                : sel)
+            .ToList();
+
+        // Act
+        vm.ApplyScoreSelections(displayOnlyChanged);
+
+        // Assert — Display-only change must NOT shift the aggregate range.
+        // (R035: cursors don't reset; aggregate values are untouched.)
+        var newMin = vm.ClassAssessment.Assessments.Min(a => a.AggregateGrade);
+        var newMax = vm.ClassAssessment.Assessments.Max(a => a.AggregateGrade);
+        Assert.Equal(originalMin, newMin);
+        Assert.Equal(originalMax, newMax);
+    }
+
+    [Fact]
+    public void ApplyScoreSelections_SingleNarrowAggregateComponent_CursorsSpanNewRange()
+    {
+        // Arrange — pin to MC as the sole Aggregate component (same scenario as the crash test).
+        var vm = CreateViewModel();
+        var firstStudent = vm.ClassAssessment.Assessments.First();
+        var narrowComponent = firstStudent.Scores.First(s =>
+            string.Equals(s.Name, "MC", StringComparison.Ordinal));
+        var narrowOnlySelections = firstStudent.Scores
+            .Select(s => new ScoreSelection(
+                s.Name,
+                s.Index,
+                Display: true,
+                Aggregate: string.Equals(s.Name, narrowComponent.Name, StringComparison.Ordinal)
+                    && !string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase),
+                Correlation: true))
+            .ToList();
+
+        // Act
+        vm.ApplyScoreSelections(narrowOnlySelections);
+
+        // Assert — when the fallback fires, best grade lands at the new max and worst at the
+        // new min. This pins the user-visible side of the fallback so cursors are at least
+        // visible across the new (narrow) aggregate range rather than stuck at stale
+        // wide-range positions from the original load.
+        var newMin = vm.ClassAssessment.Assessments.Min(a => a.AggregateGrade);
+        var newMax = vm.ClassAssessment.Assessments.Max(a => a.AggregateGrade);
+        Assert.All(vm.Cursors, c =>
+        {
+            Assert.True(c.Score >= newMin && c.Score <= newMax,
+                $"Cursor for {c.Grade.DisplayName} score={c.Score} must lie within new aggregate " +
+                $"range [{newMin}, {newMax}] after the narrow-aggregate fallback fires.");
+        });
+    }
+
+    // -------------------------------------------------------------------
     // M002/S02/T02 — Cursor pinning semantics on ApplyScoreSelections
     //
     // When the AGGREGATE selection set changes, ApplyScoreSelections must re-seed

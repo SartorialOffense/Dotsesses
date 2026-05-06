@@ -1263,6 +1263,22 @@ public partial class MainWindowViewModel : ViewModelBase
                 }
             }
 
+            // M002/S05/T03 defensive fallback: if the combined first-pass (range-driven) +
+            // second-pass (no-range catch-all) cursor positions produce a non-monotonic
+            // sequence by Grade.Order, GradeAssigner..ctor will throw "Cutoffs are out of
+            // order" on the next RecalculateGradeCounts. This happens on narrow aggregate
+            // ranges — e.g. when the user reduces the Aggregate selection to a single
+            // narrow non-Total component (SC1 Case 7 repro: aggregate range collapsed to
+            // 0–10, no way to fit 13 monotonic cutoffs). Fall back to even spacing across
+            // [minScore, maxScore] mirroring MEM028's Count > 0 guard for the empty case.
+            if (!AreCursorsMonotonicByGrade())
+            {
+                Log("MainWindowViewModel: SeedCursorsFromDefaults — non-monotonic cursors " +
+                    "after default-curve placement (narrow aggregate range); falling back to " +
+                    "even spacing across [minScore, maxScore]");
+                ApplyEvenSpacingFallback();
+            }
+
             // 8 (continued): rebuild the compliance grid from the freshly-cleared list.
             InitializeComplianceGrid();
 
@@ -1282,6 +1298,52 @@ public partial class MainWindowViewModel : ViewModelBase
         // 9: Wire the (possibly new) Cursors / ComplianceRows references and refreshed
         //    MinScore/MaxScore through to the violin plot.
         WireCursorsToViolinPlot();
+    }
+
+    /// <summary>
+    /// Returns true when every cursor's Score is monotonically non-increasing as Grade.Order
+    /// increases (i.e. better grades have ≥ scores than worse grades). GradeAssigner..ctor
+    /// rejects any violation, so this predicate gates the T03 even-spacing fallback.
+    /// </summary>
+    private bool AreCursorsMonotonicByGrade()
+    {
+        var sorted = Cursors.OrderBy(c => c.Grade.Order).ToList();
+        for (int i = 0; i < sorted.Count - 1; i++)
+        {
+            // Mirror GradeAssigner.ValidateCutoffOrdering — strict less-than fails the check;
+            // equal scores are tolerated.
+            if (sorted[i].Score < sorted[i + 1].Score) return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Defensive fallback for narrow aggregate ranges (M002/S05/T03). Replaces every cursor's
+    /// Score with an even-spacing layout across the current [minScore, maxScore] derived from
+    /// ClassAssessment.Assessments. Uses CursorPlacementCalculator.ResetToEvenSpacingMonotonic
+    /// so best grade lands at maxScore, worst at minScore, and intermediates spread linearly.
+    /// </summary>
+    private void ApplyEvenSpacingFallback()
+    {
+        if (Cursors.Count == 0) return;
+        var minScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade);
+        var maxScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade);
+        var grades = Cursors.Select(c => c.Grade).ToList();
+        var rebalanced = new CursorPlacementCalculator()
+            .ResetToEvenSpacingMonotonic(grades, minScore, maxScore);
+        foreach (var cutoff in rebalanced)
+        {
+            var cursor = Cursors.FirstOrDefault(c => c.Grade.Equals(cutoff.Grade));
+            if (cursor != null)
+            {
+                cursor.Score = cutoff.Score;
+            }
+        }
+        // Mirror back into ClassAssessment.CurrentCutoffs so RecalculateGradeCounts (which
+        // rebuilds from Cursors anyway) and any downstream readers see the rebalanced values.
+        ClassAssessment.CurrentCutoffs = Cursors
+            .Select(c => new GradeCutoff(c.Grade, c.Score))
+            .ToList();
     }
 
     private void OnComplianceCheckboxChanged()
