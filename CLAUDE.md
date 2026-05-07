@@ -4,11 +4,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Getting Started
 
-**IMPORTANT**: Before starting work on this project, read `SPEC.md` to understand the full requirements, architecture, and testing procedures.
+**IMPORTANT**: Before starting work on this project, read these in order:
+
+1. `CONTEXT.md` — domain glossary (Course, Class, ClassAssessment,
+   AggregateScore, GradeCurve, GradeBin, Compliance, etc.). Use this
+   vocabulary in code, comments, commits, and PRDs.
+2. `SPEC.md` — UX/interaction specification.
+3. `docs/adr/` — architectural decisions. Read any ADR in the area you
+   are about to touch before proposing a change there.
+4. `TECH_DEBT.md` — known debt. Check before introducing parallel debt.
 
 ## Project Overview
 
-Dotsesses is an Avalonia UI desktop application built on .NET 9.0. It uses the MVVM pattern with CommunityToolkit.Mvvm for observable properties and commands, and integrates OxyPlot for data visualization.
+Dotsesses is an Avalonia UI desktop application built on .NET 9.0. It
+uses the MVVM pattern with CommunityToolkit.Mvvm for observable
+properties and commands, and integrates OxyPlot for data visualization.
 
 ## Architecture
 
@@ -52,20 +62,37 @@ dotnet build -c Release
 
 ## Project Structure
 
-- `Program.cs` - Application entry point and Avalonia configuration
-- `App.axaml` / `App.axaml.cs` - Application-level resources and initialization
-- `ViewLocator.cs` - Convention-based View resolution for MVVM
-- `ViewModels/` - ViewModels inheriting from ViewModelBase
-- `Views/` - Avalonia UserControls and Windows (XAML + code-behind)
-- `Models/` - Data models (currently empty)
-- `Assets/` - Application resources (icons, images, etc.)
+- `Dotsesses/Program.cs` — entry point and Avalonia configuration
+- `Dotsesses/App.axaml(.cs)` — app-level resources and DI wiring
+- `Dotsesses/ViewLocator.cs` — convention-based View resolution
+- `Dotsesses/UI/` — ViewModels, Views (`*.axaml`), and code-behind,
+  co-located by feature (`MainWindow*`, `SettingsWindow*`,
+  `ViolinPlotControl*`, `CorrelationPlotControl*`,
+  `CommentEditorWindow*`, `PlotTabContainer*`, etc.)
+- `Dotsesses/Models/` — domain types (`StudentAssessment`,
+  `ClassAssessment`, `Score`, `Grade`, `GradeCutoff`,
+  `CutoffCountRange`, `ScoreSelection`, …)
+- `Dotsesses/Calculators/` — pure-function calculators
+  (`CursorPlacementCalculator`, `CursorValidation`,
+  `CutoffCountCalculator`, `GradeAssigner`, `InitialCutoffCalculator`)
+- `Dotsesses/Services/` — `ScoreReader`, `StateService`,
+  `ViolinPlotService`, `CorrelationPlotService`,
+  `PowerPointExportService`, `SyntheticStudentGenerator`, etc.
+- `Dotsesses/Messages/` — IMessenger payloads (see ADR-0004)
+- `Dotsesses/Python/Violin/` — Python plot modules invoked via CSnakes
+- `Dotsesses/Assets/` — icons and other resources
+- `Dotsesses.Tests/` — xUnit tests, mirroring source folder layout
+
+Top-level documentation: `CLAUDE.md`, `CONTEXT.md`, `SPEC.md`,
+`TECH_DEBT.md`, `docs/adr/`.
 
 ## Rules of the road
 
-- **NEVER** commit code unless I explicitly tell you to do this.
-
 - Use clean markdown, follow best practices for formatting, spacing, and line lengths.
 Check after edits to files.
+
+- Changes to code are always tied to changes in documentation
+  do that we keep in sync.
 
 - When I ask you to make a questionnaire for me, do this in the .conversations/ folder. this folder
 is in .gitignore so any record will need be in a summary file in design_history/ later on.
@@ -73,5 +100,3 @@ is in .gitignore so any record will need be in a summary file in design_history/
 - If I ask you to do something that is more than a simple fix or refinement, and you have
 multiple questions or feel you need clarification, please pose this as a questionnaire file
 for me to answer in.
-
-- **NEVER** commit code unless I explicitly tell you to do this.

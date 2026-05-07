@@ -15,9 +15,6 @@ publish/Dotsesses.app/Contents
 ~$*
 publish
 
-# ── GSD baseline (auto-generated) ──
-.gsd
-.gsd-id
 .mcp.json
 .bg-shell/
 Thumbs.db
