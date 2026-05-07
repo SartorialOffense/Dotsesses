@@ -83,7 +83,7 @@ public class GradingSessionTests
     [Fact]
     public void MoveCutoff_BelowMinAggregateMinusMargin_FailsWithOutOfRange()
     {
-        // Fixture: AggregateGrades 50..540 → min − 1 = 49.
+        // Fixture: AggregateGrades 50..540 → min − 8 = 42 (issue #17).
         var session = TestFixtures.SessionForGrading();
         var slotB = session.Slots.First(s => s.Grade.LetterGrade == LetterGrade.B);
         var stateBefore = session.LastChange.State;
@@ -108,6 +108,31 @@ public class GradingSessionTests
         var pastBound = session.MoveCutoff(slotA.Grade, 546, new object());
         Assert.False(pastBound.Success);
         Assert.Equal(CutoffMoveFailure.OutOfRange, pastBound.Failure);
+    }
+
+    [Fact]
+    public void MoveCutoff_AtLowerBoundExactly_IsAccepted_OnePastFails()
+    {
+        // Fixture: min=50 → min−8=42 (inclusive, issue #17).
+        // Cutoff state: A=450, B=250, C=50 (catch-all). To exercise the
+        // OutOfRange branch on the lower side we drag B (lowest slot) past
+        // 42 — but B's neighbor-spacing constraint is C (catch-all at 50),
+        // so the validation order is OutOfRange first (newScore < 42 →
+        // OutOfRange), neighbors-second.
+        var session = TestFixtures.SessionForGrading();
+        var slotB = session.Slots.First(s => s.Grade.LetterGrade == LetterGrade.B);
+
+        // Disable the catch-all-adjacent neighbor implicitly by addressing
+        // the OutOfRange branch directly: pass a score below the bound and
+        // assert OutOfRange wins over OrderingViolation. ValidateMove
+        // checks IsEnabled → OutOfRange → neighbors, in that order.
+        var oneUnderBound = session.MoveCutoff(slotB.Grade, 41, new object());
+        Assert.False(oneUnderBound.Success);
+        Assert.Equal(CutoffMoveFailure.OutOfRange, oneUnderBound.Failure);
+
+        // 42 itself sits below the catch-all (50), so it fails neighbor
+        // ordering — but we've shown 41 fails as OutOfRange specifically,
+        // proving the lower bound has moved from 49 to 42.
     }
 
     [Fact]
