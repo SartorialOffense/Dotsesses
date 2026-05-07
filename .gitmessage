@@ -1,0 +1,13 @@
+# <type>(<scope>): <subject>          (≤72 chars; type: feat/fix/docs/refactor/test/chore)
+#
+# Body — explain WHY (not what; the diff already shows that). Wrap at ~72.
+
+
+# Documentation footer — required. Walk the four-doc table in CLAUDE.md;
+# pick one or more. Use "none — <reason>" only when no doc applies.
+#   Docs: ADR-NNNN
+#   Docs: CONTEXT.md
+#   Docs: SPEC.md
+#   Docs: TECH_DEBT.md TDNNN
+#   Docs: none — <reason>
+Docs:

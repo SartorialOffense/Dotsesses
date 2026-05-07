@@ -86,6 +86,49 @@ dotnet build -c Release
 Top-level documentation: `CLAUDE.md`, `CONTEXT.md`, `SPEC.md`,
 `TECH_DEBT.md`, `docs/adr/`.
 
+## Documentation discipline
+
+Before declaring a code change complete (or asking the user to commit),
+walk through this table. If a row applies, update the matching doc in
+the **same** change — never as a follow-up.
+
+| If the change affects… | Update… |
+|---|---|
+| Domain vocabulary, a named concept, or how things relate | `CONTEXT.md` |
+| UX behavior visible to the user | `SPEC.md` |
+| An architectural decision that is *hard to reverse*, *surprising without context*, or the result of a *real trade-off* | new ADR at `docs/adr/NNNN-slug.md` |
+| Code that introduces or resolves known debt | `TECH_DEBT.md` (open a new TD### or close an existing one) |
+
+ADRs are not required for every code change — only the
+hard-to-reverse / surprising / real-trade-off kind. Bug fixes,
+renames, test additions, and ordinary refactors do not need ADRs.
+Read existing ADRs in the area before suggesting a change there
+(this is also `improve-codebase-architecture`'s contract).
+
+When ADR-worthy, number sequentially: scan `docs/adr/` for the highest
+existing `NNNN` and add 1. One paragraph is fine — see existing ADRs
+for the calibration.
+
+### Commit-message footer
+
+Every commit message ends with a `Docs:` footer:
+
+```
+Docs: ADR-0008
+Docs: CONTEXT.md
+Docs: TECH_DEBT.md TD004
+Docs: none — refactor, no doc impact
+```
+
+Multiple values are comma-separated. `none — <reason>` is a valid value
+when no doc was affected; the reason is mandatory so the decision
+is visible. The footer prompt lives in `.gitmessage` — opt in once per
+clone with:
+
+```
+git config commit.template .gitmessage
+```
+
 ## Rules of the road
 
 - Use clean markdown, follow best practices for formatting, spacing, and line lengths.
