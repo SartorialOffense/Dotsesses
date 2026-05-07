@@ -326,6 +326,33 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
+    public void Cursors_IncludesNonDraggableGrades_NotPresentInSessionSlots()
+    {
+        // Regression for the slice-3 hotfix: the legacy `Cursors` collection
+        // contains every grade in DefaultCurveGenerator.GetAllGrades() (11
+        // entries in production), including the structural catch-all (C
+        // for the production curve) and zero-range grades (CMinus, DPlus,
+        // D, F). `GradingSession.Slots` only contains the draggable
+        // grades (6 in production). A drag handler that calls
+        // `session.MoveCutoff(grade, …)` for a Cursors-only grade would
+        // see ArgumentException → uncaught → app crash. Verifying that
+        // the discrepancy exists so the drag-handler guard is justified.
+        var vm = CreateViewModel();
+        var slotGrades = vm.GradingSession.Slots.Select(s => s.Grade).ToHashSet();
+        var cursorGrades = vm.Cursors.Select(c => c.Grade).ToHashSet();
+        var nonDraggable = cursorGrades.Except(slotGrades).ToList();
+
+        Assert.NotEmpty(nonDraggable);
+        // And the session would refuse to move any of them — preserving
+        // the API contract from ADR-0011.
+        foreach (var grade in nonDraggable)
+        {
+            Assert.Throws<ArgumentException>(() =>
+                vm.GradingSession.MoveCutoff(grade, 100, originator: this));
+        }
+    }
+
+    [Fact]
     public void GradingSession_MoveCutoff_MirrorsIntoLegacyCursorsCollection()
     {
         // Slice 3: drag goes through GradingSession.MoveCutoff. The legacy
