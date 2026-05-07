@@ -25,11 +25,13 @@ public sealed class GradingSession : ObservableObject
     private int _catchAllScore;
     private GradingStateChange _lastChange = null!;
 
-    // Margin around the AggregateGrade envelope so cursors can sit
-    // just outside the data extremes (matches DefaultCursorSpacing
-    // in InitialCutoffCalculator). See Q2 in
-    // .conversations/2026-05-07_issue-7-grading-session-design.md.
-    private const int ScoreBoundsMargin = 12;
+    // Asymmetric margin around the AggregateGrade envelope: cursors
+    // can sit just below the lowest student score (so the catch-all
+    // band stays visible) and well above the highest (so the A
+    // boundary can be pushed past the top scorer to make A
+    // unattainable). Issue #9 / Q3: maintainer-chosen [-1, +5].
+    private const int ScoreBoundsMarginBelow = 1;
+    private const int ScoreBoundsMarginAbove = 5;
 
     public ReadOnlyObservableCollection<CutoffSlot> Slots { get; }
 
@@ -73,8 +75,8 @@ public sealed class GradingSession : ObservableObject
                 "cannot derive score bounds from an empty class.");
         }
 
-        _minScore = classAssessment.Assessments.Min(a => a.AggregateGrade) - ScoreBoundsMargin;
-        _maxScore = classAssessment.Assessments.Max(a => a.AggregateGrade) + ScoreBoundsMargin;
+        _minScore = classAssessment.Assessments.Min(a => a.AggregateGrade) - ScoreBoundsMarginBelow;
+        _maxScore = classAssessment.Assessments.Max(a => a.AggregateGrade) + ScoreBoundsMarginAbove;
 
         var midpointCurve = classAssessment.DefaultCurve
             .Where(r => r.LowerBound > 0 || r.UpperBound > 0)

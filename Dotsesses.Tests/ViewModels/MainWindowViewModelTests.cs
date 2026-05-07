@@ -326,6 +326,25 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
+    public void GradingSession_MoveCutoff_MirrorsIntoLegacyCursorsCollection()
+    {
+        // Slice 3: drag goes through GradingSession.MoveCutoff. The legacy
+        // Cursors collection mirror-syncs from session.LastChange so existing
+        // OxyPlot rendering and Compliance recalc paths keep working until
+        // the cleanup slice (issue #14) deletes _cursors entirely.
+        var vm = CreateViewModel();
+        var slotA = vm.GradingSession.Slots.First(s => s.Grade.LetterGrade == LetterGrade.A);
+        var initial = slotA.Score;
+        var newScore = initial - 5;
+
+        vm.GradingSession.MoveCutoff(slotA.Grade, newScore, originator: this);
+
+        var legacyA = vm.Cursors.First(c => c.Grade.LetterGrade == LetterGrade.A);
+        Assert.Equal(newScore, slotA.Score);
+        Assert.Equal(newScore, legacyA.Score);
+    }
+
+    [Fact]
     public async Task LoadStateAsync_V2File_HydratesGradingSession()
     {
         // VM-driven round-trip: save a session with a non-default cutoff,
