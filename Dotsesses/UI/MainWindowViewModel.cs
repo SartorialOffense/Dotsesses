@@ -128,6 +128,50 @@ public partial class MainWindowViewModel : ViewModelBase
     /// </summary>
     public StateService StateService => _stateService;
 
+    /// <summary>
+    /// Mirrors the GradingSession's slot state into the legacy
+    /// <see cref="Cursors"/> collection so existing OxyPlot rendering
+    /// and Compliance recalc paths keep working while drag goes
+    /// through the session. Called when GradingSession swaps in
+    /// (file load) and on every session.LastChange notification.
+    /// Slice 3 of issue #6 — minimal scope. Future cleanup slice will
+    /// remove _cursors entirely (see issue #14).
+    /// </summary>
+    private void SyncCursorsFromSession()
+    {
+        if (GradingSession is null) return;
+        foreach (var slot in GradingSession.Slots)
+        {
+            var cursor = Cursors.FirstOrDefault(c => c.Grade.Equals(slot.Grade));
+            if (cursor is null) continue;
+            if (cursor.Score != slot.Score) cursor.Score = slot.Score;
+            if (cursor.IsEnabled != slot.IsEnabled) cursor.IsEnabled = slot.IsEnabled;
+        }
+    }
+
+    partial void OnGradingSessionChanged(GradingSession? oldValue, GradingSession newValue)
+    {
+        if (oldValue is not null)
+        {
+            oldValue.PropertyChanged -= OnGradingSessionPropertyChanged;
+        }
+        if (newValue is not null)
+        {
+            newValue.PropertyChanged += OnGradingSessionPropertyChanged;
+        }
+
+        if (ViolinPlotViewModel is not null)
+        {
+            ViolinPlotViewModel.GradingSession = newValue;
+        }
+    }
+
+    private void OnGradingSessionPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(GradingSession.LastChange)) return;
+        SyncCursorsFromSession();
+    }
+
     public MainWindowViewModel()
     {
         
@@ -1956,29 +2000,25 @@ public partial class MainWindowViewModel : ViewModelBase
 
         var newScore = (int)Math.Round(pos.X);
 
-        // Allow cursor movement beyond actual student scores
-        var minBound = ClassAssessment.Assessments.Min(a => a.AggregateGrade) - 20;
-        var maxBound = ClassAssessment.Assessments.Max(a => a.AggregateGrade) + 20;
-
-        // Validate cursor movement (include ALL enabled cursors for proper ordering constraints)
+        // Pre-clamp to legacy bounds so the visual continues to track the
+        // mouse smoothly past the data envelope. Session.MoveCutoff applies
+        // its own canonical bounds (see ScoreBoundsMargin{Below,Above} in
+        // GradingSession); rejected moves leave the cursor at its last
+        // valid position, which gives users implicit boundary feedback.
+        var legacyMinBound = ClassAssessment.Assessments.Min(a => a.AggregateGrade) - 20;
+        var legacyMaxBound = ClassAssessment.Assessments.Max(a => a.AggregateGrade) + 20;
         var allCutoffs = Cursors
             .Where(c => c.IsEnabled)
             .Select(c => new GradeCutoff(c.Grade, c == _draggingCursor ? newScore : c.Score))
             .ToList();
+        var clampedScore = _cursorValidation.ValidateMovement(
+            _draggingCursor.Grade, newScore, allCutoffs, (int)legacyMinBound, (int)legacyMaxBound);
 
-        var validatedScore = _cursorValidation.ValidateMovement(_draggingCursor.Grade, newScore, allCutoffs, (int)minBound, (int)maxBound);
-
-        _isUpdatingCursorsFromSubscription = true;
-        try
-        {
-            _draggingCursor.Score = validatedScore;
-            UpdateCursors();
-            RecalculateGradeCounts(); // Update counts during drag
-        }
-        finally
-        {
-            _isUpdatingCursorsFromSubscription = false;
-        }
+        // Slice 3: route the commit through GradingSession. The session
+        // emits LastChange on success → SyncCursorsFromSession mirrors
+        // back into _cursors → existing cursor PropertyChanged handlers
+        // update OxyPlot annotations and Compliance counts.
+        GradingSession?.MoveCutoff(_draggingCursor.Grade, clampedScore, this);
         e.Handled = true;
     }
 

@@ -68,15 +68,13 @@ public class GradingSessionTests
     [Fact]
     public void MoveCutoff_AboveMaxAggregatePlusMargin_FailsWithOutOfRange()
     {
-        // Arrange — fixture: AggregateGrades 50..540 → max + 12 = 552
+        // Fixture: AggregateGrades 50..540 → max + 5 = 545.
         var session = TestFixtures.SessionForGrading();
         var slotA = session.Slots.First(s => s.Grade.LetterGrade == LetterGrade.A);
         var stateBefore = session.LastChange.State;
 
-        // Act — move A to 600 (well outside the upper bound)
         var result = session.MoveCutoff(slotA.Grade, 600, new object());
 
-        // Assert
         Assert.False(result.Success);
         Assert.Equal(CutoffMoveFailure.OutOfRange, result.Failure);
         Assert.Same(stateBefore, session.LastChange.State);
@@ -85,18 +83,31 @@ public class GradingSessionTests
     [Fact]
     public void MoveCutoff_BelowMinAggregateMinusMargin_FailsWithOutOfRange()
     {
-        // Arrange — fixture: AggregateGrades 50..540 → min − 12 = 38
+        // Fixture: AggregateGrades 50..540 → min − 1 = 49.
         var session = TestFixtures.SessionForGrading();
         var slotB = session.Slots.First(s => s.Grade.LetterGrade == LetterGrade.B);
         var stateBefore = session.LastChange.State;
 
-        // Act — move B to 0 (below the lower bound)
         var result = session.MoveCutoff(slotB.Grade, 0, new object());
 
-        // Assert
         Assert.False(result.Success);
         Assert.Equal(CutoffMoveFailure.OutOfRange, result.Failure);
         Assert.Same(stateBefore, session.LastChange.State);
+    }
+
+    [Fact]
+    public void MoveCutoff_AtUpperBoundExactly_IsAccepted_OnePastFails()
+    {
+        // Fixture: max=540 → max+5=545 (inclusive). 546 is OutOfRange.
+        var session = TestFixtures.SessionForGrading();
+        var slotA = session.Slots.First(s => s.Grade.LetterGrade == LetterGrade.A);
+
+        var atBound = session.MoveCutoff(slotA.Grade, 545, new object());
+        Assert.True(atBound.Success);
+
+        var pastBound = session.MoveCutoff(slotA.Grade, 546, new object());
+        Assert.False(pastBound.Success);
+        Assert.Equal(CutoffMoveFailure.OutOfRange, pastBound.Failure);
     }
 
     [Fact]

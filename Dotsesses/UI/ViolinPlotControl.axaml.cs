@@ -930,17 +930,21 @@ public partial class ViolinPlotControl : UserControl
         // Convert to raw score (can be beyond MinScore/MaxScore)
         var newScore = vm.NormalizedToScore(normalized);
 
-        // Build cutoffs with proposed position
+        // Build cutoffs with proposed position so the legacy spacing
+        // clamp can produce a visually-smooth pre-commit score.
         var allCutoffs = vm.Cursors
             .Where(c => c.IsEnabled)
             .Select(c => new GradeCutoff(c.Grade, c == _draggingBarbellCursor ? newScore : c.Score))
             .ToList();
-
-        // Validate movement - use very wide bounds to allow full range
-        var validated = _cursorValidation.ValidateMovement(
+        var clamped = _cursorValidation.ValidateMovement(
             _draggingBarbellCursor.Grade, newScore, allCutoffs, int.MinValue, int.MaxValue);
 
-        _draggingBarbellCursor.Score = validated;
+        // Slice 3: route the commit through GradingSession. The session
+        // applies canonical out-of-range bounds (issue #9 / Q3: -1, +5);
+        // rejected moves leave the cursor at its last valid position,
+        // and the mirror sync in MainWindowViewModel updates vm.Cursors
+        // on success.
+        vm.GradingSession?.MoveCutoff(_draggingBarbellCursor.Grade, clamped, this);
         e.Handled = true;
     }
 
@@ -1194,17 +1198,20 @@ public partial class ViolinPlotControl : UserControl
         // Convert to raw score (can be beyond MinScore/MaxScore)
         var newScore = vm.NormalizedToScore(normalized);
 
-        // Build cutoffs with proposed position
+        // Pre-clamp via legacy spacing rules so the visual lags the
+        // mouse smoothly past adjacent neighbors.
         var allCutoffs = vm.Cursors
             .Where(c => c.IsEnabled)
             .Select(c => new GradeCutoff(c.Grade, c == _draggingCursor ? newScore : c.Score))
             .ToList();
-
-        // Validate movement - use very wide bounds to allow full range
-        var validated = _cursorValidation.ValidateMovement(
+        var clamped = _cursorValidation.ValidateMovement(
             _draggingCursor.Grade, newScore, allCutoffs, int.MinValue, int.MaxValue);
 
-        _draggingCursor.Score = validated;
+        // Slice 3: route the commit through GradingSession (issue #6
+        // ADR-0010). Mirror sync in MainWindowViewModel reflects the
+        // change back into vm.Cursors so existing rendering keeps
+        // working until issue #14's cleanup.
+        vm.GradingSession?.MoveCutoff(_draggingCursor.Grade, clamped, this);
         e.Handled = true;
     }
 

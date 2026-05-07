@@ -138,24 +138,11 @@ shape).
 
 ---
 
-### TD007 — Cursor drag accepts scores below the AggregateScore envelope
+### TD007 — Cursor drag accepts scores below the AggregateScore envelope *(closed)*
 
-**Why it's debt:** Surfaced during manual smoke-testing of slice 2:
-in the live UI, dragging a cursor below the visible plot range
-lets the score go past −1 (and presumably arbitrarily negative).
-The legacy drag path in `MainWindow.axaml.cs` /
-`ViolinPlotControl.axaml.cs` calls `CursorValidation.ValidateMovement`
-with `minBound` derived from screen geometry, which is not pinned
-to the dataset's `AggregateScore` floor.
-
-`GradingSession.MoveCutoff` already enforces `[min−12, max+12]`
-relative to the data envelope (Q2=B in the slice 1 questionnaire),
-so this is fixed *as a side-effect* once slice #3 of issue #6
-migrates drag through the session.
-
-**Trigger:** Slice #3 of issue #6. Verify the manual smoke test
-afterwards — and if for some reason that slice is delayed, open a
-hot-fix issue against the legacy drag path.
-
-**Touches:** none for now — the fix lands with the slice #3
-migration.
+**Resolved by issue #9 / slice 3 of #6 (2026-05-07).** Both drag
+handlers now commit through `GradingSession.MoveCutoff`, which
+enforces `[min−1, max+5]` (issue #9 / Q3, asymmetric per
+maintainer preference). Rejected moves are silently dropped, so
+the cursor visually parks at its last valid position when the
+mouse pushes past the boundary.

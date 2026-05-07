@@ -53,6 +53,16 @@ public partial class ViolinPlotViewModel : ViewModelBase
     [ObservableProperty]
     private int _maxScore;
 
+    /// <summary>
+    /// The active GradingSession, pushed in from MainWindowViewModel after
+    /// every load. The violin's drag handlers commit through this; the
+    /// legacy <see cref="Cursors"/> collection is mirror-synced from
+    /// session by MainWindowViewModel and remains the source for
+    /// rendering until the slice 3 cleanup follow-up (issue #14).
+    /// </summary>
+    [ObservableProperty]
+    private GradingSession? _gradingSession;
+
 
     public ViolinPlotViewModel(ViolinPlotService violinService, IMessenger messenger, HoverDelayService hoverDelayService)
     {
