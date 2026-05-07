@@ -26,11 +26,15 @@ public sealed class GradingSession : ObservableObject
     private GradingStateChange _lastChange = null!;
 
     // Asymmetric margin around the AggregateGrade envelope: cursors
-    // can sit just below the lowest student score (so the catch-all
-    // band stays visible) and well above the highest (so the A
-    // boundary can be pushed past the top scorer to make A
-    // unattainable). Issue #9 / Q3: maintainer-chosen [-1, +5].
-    private const int ScoreBoundsMarginBelow = 1;
+    // can sit well below the lowest student score (so the lowest
+    // enabled cursor has room to drop further when lower grades are
+    // disabled — e.g. pushing the catch-all band so a data-floor
+    // student still falls into a real letter grade) and above the
+    // highest score (so the A boundary can be pushed past the top
+    // scorer to make A unattainable). Slice 3 of issue #6 used
+    // [-1, +5]; issue #17 widened the lower margin to -8 after a
+    // smoke-test showed -1 was too tight in real grading flows.
+    private const int ScoreBoundsMarginBelow = 8;
     private const int ScoreBoundsMarginAbove = 5;
 
     public ReadOnlyObservableCollection<CutoffSlot> Slots { get; }
