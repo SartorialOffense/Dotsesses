@@ -3,6 +3,7 @@ namespace Dotsesses.Tests.Services;
 using System.Text.Json;
 using Dotsesses.Models;
 using Dotsesses.Services;
+using Dotsesses.Tests.Fixtures;
 using Dotsesses.UI;
 
 public class StateServiceTests : IDisposable
@@ -31,10 +32,10 @@ public class StateServiceTests : IDisposable
         // Arrange
         var filePath = Path.Combine(_testDirectory, "test_state.json");
         var students = CreateTestStudents();
-        var cursors = CreateTestCursors();
+        var session = TestFixtures.SessionForGrading();
 
         // Act
-        await _stateService.SaveAsync(filePath, students, cursors, Array.Empty<ScoreSelection>(), "test_source.xlsx");
+        await _stateService.SaveAsync(filePath, students, session, Array.Empty<ScoreSelection>(), "test_source.xlsx");
 
         // Assert
         Assert.True(File.Exists(filePath));
@@ -50,10 +51,10 @@ public class StateServiceTests : IDisposable
         // Arrange
         var filePath = Path.Combine(_testDirectory, "test_state.json");
         var students = CreateTestStudents();
-        var cursors = CreateTestCursors();
+        var session = TestFixtures.SessionForGrading();
 
         // Act
-        await _stateService.SaveAsync(filePath, students, cursors, Array.Empty<ScoreSelection>());
+        await _stateService.SaveAsync(filePath, students, session, Array.Empty<ScoreSelection>());
 
         // Assert
         Assert.Equal(_testDirectory, _stateService.LastUsedDirectory);
@@ -65,8 +66,8 @@ public class StateServiceTests : IDisposable
         // Arrange
         var filePath = Path.Combine(_testDirectory, "test_state.json");
         var students = CreateTestStudents();
-        var cursors = CreateTestCursors();
-        await _stateService.SaveAsync(filePath, students, cursors, Array.Empty<ScoreSelection>(), "original_source.xlsx");
+        var session = TestFixtures.SessionForGrading();
+        await _stateService.SaveAsync(filePath, students, session, Array.Empty<ScoreSelection>(), "original_source.xlsx");
 
         // Act
         var loadedState = await _stateService.LoadAsync(filePath);
@@ -76,7 +77,8 @@ public class StateServiceTests : IDisposable
         Assert.Equal(2, loadedState.Version);
         Assert.Equal("original_source.xlsx", loadedState.SourceFile);
         Assert.Equal(2, loadedState.Students.Count);
-        Assert.Equal(2, loadedState.Cursors.Count);
+        // Slots are A and B (C is the catch-all and is appended); 3 cursor entries total.
+        Assert.Equal(3, loadedState.Cursors.Count);
     }
 
     [Fact]
@@ -85,8 +87,8 @@ public class StateServiceTests : IDisposable
         // Arrange
         var filePath = Path.Combine(_testDirectory, "test_state.json");
         var students = CreateTestStudents();
-        var cursors = CreateTestCursors();
-        await _stateService.SaveAsync(filePath, students, cursors, Array.Empty<ScoreSelection>());
+        var session = TestFixtures.SessionForGrading();
+        await _stateService.SaveAsync(filePath, students, session, Array.Empty<ScoreSelection>());
         _stateService.LastUsedDirectory = null; // Reset
 
         // Act
@@ -103,10 +105,10 @@ public class StateServiceTests : IDisposable
         var filePath = Path.Combine(_testDirectory, "roundtrip.json");
         var originalStudents = CreateTestStudents();
         originalStudents[0].Scores[0].Comment = "This is a test comment";
-        var cursors = CreateTestCursors();
+        var session = TestFixtures.SessionForGrading();
 
         // Act - Save then load
-        await _stateService.SaveAsync(filePath, originalStudents, cursors, Array.Empty<ScoreSelection>());
+        await _stateService.SaveAsync(filePath, originalStudents, session, Array.Empty<ScoreSelection>());
         var loadedState = await _stateService.LoadAsync(filePath);
         var (students, muppetMap) = _stateService.ConvertToStudents(loadedState);
 
@@ -121,21 +123,45 @@ public class StateServiceTests : IDisposable
     [Fact]
     public async Task RoundTrip_PreservesCursorData()
     {
-        // Arrange
+        // Arrange — TestFixtures.SessionForGrading defaults: A=450, B=250, C=50 (catch-all).
+        // Move A to 275 and disable B; verify both round-trip through the saved JSON.
         var filePath = Path.Combine(_testDirectory, "cursor_roundtrip.json");
         var students = CreateTestStudents();
-        var cursors = CreateTestCursors();
-        cursors[0].Score = 275;
-        cursors[1].IsEnabled = false;
+        var session = TestFixtures.SessionForGrading();
+        session.MoveCutoff(TestFixtures.GradeA, 275, originator: this);
+        session.DisableGrade(TestFixtures.GradeB);
 
-        // Act - Save then load
-        await _stateService.SaveAsync(filePath, students, cursors, Array.Empty<ScoreSelection>());
+        // Act
+        await _stateService.SaveAsync(filePath, students, session, Array.Empty<ScoreSelection>());
         var loadedState = await _stateService.LoadAsync(filePath);
 
-        // Assert
-        Assert.Equal(2, loadedState.Cursors.Count);
+        // Assert — A's new score landed; B is recorded as disabled.
         Assert.Equal(275, loadedState.Cursors.First(c => c.Grade == "A").Score);
         Assert.False(loadedState.Cursors.First(c => c.Grade == "B").Enabled);
+    }
+
+    [Fact]
+    public async Task RoundTrip_PreservesGradingSessionState_ViaConvertToGradingState()
+    {
+        // Save a session, load the SavedState, hydrate a fresh session via
+        // ConvertToGradingState + LoadCutoffs, and verify slot scores and
+        // EnabledGrades match the original.
+        var filePath = Path.Combine(_testDirectory, "session_roundtrip.json");
+        var students = CreateTestStudents();
+        var original = TestFixtures.SessionForGrading();
+        original.MoveCutoff(TestFixtures.GradeA, 400, originator: this);
+        original.DisableGrade(TestFixtures.GradeB);
+
+        await _stateService.SaveAsync(filePath, students, original, Array.Empty<ScoreSelection>());
+        var loaded = await _stateService.LoadAsync(filePath);
+
+        var fresh = TestFixtures.SessionForGrading();
+        var (cutoffs, enabledGrades) = _stateService.ConvertToGradingState(loaded, fresh);
+        fresh.LoadCutoffs(cutoffs, enabledGrades);
+
+        Assert.Equal(400, fresh.Slots.First(s => s.Grade.LetterGrade == LetterGrade.A).Score);
+        Assert.False(fresh.Slots.First(s => s.Grade.LetterGrade == LetterGrade.B).IsEnabled);
+        Assert.DoesNotContain(TestFixtures.GradeB, fresh.CurrentState.EnabledGrades);
     }
 
     [Fact]
@@ -208,7 +234,7 @@ public class StateServiceTests : IDisposable
     public async Task SaveAsync_WritesVersion2()
     {
         var filePath = Path.Combine(_testDirectory, "v2_check.json");
-        await _stateService.SaveAsync(filePath, CreateTestStudents(), CreateTestCursors(), Array.Empty<ScoreSelection>());
+        await _stateService.SaveAsync(filePath, CreateTestStudents(), TestFixtures.SessionForGrading(), Array.Empty<ScoreSelection>());
         var json = await File.ReadAllTextAsync(filePath);
         Assert.Contains("\"version\": 2", json);
     }
@@ -218,7 +244,7 @@ public class StateServiceTests : IDisposable
     {
         var filePath = Path.Combine(_testDirectory, "selection_roundtrip.json");
         var originalSelections = CreateTestScoreSelections();
-        await _stateService.SaveAsync(filePath, CreateTestStudents(), CreateTestCursors(), originalSelections);
+        await _stateService.SaveAsync(filePath, CreateTestStudents(), TestFixtures.SessionForGrading(), originalSelections);
         var loadedState = await _stateService.LoadAsync(filePath);
         var converted = _stateService.ConvertToScoreSelections(loadedState);
         Assert.Equal(originalSelections.Count, converted.Count);
@@ -233,16 +259,15 @@ public class StateServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task LoadAsync_V1ExampleFile_ReturnsEmptyScoreSelections()
+    public async Task LoadAsync_V1Json_ThrowsForUnsupportedVersion()
     {
-        var examplePath = ResolveRepoFile(Path.Combine("Dotsesses", "example", "IP exam scores 2025.dots"));
-        Assert.True(File.Exists(examplePath), $"Expected example file at {examplePath}");
-        var state = await _stateService.LoadAsync(examplePath);
-        Assert.NotNull(state);
-        Assert.Equal(1, state.Version);
-        Assert.NotNull(state.ScoreSelections);
-        Assert.Empty(state.ScoreSelections);
-        Assert.NotEmpty(state.Students);
+        var filePath = Path.Combine(_testDirectory, "v1.dots");
+        var v1Content = """{"version": 1, "savedAt": "2024-01-01T00:00:00Z", "students": [], "cursors": []}""";
+        await File.WriteAllTextAsync(filePath, v1Content);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _stateService.LoadAsync(filePath));
+        Assert.Contains("v1", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string ResolveRepoFile(string relativePath)

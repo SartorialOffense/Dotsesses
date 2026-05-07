@@ -25,15 +25,39 @@ public class StateService
     public string? LastUsedDirectory { get; set; }
 
     /// <summary>
-    /// Saves the current state to a JSON file.
+    /// Saves the current state to a JSON file. The GradingSession is the
+    /// canonical source for cutoff and enabled-grades data; per-slot
+    /// scores are persisted (including disabled slots) so a load
+    /// round-trip restores the user's last-known positions.
     /// </summary>
     public async Task SaveAsync(
         string filePath,
         IEnumerable<StudentAssessment> students,
-        IEnumerable<CursorViewModel> cursors,
+        GradingSession gradingSession,
         IEnumerable<ScoreSelection> selections,
         string? sourceFile = null)
     {
+        ArgumentNullException.ThrowIfNull(gradingSession);
+
+        var slotGrades = gradingSession.Slots.Select(s => s.Grade).ToHashSet();
+
+        var savedCursors = gradingSession.Slots
+            .Select(slot => new SavedCursor
+            {
+                Grade = slot.Grade.DisplayName,
+                Score = slot.Score,
+                Enabled = slot.IsEnabled,
+            })
+            .Concat(gradingSession.CurrentState.Cutoffs
+                .Where(c => !slotGrades.Contains(c.Grade))
+                .Select(c => new SavedCursor
+                {
+                    Grade = c.Grade.DisplayName,
+                    Score = c.Score,
+                    Enabled = true,
+                }))
+            .ToList();
+
         var state = new SavedState
         {
             Version = 2,
@@ -57,12 +81,7 @@ public class StateService
                     Value = a.Value
                 }).ToList()
             }).ToList(),
-            Cursors = cursors.Select(c => new SavedCursor
-            {
-                Grade = c.Grade.DisplayName,
-                Score = c.Score,
-                Enabled = c.IsEnabled
-            }).ToList(),
+            Cursors = savedCursors,
             ScoreSelections = selections.Select(s => new SavedScoreSelection
             {
                 Name = s.Name,
@@ -80,7 +99,7 @@ public class StateService
     }
 
     /// <summary>
-    /// Loads state from a JSON file.
+    /// Loads state from a JSON file. Rejects v1 files per ADR-0009.
     /// </summary>
     public async Task<SavedState> LoadAsync(string filePath)
     {
@@ -90,6 +109,14 @@ public class StateService
         if (state == null)
         {
             throw new InvalidOperationException("Failed to deserialize state file.");
+        }
+
+        if (state.Version < 2)
+        {
+            throw new InvalidOperationException(
+                $"This .dots file is v{state.Version}, which is no longer supported. " +
+                "Re-load the original Excel file and save a fresh .dots file " +
+                "(see ADR-0009).");
         }
 
         LastUsedDirectory = Path.GetDirectoryName(filePath);
@@ -134,6 +161,38 @@ public class StateService
         return state.ScoreSelections
             .Select(s => new ScoreSelection(s.Name, s.Index, s.Display, s.Aggregate, s.Correlation))
             .ToList();
+    }
+
+    /// <summary>
+    /// Converts a SavedState's cursor data into the (cutoffs, enabledGrades)
+    /// pair that GradingSession.LoadCutoffs expects. The supplied
+    /// <paramref name="session"/> provides the canonical Grade objects (so
+    /// the string-keyed SavedCursor entries can be mapped back to
+    /// strongly-typed Grade records).
+    /// </summary>
+    public (IReadOnlyList<GradeCutoff> Cutoffs, IReadOnlySet<Grade> EnabledGrades)
+        ConvertToGradingState(SavedState state, GradingSession session)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var allGrades = session.Slots
+            .Select(s => s.Grade)
+            .Concat(session.CurrentState.Cutoffs.Select(c => c.Grade))
+            .Distinct()
+            .ToDictionary(g => g.DisplayName);
+
+        var cutoffs = state.Cursors
+            .Where(sc => allGrades.ContainsKey(sc.Grade))
+            .Select(sc => new GradeCutoff(allGrades[sc.Grade], sc.Score))
+            .ToList();
+
+        var enabledGrades = state.Cursors
+            .Where(sc => sc.Enabled && allGrades.ContainsKey(sc.Grade))
+            .Select(sc => allGrades[sc.Grade])
+            .ToHashSet();
+
+        return (cutoffs, enabledGrades);
     }
 
     /// <summary>

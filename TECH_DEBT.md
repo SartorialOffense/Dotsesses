@@ -52,23 +52,15 @@ binding that displays MuppetName, and the generation logic in
 
 ---
 
-### TD003 — Initial cursors / Compliance grid duplicate on second load
+### TD003 — Initial cursors / Compliance grid duplicate on second load *(closed)*
 
-**Why it's debt:**
-`MainWindowViewModel.InitializeCursors()` and
-`InitializeComplianceGrid()` append to their `ObservableCollection`s
-without clearing first. Calling `LoadFromExcelFile` then
-`LoadStateAsync` on the same ViewModel duplicates the cursor and
-Compliance rows. Production user flow (one fresh-app + one load)
-doesn't hit this; tests work around it via the parameterless
-`CreateForTesting()` overload.
-
-**Trigger:** Multi-Class handling will exercise repeated load paths
-on the same ViewModel and surface this immediately. Fix as part of
-that work.
-
-**Touches:** `MainWindowViewModel.cs` (the two `Initialize*` methods
-and their callers).
+**Resolved by issue #8 / slice 2 of #6 (2026-05-07).** The freshly
+constructed `GradingSession` now provides the single seam from "no
+grading state" to "valid grading state" on every load (Excel and
+saved state), so the duplicate-append path no longer affects the
+canonical state. The legacy `_cursors` and `InitializeComplianceGrid`
+mechanics still exist but are slated for removal in slices #3 and
+#4 of the issue #6 refactor.
 
 ---
 
@@ -98,3 +90,72 @@ deferred until this is fixed.
 **Touches:** `Calculators/CursorPlacementCalculator.cs` (the private
 `ResetToEvenSpacing`), and the existing test should be tightened to
 assert orientation, not just even spacing.
+
+---
+
+### TD005 — Consolidate test fixture files into a dedicated folder
+
+**Why it's debt:** Test fixtures (`IP exam scores 2025.xlsx`, the
+v2 example `.dots`, etc.) live under `Dotsesses/example/`, which is
+shared with documentation/demo material and lives inside the main
+project, not the test project. Tests reach into the production
+project's directory via a `ResolveRepoFile` helper and a hard-coded
+relative path. A dedicated test data folder (e.g.
+`Dotsesses.Tests/TestData/` or `tests/fixtures/`) would make the
+boundary explicit and let `Dotsesses/example/` be purely
+user-facing demo material.
+
+**Trigger:** Any time a test fixture needs adding or moving;
+include in the same change to amortise the move.
+
+**Touches:** physical move of fixture files; update the
+`ResolveRepoFile` callers in `MainWindowViewModelTests` and
+`StateServiceTests` to point at the new path.
+
+---
+
+### TD006 — Compliance panel exposes no per-Grade enable/disable affordance
+
+**Why it's debt:** `CursorViewModel.IsEnabled` and the new
+`GradingSession.EnableGrade` / `DisableGrade` mutators support
+toggling individual Grades on and off, but the live UI has no
+discoverable control to drive them — no checkbox or toggle in the
+Compliance grid rows, no context menu on cursor visuals.
+Surfaced during manual smoke-testing of slice 2 (issue #8): the
+domain model says "user can disable a Grade" and the persistence
+layer round-trips that state, but a user actually trying it has
+nowhere to click.
+
+**Trigger:** Slice #5 of issue #6 (extract
+`ComplianceGridViewModel`) is the natural place to add the toggle
+control, since that's when Compliance rows become the canonical
+driver for `EnableGrade` / `DisableGrade`. If slice #5 lands without
+addressing this, open a dedicated issue.
+
+**Touches:** likely `Dotsesses/UI/MainWindow.axaml` (Compliance
+section) and `ComplianceRowViewModel` (already has `IsEnabled`
+shape).
+
+---
+
+### TD007 — Cursor drag accepts scores below the AggregateScore envelope
+
+**Why it's debt:** Surfaced during manual smoke-testing of slice 2:
+in the live UI, dragging a cursor below the visible plot range
+lets the score go past −1 (and presumably arbitrarily negative).
+The legacy drag path in `MainWindow.axaml.cs` /
+`ViolinPlotControl.axaml.cs` calls `CursorValidation.ValidateMovement`
+with `minBound` derived from screen geometry, which is not pinned
+to the dataset's `AggregateScore` floor.
+
+`GradingSession.MoveCutoff` already enforces `[min−12, max+12]`
+relative to the data envelope (Q2=B in the slice 1 questionnaire),
+so this is fixed *as a side-effect* once slice #3 of issue #6
+migrates drag through the session.
+
+**Trigger:** Slice #3 of issue #6. Verify the manual smoke test
+afterwards — and if for some reason that slice is delayed, open a
+hot-fix issue against the legacy drag path.
+
+**Touches:** none for now — the fix lands with the slice #3
+migration.
