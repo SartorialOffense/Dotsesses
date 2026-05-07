@@ -55,9 +55,41 @@ target range per Grade.
 three booleans — Display, Aggregate, Correlation — that determine
 where that Score participates. Persisted on ClassAssessment.
 
-**ClassAssessment**: The root container for one Class's grading
-session. Owns the StudentAssessments, current GradeCutoffs, the
-GradeCurve in use, ScoreSelections, MuppetNameMap, and SeriesColorMap.
+**ClassAssessment**: The post-load dataset for one Class — the
+StudentAssessments, the GradeCurve in use, ScoreSelections,
+MuppetNameMap, SeriesColorMap, and named SavedCutoffs. The *live*
+grading state (current GradeCutoffs, current CutoffCounts, EnabledGrades)
+is not on ClassAssessment — it lives on the paired **GradingSession**.
+
+**GradingState**: An immutable snapshot of a Class's grading at one
+moment — the current GradeCutoffs, the per-Grade CutoffCounts derived
+from them, and the set of EnabledGrades. Carried as the `State` member
+of every `GradingStateChange` notification.
+
+**GradingSession**: The live, observable counterpart to a GradingState
+snapshot. Owns the current GradingState for one Class, validates
+mutations (cursor moves, Grade enable/disable, reseed), and broadcasts
+each accepted change via INPC with the new GradingState and the
+originator object embedded in the payload. There is one GradingSession
+per loaded Class.
+
+A GradingSession is **immutable in shape**: the set of Grades it
+manages — and therefore the set of CutoffSlots it exposes — is fixed
+at construction time from the loaded ClassAssessment. Mutations
+within that lifetime are limited to per-Slot Score, per-Grade
+EnabledGrades membership, and the derived CutoffCounts. Any
+structural change (different Grade set, different GradeCurve) means
+constructing a fresh GradingSession and rebuilding the dependent
+view models — never in-place restructuring.
+
+**CutoffSlot**: The UI-binding adapter for one GradeCutoff inside a
+GradingSession — a stable per-Grade observable handle exposing
+`Score` and `IsEnabled`. Slots are owned by the GradingSession; the
+session updates a slot's properties in place when a mutation is
+accepted. The dotplot and violin plot bind their cursor visuals to
+the slot collection so item identity is preserved across moves (no
+ItemsControl rebuild churn). Slots are read-only from the binding
+side — mutations go through the GradingSession's API.
 
 **GradeBin**: The vertical stack of dots in the dotplot at one
 AggregateScore value. Students sharing an AggregateScore stack into the
