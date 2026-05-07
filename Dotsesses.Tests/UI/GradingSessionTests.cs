@@ -105,27 +105,32 @@ public class GradingSessionTests
         // permits. The catch-all (or whichever worse neighbor is
         // enabled) is now the only floor, via OrderingViolation /
         // WouldOverlap.
-        //
-        // Fixture: A=450, B=250, C=50, F catch-all at 38. Disable C so
-        // B's worse neighbor is the catch-all directly.
         var session = TestFixtures.SessionForGrading();
         var slotB = session.Slots.First(s => s.Grade.LetterGrade == LetterGrade.B);
         session.DisableGrade(TestFixtures.GradeC);
 
-        // 39 is just above the catch-all (38). Pre-#18 this would have
-        // failed with OutOfRange because 39 < 42 (the old lower bound).
-        // Post-#18 it succeeds — neighbor spacing is satisfied.
-        var lowMove = session.MoveCutoff(slotB.Grade, 39, new object());
+        // Look up the catch-all's actual score from session state — its
+        // exact value depends on the fixture's data envelope and the
+        // legacy-matched fallback formula in GradingSession.
+        var catchAllScore = session.CurrentState.Cutoffs
+            .Single(c => c.Grade.LetterGrade == LetterGrade.F)
+            .Score;
+
+        // One above the catch-all: succeeds (neighbor spacing satisfied).
+        // This score is well below the prior OutOfRange floor (which
+        // was `min − 8 = 42` in the fixture), so passing here proves the
+        // floor is gone.
+        var lowMove = session.MoveCutoff(slotB.Grade, catchAllScore + 1, new object());
         Assert.True(lowMove.Success);
-        Assert.Equal(39, slotB.Score);
+        Assert.Equal(catchAllScore + 1, slotB.Score);
 
         // Same score as catch-all → WouldOverlap (not OutOfRange).
-        var atCatchAll = session.MoveCutoff(slotB.Grade, 38, new object());
+        var atCatchAll = session.MoveCutoff(slotB.Grade, catchAllScore, new object());
         Assert.False(atCatchAll.Success);
         Assert.Equal(CutoffMoveFailure.WouldOverlap, atCatchAll.Failure);
 
         // Below the catch-all → OrderingViolation (not OutOfRange).
-        var belowCatchAll = session.MoveCutoff(slotB.Grade, 37, new object());
+        var belowCatchAll = session.MoveCutoff(slotB.Grade, catchAllScore - 1, new object());
         Assert.False(belowCatchAll.Success);
         Assert.Equal(CutoffMoveFailure.OrderingViolation, belowCatchAll.Failure);
     }

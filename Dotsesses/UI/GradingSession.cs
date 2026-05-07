@@ -133,26 +133,51 @@ public sealed class GradingSession : ObservableObject
         // Untargeted slots (zero-range CutoffCountRange) get fallback
         // positions in a band below the data envelope — visible and
         // draggable but not positioned to catch students by default.
-        // Mirrors the legacy SeedCursorsFromDefaults "Second pass" so
-        // the legacy `_cursors` mirror sync stays consistent during
-        // the slice-3 transition.
+        // Match the legacy SeedCursorsFromDefaults "Second pass"
+        // algorithm exactly so the initial visible positions agree
+        // between the legacy `_cursors` collection and `session.Slots`.
+        // Otherwise the mirror sync after the first drag yanks
+        // untargeted cursors from their legacy positions to session
+        // positions, producing a visible "jump."
+        //
+        // Legacy stack order (descending Order):
+        //   i=0 → catch-all (basePosition)
+        //   i=1 → next-lowest grade (basePosition + spacing)
+        //   i=2 → ...                  (basePosition + 2*spacing)
+        //   ...
         var minStudentScore = classAssessment.Assessments.Min(a => a.AggregateGrade);
         var maxStudentScore = classAssessment.Assessments.Max(a => a.AggregateGrade);
         var fallbackScoreRange = maxStudentScore - minStudentScore;
         var fallbackBaseScore = (int)Math.Round(minStudentScore - fallbackScoreRange * 0.25);
 
+        // Spacing formula copied verbatim from
+        // MainWindowViewModel.SeedCursorsFromDefaults so the two
+        // placements match. When issue #14's cleanup deletes the
+        // legacy path, this formula can be replaced with something
+        // simpler (it currently encodes a 400px-plot pixel
+        // assumption, which is a layout detail that doesn't belong
+        // here).
+        const double BarbellHandlePixels = 8.0;
+        const double SpacingPixels = BarbellHandlePixels * 2;
+        const double EstimatedPlotHeight = 400.0 * 0.8;
+        var fallbackCursorSpacing = (int)Math.Ceiling(
+            SpacingPixels * fallbackScoreRange / Math.Max(1, EstimatedPlotHeight));
+
         var untargetedSlotGrades = slotGrades
             .Where(g => !seededCutoffs.ContainsKey(g))
-            .OrderBy(g => g.Order)
+            .OrderByDescending(g => g.Order)
             .ToList();
 
         var fallbackScores = new Dictionary<Grade, int>();
         for (int i = 0; i < untargetedSlotGrades.Count; i++)
         {
-            // Lower-Order grades sit higher in the fallback band so the
-            // overall (Order, Score) relationship stays monotonic
-            // descending across all slots.
-            fallbackScores[untargetedSlotGrades[i]] = fallbackBaseScore - i * DefaultCursorSpacing;
+            // i=0 is reserved for the catch-all; slot positions start
+            // at i=1 and stack upward with descending Order. So the
+            // highest-Order untargeted slot gets the lowest score
+            // above the catch-all, and the lowest-Order untargeted
+            // slot tops the fallback band.
+            fallbackScores[untargetedSlotGrades[i]] =
+                fallbackBaseScore + (i + 1) * fallbackCursorSpacing;
         }
 
         _slots = new ObservableCollection<CutoffSlot>(
@@ -165,10 +190,12 @@ public sealed class GradingSession : ObservableObject
 
         Slots = new ReadOnlyObservableCollection<CutoffSlot>(_slots);
 
-        // Catch-all sits below the lowest slot so it remains the
-        // assignment fallback (until a user drags a slot below it,
-        // which ValidateMove rejects via OrderingViolation).
-        _catchAllScore = _slots.Min(s => s.Score) - DefaultCursorSpacing;
+        // Catch-all sits at the legacy "i=0" position — basePosition.
+        // This stays below all slot positions whether or not there are
+        // untargeted slots, since untargeted slots stack above
+        // basePosition and targeted slots are seeded inside the data
+        // envelope (above basePosition by construction).
+        _catchAllScore = fallbackBaseScore;
 
         var initialCutoffs = BuildCurrentCutoffs();
         var enabledGrades = _slots
@@ -189,12 +216,6 @@ public sealed class GradingSession : ObservableObject
 
         _lastChange = new GradingStateChange(Originator: null, State: initialState);
     }
-
-    // Matches CursorPlacementCalculator's DefaultCursorSpacing — the
-    // minimum safe gap between adjacent cutoffs that still respects
-    // ordering. Used to space the fallback band for untargeted slots
-    // and to position the catch-all below them.
-    private const int DefaultCursorSpacing = 12;
 
     public CutoffMoveResult CanMoveCutoff(Grade grade, int newScore)
     {
