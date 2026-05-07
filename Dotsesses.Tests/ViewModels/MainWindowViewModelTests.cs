@@ -102,17 +102,6 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
-    public void Constructor_InitializesCursors()
-    {
-        // Act
-        var viewModel = CreateViewModel();
-
-        // Assert
-        Assert.NotNull(viewModel.Cursors);
-        Assert.NotEmpty(viewModel.Cursors);
-    }
-
-    [Fact]
     public void Constructor_InitializesComplianceGrid()
     {
         // Act
@@ -129,14 +118,15 @@ public class MainWindowViewModelTests
         // Arrange
         var viewModel = CreateViewModel();
 
-        // Assert - All grades (A through F) should be enabled by default
+        // Assert — All grades (A through F) are enabled by default. The
+        // catch-all (F in production) is structurally always enabled and
+        // not present in Slots; assert via session.CurrentState.EnabledGrades.
         var fGrade = viewModel.ComplianceRows.FirstOrDefault(r => r.Grade.LetterGrade == LetterGrade.F);
         Assert.NotNull(fGrade);
-        Assert.True(fGrade.IsEnabled, "F grade should be enabled by default");
+        Assert.True(fGrade.IsEnabled, "F compliance row should be enabled by default");
 
-        var fCursor = viewModel.Cursors.FirstOrDefault(c => c.Grade.LetterGrade == LetterGrade.F);
-        Assert.NotNull(fCursor);
-        Assert.True(fCursor.IsEnabled, "F cursor should be enabled by default");
+        var enabledGrades = viewModel.GradingSession.CurrentState.EnabledGrades;
+        Assert.Contains(enabledGrades, g => g.LetterGrade == LetterGrade.F);
     }
 
     // -----------------------------------------------------------------------
@@ -312,6 +302,36 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
+    public void LoadFromExcelFile_AllSlotsEnabled_IncludingNonMandatoryGrades()
+    {
+        // Regression for issue #14 cleanup follow-up: every slot in the
+        // session — including grades without a mandatory percentage range
+        // (C-, D+, D in the production curve) — must remain enabled
+        // after load. The constructor seeds those at fallback-band
+        // positions and marks them enabled; the post-load
+        // SeedCursorsFromDefaults helper must not silently flip them
+        // off, otherwise the user loses the corresponding cursors and
+        // can't drag them.
+        var vm = CreateViewModel();
+
+        var nonMandatoryGrades = new[]
+        {
+            LetterGrade.CMinus,
+            LetterGrade.DPlus,
+            LetterGrade.D,
+        };
+
+        foreach (var letter in nonMandatoryGrades)
+        {
+            var slot = vm.GradingSession.Slots
+                .FirstOrDefault(s => s.Grade.LetterGrade == letter);
+            Assert.NotNull(slot);
+            Assert.True(slot.IsEnabled,
+                $"Slot for {letter} (no mandatory range) must be enabled after load.");
+        }
+    }
+
+    [Fact]
     public void LoadFromExcelFile_TwoLoads_ProduceFreshSession()
     {
         // Each load creates a new session — no state from the prior file leaks.
@@ -323,52 +343,6 @@ public class MainWindowViewModelTests
             ResolveRepoFile(Path.Combine("Dotsesses", "example", "IP exam scores 2025.xlsx")));
 
         Assert.NotSame(firstSession, vm.GradingSession);
-    }
-
-    [Fact]
-    public void Cursors_IncludesNonDraggableGrades_NotPresentInSessionSlots()
-    {
-        // Regression for the slice-3 hotfix: the legacy `Cursors` collection
-        // contains every grade in DefaultCurveGenerator.GetAllGrades() (11
-        // entries in production), including the structural catch-all (C
-        // for the production curve) and zero-range grades (CMinus, DPlus,
-        // D, F). `GradingSession.Slots` only contains the draggable
-        // grades (6 in production). A drag handler that calls
-        // `session.MoveCutoff(grade, …)` for a Cursors-only grade would
-        // see ArgumentException → uncaught → app crash. Verifying that
-        // the discrepancy exists so the drag-handler guard is justified.
-        var vm = CreateViewModel();
-        var slotGrades = vm.GradingSession.Slots.Select(s => s.Grade).ToHashSet();
-        var cursorGrades = vm.Cursors.Select(c => c.Grade).ToHashSet();
-        var nonDraggable = cursorGrades.Except(slotGrades).ToList();
-
-        Assert.NotEmpty(nonDraggable);
-        // And the session would refuse to move any of them — preserving
-        // the API contract from ADR-0011.
-        foreach (var grade in nonDraggable)
-        {
-            Assert.Throws<ArgumentException>(() =>
-                vm.GradingSession.MoveCutoff(grade, 100, originator: this));
-        }
-    }
-
-    [Fact]
-    public void GradingSession_MoveCutoff_MirrorsIntoLegacyCursorsCollection()
-    {
-        // Slice 3: drag goes through GradingSession.MoveCutoff. The legacy
-        // Cursors collection mirror-syncs from session.LastChange so existing
-        // OxyPlot rendering and Compliance recalc paths keep working until
-        // the cleanup slice (issue #14) deletes _cursors entirely.
-        var vm = CreateViewModel();
-        var slotA = vm.GradingSession.Slots.First(s => s.Grade.LetterGrade == LetterGrade.A);
-        var initial = slotA.Score;
-        var newScore = initial - 5;
-
-        vm.GradingSession.MoveCutoff(slotA.Grade, newScore, originator: this);
-
-        var legacyA = vm.Cursors.First(c => c.Grade.LetterGrade == LetterGrade.A);
-        Assert.Equal(newScore, slotA.Score);
-        Assert.Equal(newScore, legacyA.Score);
     }
 
     [Fact]
@@ -549,18 +523,18 @@ public class MainWindowViewModelTests
         // post-fix the defensive fallback kicks in and Apply succeeds.
         var ex = Record.Exception(() => vm.ApplyScoreSelections(narrowOnlySelections));
 
-        // Assert — no crash. ClassAssessment.Current populated. Cursors monotonic by Grade.Order.
+        // Assert — no crash. ClassAssessment.Current populated. Slots monotonic by Grade.Order.
         Assert.Null(ex);
         Assert.NotNull(vm.ClassAssessment.Current);
 
-        var cursorsByOrder = vm.Cursors.OrderBy(c => c.Grade.Order).ToList();
-        for (int i = 0; i < cursorsByOrder.Count - 1; i++)
+        var slotsByOrder = vm.GradingSession.Slots.OrderBy(s => s.Grade.Order).ToList();
+        for (int i = 0; i < slotsByOrder.Count - 1; i++)
         {
             Assert.True(
-                cursorsByOrder[i].Score >= cursorsByOrder[i + 1].Score,
-                $"Cursor for {cursorsByOrder[i].Grade.DisplayName} (score {cursorsByOrder[i].Score}) " +
-                $"must be ≥ cursor for {cursorsByOrder[i + 1].Grade.DisplayName} " +
-                $"(score {cursorsByOrder[i + 1].Score}) after narrow-aggregate Apply.");
+                slotsByOrder[i].Score >= slotsByOrder[i + 1].Score,
+                $"Slot for {slotsByOrder[i].Grade.DisplayName} (score {slotsByOrder[i].Score}) " +
+                $"must be ≥ slot for {slotsByOrder[i + 1].Grade.DisplayName} " +
+                $"(score {slotsByOrder[i + 1].Score}) after narrow-aggregate Apply.");
         }
     }
 
@@ -684,10 +658,10 @@ public class MainWindowViewModelTests
         // wide-range positions from the original load.
         var newMin = vm.ClassAssessment.Assessments.Min(a => a.AggregateGrade);
         var newMax = vm.ClassAssessment.Assessments.Max(a => a.AggregateGrade);
-        Assert.All(vm.Cursors, c =>
+        Assert.All(vm.GradingSession.Slots, s =>
         {
-            Assert.True(c.Score >= newMin && c.Score <= newMax,
-                $"Cursor for {c.Grade.DisplayName} score={c.Score} must lie within new aggregate " +
+            Assert.True(s.Score >= newMin && s.Score <= newMax,
+                $"Slot for {s.Grade.DisplayName} score={s.Score} must lie within new aggregate " +
                 $"range [{newMin}, {newMax}] after the narrow-aggregate fallback fires.");
         });
     }
@@ -709,18 +683,17 @@ public class MainWindowViewModelTests
         var nonTotalScore = firstStudent.Scores.First(s =>
             !string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase) && s.Value > 0);
 
-        // Hand-set the B cursor to a deliberately off-default Score (mimics a user drag).
-        // Decrement by 1 so we stay within the valid B+ ≥ B ≥ B- ordering invariant
-        // (MEM023 — OnCursorPropertyChanged fires synchronously on assignment, and a value
-        // that breaks ordering throws "Cutoffs are out of order"). One unit off-default is
-        // enough to detect a reset because SeedCursorsFromDefaults computes via the
-        // InitialCutoffCalculator + barbell projection, which is deterministic for a fixed
-        // (assessments, midpointCurve) pair — so the post-Apply cursor value lands on the
-        // recomputed cutoff, not on the hand-set value.
-        var bCursor = vm.Cursors.First(c => c.Grade.LetterGrade == LetterGrade.B);
-        var handSetScore = bCursor.Score - 1;
-        bCursor.Score = handSetScore;
-        Assert.Equal(handSetScore, vm.Cursors.First(c => c.Grade.LetterGrade == LetterGrade.B).Score);
+        // Hand-set the B slot to a deliberately off-default Score (mimics a user drag).
+        // Decrement by 1 so we stay within the valid B+ ≥ B ≥ B- ordering invariant.
+        // One unit off-default is enough to detect a reset because
+        // SeedCursorsFromDefaults computes via the InitialCutoffCalculator + barbell
+        // projection, which is deterministic for a fixed (assessments, midpointCurve)
+        // pair — so the post-Apply slot value lands on the recomputed cutoff, not on
+        // the hand-set value.
+        var bSlot = vm.GradingSession.Slots.First(s => s.Grade.LetterGrade == LetterGrade.B);
+        var handSetScore = bSlot.Score - 1;
+        vm.GradingSession.MoveCutoff(bSlot.Grade, handSetScore, originator: this);
+        Assert.Equal(handSetScore, vm.GradingSession.Slots.First(s => s.Grade.LetterGrade == LetterGrade.B).Score);
 
         // Build a selection list that toggles Aggregate=false on the chosen non-Total score.
         var modified = vm.ClassAssessment.ScoreSelections
@@ -733,9 +706,9 @@ public class MainWindowViewModelTests
         // Act
         vm.ApplyScoreSelections(modified);
 
-        // Assert — cursor moved off the hand-set value...
-        var bCursorAfter = vm.Cursors.First(c => c.Grade.LetterGrade == LetterGrade.B);
-        Assert.NotEqual(handSetScore, bCursorAfter.Score);
+        // Assert — slot moved off the hand-set value...
+        var bSlotAfter = vm.GradingSession.Slots.First(s => s.Grade.LetterGrade == LetterGrade.B);
+        Assert.NotEqual(handSetScore, bSlotAfter.Score);
 
         // ...and the new value matches what a fresh InitialCutoffCalculator would compute
         // against the post-Apply Assessments. This mirrors the production projection in
@@ -749,20 +722,20 @@ public class MainWindowViewModelTests
         var expectedCutoffs = new InitialCutoffCalculator()
             .Calculate(vm.ClassAssessment.Assessments, midpointCurve);
         var expectedB = expectedCutoffs.First(c => c.Grade.LetterGrade == LetterGrade.B).Score;
-        Assert.Equal(expectedB, bCursorAfter.Score);
+        Assert.Equal(expectedB, bSlotAfter.Score);
     }
 
     [Fact]
     public void ApplyScoreSelections_DisplayOnlyChange_DoesNotResetCursors()
     {
-        // Arrange — load fixture, hand-set two cursor Score values to off-default values
-        // (mimics a user dragging cursors), then snapshot every cursor's Score.
+        // Arrange — load fixture, nudge two slots one unit off-default (mimics a user
+        // drag) via the session, then snapshot every slot's Score.
         var vm = CreateViewModel();
-        var bCursor = vm.Cursors.First(c => c.Grade.LetterGrade == LetterGrade.B);
-        var cCursor = vm.Cursors.First(c => c.Grade.LetterGrade == LetterGrade.C);
-        bCursor.Score = bCursor.Score + 7; // deliberate off-default
-        cCursor.Score = cCursor.Score - 3; // deliberate off-default
-        var snapshot = vm.Cursors.ToDictionary(c => c.Grade, c => c.Score);
+        var bSlot = vm.GradingSession.Slots.First(s => s.Grade.LetterGrade == LetterGrade.B);
+        var cSlot = vm.GradingSession.Slots.First(s => s.Grade.LetterGrade == LetterGrade.C);
+        vm.GradingSession.MoveCutoff(bSlot.Grade, bSlot.Score + 1, originator: this);
+        vm.GradingSession.MoveCutoff(cSlot.Grade, cSlot.Score - 1, originator: this);
+        var snapshot = vm.GradingSession.Slots.ToDictionary(s => s.Grade, s => s.Score);
 
         // Build a selection list that flips ONLY a Display flag (Aggregate, Correlation untouched).
         // Pick a non-Total score so we don't accidentally drop the Total from Aggregate.
@@ -779,14 +752,14 @@ public class MainWindowViewModelTests
         // Act
         vm.ApplyScoreSelections(modified);
 
-        // Assert — every cursor's Score is identical to the snapshot.
-        foreach (var cursor in vm.Cursors)
+        // Assert — every slot's Score is identical to the snapshot.
+        foreach (var slot in vm.GradingSession.Slots)
         {
-            Assert.True(snapshot.ContainsKey(cursor.Grade),
-                $"Cursor for {cursor.Grade.DisplayName} appeared after a Display-only change");
-            Assert.Equal(snapshot[cursor.Grade], cursor.Score);
+            Assert.True(snapshot.ContainsKey(slot.Grade),
+                $"Slot for {slot.Grade.DisplayName} appeared after a Display-only change");
+            Assert.Equal(snapshot[slot.Grade], slot.Score);
         }
-        Assert.Equal(snapshot.Count, vm.Cursors.Count);
+        Assert.Equal(snapshot.Count, vm.GradingSession.Slots.Count);
     }
 
     [Fact]
@@ -794,11 +767,11 @@ public class MainWindowViewModelTests
     {
         // Arrange — same shape as Display-only but flipping Correlation instead.
         var vm = CreateViewModel();
-        var bCursor = vm.Cursors.First(c => c.Grade.LetterGrade == LetterGrade.B);
-        var cCursor = vm.Cursors.First(c => c.Grade.LetterGrade == LetterGrade.C);
-        bCursor.Score = bCursor.Score + 11;
-        cCursor.Score = cCursor.Score - 5;
-        var snapshot = vm.Cursors.ToDictionary(c => c.Grade, c => c.Score);
+        var bSlot = vm.GradingSession.Slots.First(s => s.Grade.LetterGrade == LetterGrade.B);
+        var cSlot = vm.GradingSession.Slots.First(s => s.Grade.LetterGrade == LetterGrade.C);
+        vm.GradingSession.MoveCutoff(bSlot.Grade, bSlot.Score + 1, originator: this);
+        vm.GradingSession.MoveCutoff(cSlot.Grade, cSlot.Score - 1, originator: this);
+        var snapshot = vm.GradingSession.Slots.ToDictionary(s => s.Grade, s => s.Score);
 
         var firstStudent = vm.ClassAssessment.Assessments.First();
         var target = firstStudent.Scores.First(s =>
@@ -813,14 +786,14 @@ public class MainWindowViewModelTests
         // Act
         vm.ApplyScoreSelections(modified);
 
-        // Assert — no cursor moved.
-        foreach (var cursor in vm.Cursors)
+        // Assert — no slot moved.
+        foreach (var slot in vm.GradingSession.Slots)
         {
-            Assert.True(snapshot.ContainsKey(cursor.Grade),
-                $"Cursor for {cursor.Grade.DisplayName} appeared after a Correlation-only change");
-            Assert.Equal(snapshot[cursor.Grade], cursor.Score);
+            Assert.True(snapshot.ContainsKey(slot.Grade),
+                $"Slot for {slot.Grade.DisplayName} appeared after a Correlation-only change");
+            Assert.Equal(snapshot[slot.Grade], slot.Score);
         }
-        Assert.Equal(snapshot.Count, vm.Cursors.Count);
+        Assert.Equal(snapshot.Count, vm.GradingSession.Slots.Count);
     }
 
     // -------------------------------------------------------------------

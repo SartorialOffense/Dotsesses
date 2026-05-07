@@ -189,29 +189,6 @@ public class StateServiceTests : IDisposable
     }
 
     [Fact]
-    public void ApplyCursors_UpdatesExistingCursors()
-    {
-        // Arrange
-        var state = new SavedState
-        {
-            Cursors = new List<SavedCursor>
-            {
-                new() { Grade = "A", Score = 290, Enabled = true },
-                new() { Grade = "B", Score = 260, Enabled = false }
-            }
-        };
-        var cursors = CreateTestCursors();
-
-        // Act
-        _stateService.ApplyCursors(state, cursors);
-
-        // Assert
-        Assert.Equal(290, cursors.First(c => c.Grade.DisplayName == "A").Score);
-        Assert.Equal(260, cursors.First(c => c.Grade.DisplayName == "B").Score);
-        Assert.False(cursors.First(c => c.Grade.DisplayName == "B").IsEnabled);
-    }
-
-    [Fact]
     public async Task LoadAsync_WithInvalidFile_ThrowsException()
     {
         // Arrange
@@ -327,12 +304,4 @@ public class StateServiceTests : IDisposable
         };
     }
 
-    private List<CursorViewModel> CreateTestCursors()
-    {
-        return new List<CursorViewModel>
-        {
-            new CursorViewModel(new Grade(LetterGrade.A, 0), 280, true),
-            new CursorViewModel(new Grade(LetterGrade.B, 1), 250, true)
-        };
-    }
 }

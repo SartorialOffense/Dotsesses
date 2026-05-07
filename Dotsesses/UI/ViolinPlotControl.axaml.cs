@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
@@ -15,7 +14,6 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Messaging;
-using Dotsesses.Calculators;
 using Dotsesses.Messages;
 using Dotsesses.Models;
 using Dotsesses.Services;
@@ -33,9 +31,8 @@ public partial class ViolinPlotControl : UserControl
     private const int DoubleClickThresholdMs = 500;
 
     // Cursor dragging state
-    private CursorViewModel? _draggingCursor;
+    private CutoffSlot? _draggingCursor;
     private bool _isDraggingCursor;
-    private readonly CursorValidation _cursorValidation = new();
 
     // Current rendering theme
     private ThemeName _currentTheme = ThemeName.DarkMode;
@@ -123,7 +120,7 @@ public partial class ViolinPlotControl : UserControl
         var width = CursorColumnCanvas.Bounds.Width;
 
         // Render when canvas gets valid bounds for the first time, or when height changes significantly
-        if (height > 0 && width > 0 && DataContext is ViolinPlotViewModel vm && vm.Cursors != null && vm.Cursors.Count > 0)
+        if (height > 0 && width > 0 && DataContext is ViolinPlotViewModel vm && vm.GradingSession is { } session && session.Slots.Count > 0)
         {
             // Only re-render if this is the first time or height changed significantly (avoid excessive renders)
             if (!_cursorColumnHasRenderedOnce || Math.Abs(height - _lastCursorColumnHeight) > 1)
@@ -193,6 +190,8 @@ public partial class ViolinPlotControl : UserControl
         }, token);
     }
 
+    private GradingSession? _subscribedSession;
+
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
         if (DataContext is ViolinPlotViewModel vm)
@@ -205,18 +204,16 @@ public partial class ViolinPlotControl : UserControl
                 UpdateSvgDisplay(vm.SvgContent);
             }
 
-            // Subscribe to cursor changes
-            SubscribeToCursors(vm);
-
-            // Subscribe to compliance row changes
+            SubscribeToSession(vm.GradingSession);
             SubscribeToComplianceRows(vm);
 
             vm.PropertyChanged += (s, args) =>
             {
-                if (args.PropertyName == nameof(ViolinPlotViewModel.Cursors))
+                if (args.PropertyName == nameof(ViolinPlotViewModel.GradingSession))
                 {
-                    SubscribeToCursors(vm);
+                    SubscribeToSession(vm.GradingSession);
                     RenderRegionBands();
+                    RenderCursorColumn();
                 }
                 else if (args.PropertyName == nameof(ViolinPlotViewModel.ComplianceRows))
                 {
@@ -227,57 +224,22 @@ public partial class ViolinPlotControl : UserControl
         }
     }
 
-    private void SubscribeToCursors(ViolinPlotViewModel vm)
+    private void SubscribeToSession(GradingSession? session)
     {
-        if (vm.Cursors == null) return;
-
-        foreach (var cursor in vm.Cursors)
+        if (_subscribedSession is not null)
         {
-            // Idempotent: removing a non-subscribed handler is a no-op, so this is safe
-            // when called multiple times (e.g. from CollectionChanged after an in-place
-            // SeedCursorsFromDefaults rebuild).
-            cursor.PropertyChanged -= OnCursorPropertyChanged;
-            cursor.PropertyChanged += OnCursorPropertyChanged;
+            _subscribedSession.PropertyChanged -= OnSessionPropertyChanged;
         }
-
-        // Watch the collection itself for in-place mutations (Clear+Re-add cycle inside
-        // MainWindowViewModel.SeedCursorsFromDefaults reuses the same ObservableCollection
-        // reference, so the [ObservableProperty] PropertyChanged for Cursors does NOT fire
-        // — fixed by re-syncing subscriptions on every CollectionChanged event).
-        // M002/S05/T05 — Subscribed observed: violin barbell drag was no-op after an
-        // aggregate-change Apply because the cursor list was rebuilt in place and the
-        // PropertyChanged subscriptions were stranded on the old (removed) cursor instances.
-        if (vm.Cursors is INotifyCollectionChanged incc)
+        _subscribedSession = session;
+        if (_subscribedSession is not null)
         {
-            // Idempotent unsubscribe + subscribe so re-entry doesn't double-up.
-            incc.CollectionChanged -= OnCursorsCollectionChanged;
-            incc.CollectionChanged += OnCursorsCollectionChanged;
+            _subscribedSession.PropertyChanged += OnSessionPropertyChanged;
         }
     }
 
-    private void OnCursorsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    private void OnSessionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (DataContext is not ViolinPlotViewModel vm) return;
-
-        // Detach handlers from removed cursors so we don't leak them and so the next
-        // sequence of Score writes on the removed instances is silent.
-        if (e.OldItems != null)
-        {
-            foreach (CursorViewModel removed in e.OldItems)
-            {
-                removed.PropertyChanged -= OnCursorPropertyChanged;
-            }
-        }
-
-        // Attach handlers to the current cursor instances. SubscribeToCursors uses the
-        // idempotent unsubscribe-before-subscribe pattern so calling it on a partial
-        // diff (e.NewItems only) versus the full list both work; using the full list
-        // here is safer because Reset events do not provide e.OldItems.
-        SubscribeToCursors(vm);
-
-        // Force a re-render so the new cursor positions land on screen even if no Score
-        // mutation fires (e.g. an Add of a freshly-created cursor at the same Score as
-        // the one it logically replaced does not raise Score-PropertyChanged on its own).
+        if (e.PropertyName != nameof(GradingSession.LastChange)) return;
         RenderRegionBands();
         RenderCursorColumn();
     }
@@ -289,16 +251,6 @@ public partial class ViolinPlotControl : UserControl
         foreach (var row in vm.ComplianceRows)
         {
             row.PropertyChanged += OnComplianceRowPropertyChanged;
-        }
-    }
-
-    private void OnCursorPropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(CursorViewModel.Score) ||
-            e.PropertyName == nameof(CursorViewModel.IsEnabled))
-        {
-            RenderRegionBands();    // Update Canvas bands
-            RenderCursorColumn();   // Update Canvas cursor column
         }
     }
 
@@ -800,7 +752,7 @@ public partial class ViolinPlotControl : UserControl
     }
 
     // Barbell cursor state
-    private CursorViewModel? _draggingBarbellCursor;
+    private CutoffSlot? _draggingBarbellCursor;
     private bool _isDraggingBarbell;
     private const double BarbellHandleSize = 8;
 
@@ -808,7 +760,7 @@ public partial class ViolinPlotControl : UserControl
     {
         RegionBandsOverlay.Children.Clear();
 
-        if (DataContext is not ViolinPlotViewModel vm || vm.Cursors == null) return;
+        if (DataContext is not ViolinPlotViewModel vm || vm.GradingSession is not { } session) return;
 
         var height = RegionBandsOverlay.Bounds.Height;
         var width = RegionBandsOverlay.Bounds.Width;
@@ -820,22 +772,19 @@ public partial class ViolinPlotControl : UserControl
 
         var (bandLeft, bandRight) = totalBounds.Value;
 
-        var enabledCursors = vm.Cursors.Where(c => c.IsEnabled).OrderBy(c => c.Score).ToList();
-        if (!enabledCursors.Any()) return;
-
-        var lowestGrade = enabledCursors.OrderByDescending(c => c.Grade.Order).FirstOrDefault();
-        var cursorsWithLines = enabledCursors.Where(c => c != lowestGrade).OrderBy(c => c.Score).ToList();
-
-        if (!cursorsWithLines.Any()) return;
+        // Slots structurally exclude the catch-all (ADR-0011), so every
+        // enabled slot here gets a barbell — no lowest-Order exclusion.
+        var enabledSlots = session.Slots.Where(s => s.IsEnabled).OrderBy(s => s.Score).ToList();
+        if (!enabledSlots.Any()) return;
 
         var lineBrush = ThemeColors.TransparentLineBrush(_currentTheme);
         var handleBrush = ThemeColors.ForegroundBrush(_currentTheme);
         var handleFill = ThemeColors.BackgroundBrush(_currentTheme);
 
         // Draw barbell cursors at each grade boundary
-        foreach (var cursor in cursorsWithLines)
+        foreach (var slot in enabledSlots)
         {
-            var y = vm.ScoreToDisplayY(cursor.Score, height);
+            var y = vm.ScoreToDisplayY(slot.Score, height);
 
             // Draw the horizontal line (bar) - 50% transparent
             var line = new Line
@@ -844,7 +793,7 @@ public partial class ViolinPlotControl : UserControl
                 EndPoint = new Point(bandRight, y),
                 Stroke = lineBrush,
                 StrokeThickness = 1,
-                Tag = cursor,
+                Tag = slot,
                 IsHitTestVisible = false
             };
             RegionBandsOverlay.Children.Add(line);
@@ -857,7 +806,7 @@ public partial class ViolinPlotControl : UserControl
                 Fill = handleFill,
                 Stroke = handleBrush,
                 StrokeThickness = 2,
-                Tag = cursor,
+                Tag = slot,
                 Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.SizeNorthSouth)
             };
             Canvas.SetLeft(leftHandle, bandLeft); // Inward from left edge
@@ -872,7 +821,7 @@ public partial class ViolinPlotControl : UserControl
                 Fill = handleFill,
                 Stroke = handleBrush,
                 StrokeThickness = 2,
-                Tag = cursor,
+                Tag = slot,
                 Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.SizeNorthSouth)
             };
             Canvas.SetLeft(rightHandle, bandRight - BarbellHandleSize); // Inward from right edge
@@ -883,16 +832,16 @@ public partial class ViolinPlotControl : UserControl
 
     private void OnBarbellPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (DataContext is not ViolinPlotViewModel vm || vm.Cursors == null) return;
+        if (DataContext is not ViolinPlotViewModel vm || vm.GradingSession is null) return;
 
         var point = e.GetCurrentPoint(RegionBandsOverlay);
         if (!point.Properties.IsLeftButtonPressed) return;
 
         // Check if we clicked on a handle
         var clickedElement = RegionBandsOverlay.InputHitTest(point.Position);
-        if (clickedElement is Rectangle rect && rect.Tag is CursorViewModel cursor)
+        if (clickedElement is Rectangle rect && rect.Tag is CutoffSlot slot)
         {
-            _draggingBarbellCursor = cursor;
+            _draggingBarbellCursor = slot;
             _isDraggingBarbell = true;
             e.Pointer.Capture(RegionBandsOverlay);
             e.Handled = true;
@@ -908,7 +857,7 @@ public partial class ViolinPlotControl : UserControl
     private void OnBarbellPointerMoved(object? sender, PointerEventArgs e)
     {
         if (!_isDraggingBarbell || _draggingBarbellCursor == null) return;
-        if (DataContext is not ViolinPlotViewModel vm || vm.Cursors == null) return;
+        if (DataContext is not ViolinPlotViewModel vm || vm.GradingSession is not { } session) return;
 
         var height = RegionBandsOverlay.Bounds.Height;
         if (height <= 0) return;
@@ -930,26 +879,9 @@ public partial class ViolinPlotControl : UserControl
         // Convert to raw score (can be beyond MinScore/MaxScore)
         var newScore = vm.NormalizedToScore(normalized);
 
-        // Build cutoffs with proposed position so the legacy spacing
-        // clamp can produce a visually-smooth pre-commit score.
-        var allCutoffs = vm.Cursors
-            .Where(c => c.IsEnabled)
-            .Select(c => new GradeCutoff(c.Grade, c == _draggingBarbellCursor ? newScore : c.Score))
-            .ToList();
-        var clamped = _cursorValidation.ValidateMovement(
-            _draggingBarbellCursor.Grade, newScore, allCutoffs, int.MinValue, int.MaxValue);
-
-        // Slice 3: route the commit through GradingSession. The session
-        // applies canonical out-of-range bounds (issue #9 / Q3: -1, +5);
-        // rejected moves leave the cursor at its last valid position,
-        // and the mirror sync in MainWindowViewModel updates vm.Cursors
-        // on success. Guard non-draggable grades (catch-all, zero-range)
-        // since session.MoveCutoff throws ArgumentException for those.
-        if (vm.GradingSession is not null
-            && vm.GradingSession.Slots.Any(s => s.Grade.Equals(_draggingBarbellCursor.Grade)))
-        {
-            vm.GradingSession.MoveCutoff(_draggingBarbellCursor.Grade, clamped, this);
-        }
+        // Validation lives on the session — invalid moves are rejected and
+        // leave the slot at its last valid position.
+        session.MoveCutoff(_draggingBarbellCursor.Grade, newScore, this);
         e.Handled = true;
     }
 
@@ -971,23 +903,18 @@ public partial class ViolinPlotControl : UserControl
     {
         CursorColumnCanvas.Children.Clear();
 
-        if (DataContext is not ViolinPlotViewModel vm || vm.Cursors == null) return;
+        if (DataContext is not ViolinPlotViewModel vm || vm.GradingSession is not { } session) return;
 
         var height = CursorColumnCanvas.Bounds.Height;
         var width = CursorColumnCanvas.Bounds.Width;
         if (height <= 0 || width <= 0) return;
 
-        var enabledCursors = vm.Cursors.Where(c => c.IsEnabled).OrderBy(c => c.Score).ToList();
-        if (!enabledCursors.Any()) return;
+        // Slots structurally exclude the catch-all (ADR-0011).
+        var enabledSlots = session.Slots.Where(s => s.IsEnabled).OrderBy(s => s.Score).ToList();
+        if (!enabledSlots.Any()) return;
 
-        var lowestGrade = enabledCursors.OrderByDescending(c => c.Grade.Order).FirstOrDefault();
-        var cursorsWithLines = enabledCursors.Where(c => c != lowestGrade).OrderBy(c => c.Score).ToList();
-
-        // Draw grade labels
-        // Top grade (A): locked just below its cursor line
-        // Bottom grade (F): locked just above the plot bottom (no cursor)
-        // Middle grades: centered between their cursor lines
-        var enabledGrades = enabledCursors.Select(c => c.Grade).OrderBy(g => g.Order).ToList();
+        // Labels include the catch-all so the bottom grade is named.
+        var enabledGrades = session.CurrentState.EnabledGrades.OrderBy(g => g.Order).ToList();
 
         // Get plot area bounds for label positioning
         var plotTop = vm.GetPlotAreaTopFraction() * height;
@@ -1087,10 +1014,10 @@ public partial class ViolinPlotControl : UserControl
             if (i == 0)
             {
                 // Top grade (A): position above its cursor line with offset
-                var cursor = enabledCursors.FirstOrDefault(c => c.Grade.Order == grade.Order);
-                if (cursor != null)
+                var slot = enabledSlots.FirstOrDefault(s => s.Grade.Order == grade.Order);
+                if (slot != null)
                 {
-                    var cursorY = vm.ScoreToDisplayY(cursor.Score, height);
+                    var cursorY = vm.ScoreToDisplayY(slot.Score, height);
                     // Position label above cursor (smaller Y = higher on screen)
                     labelY = cursorY - labelOffset - containerHeight;
                 }
@@ -1101,11 +1028,11 @@ public partial class ViolinPlotControl : UserControl
             }
             else if (i == enabledGrades.Count - 1)
             {
-                // Bottom grade (F): position BELOW the lowest cursor line
-                var lowestCursor = cursorsWithLines.FirstOrDefault(); // First = lowest score
-                if (lowestCursor != null)
+                // Bottom grade (catch-all): position BELOW the lowest cursor line
+                var lowestSlot = enabledSlots.FirstOrDefault(); // First = lowest score
+                if (lowestSlot != null)
                 {
-                    var cursorY = vm.ScoreToDisplayY(lowestCursor.Score, height);
+                    var cursorY = vm.ScoreToDisplayY(lowestSlot.Score, height);
                     labelY = cursorY + labelOffset; // Below the cursor line
                 }
                 else
@@ -1116,12 +1043,12 @@ public partial class ViolinPlotControl : UserControl
             else
             {
                 // Middle grades: centered between adjacent cursors
-                var cursorAbove = enabledCursors.FirstOrDefault(c => c.Grade.Order == enabledGrades[i - 1].Order);
-                var cursorBelow = enabledCursors.FirstOrDefault(c => c.Grade.Order == grade.Order);
-                if (cursorAbove != null && cursorBelow != null)
+                var slotAbove = enabledSlots.FirstOrDefault(s => s.Grade.Order == enabledGrades[i - 1].Order);
+                var slotBelow = enabledSlots.FirstOrDefault(s => s.Grade.Order == grade.Order);
+                if (slotAbove != null && slotBelow != null)
                 {
-                    var aboveY = vm.ScoreToDisplayY(cursorAbove.Score, height);
-                    var belowY = vm.ScoreToDisplayY(cursorBelow.Score, height);
+                    var aboveY = vm.ScoreToDisplayY(slotAbove.Score, height);
+                    var belowY = vm.ScoreToDisplayY(slotBelow.Score, height);
                     labelY = (aboveY + belowY) / 2.0 - containerHeight / 2.0;
                 }
                 else
@@ -1140,7 +1067,7 @@ public partial class ViolinPlotControl : UserControl
 
     private void OnCursorColumnPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (DataContext is not ViolinPlotViewModel vm || vm.Cursors == null) return;
+        if (DataContext is not ViolinPlotViewModel vm || vm.GradingSession is not { } session) return;
 
         var point = e.GetCurrentPoint(CursorColumnCanvas);
         if (!point.Properties.IsLeftButtonPressed) return;
@@ -1150,21 +1077,18 @@ public partial class ViolinPlotControl : UserControl
 
         var clickY = point.Position.Y;
 
-        // Find nearest cursor line
-        var lowestGrade = vm.Cursors.Where(c => c.IsEnabled)
-            .OrderByDescending(c => c.Grade.Order).FirstOrDefault();
-
-        CursorViewModel? nearest = null;
+        // Find nearest slot line. Slots already exclude the catch-all.
+        CutoffSlot? nearest = null;
         double minDist = double.MaxValue;
 
-        foreach (var cursor in vm.Cursors.Where(c => c.IsEnabled && c != lowestGrade))
+        foreach (var slot in session.Slots.Where(s => s.IsEnabled))
         {
-            var cursorY = vm.ScoreToDisplayY(cursor.Score, height);
+            var cursorY = vm.ScoreToDisplayY(slot.Score, height);
             var dist = Math.Abs(cursorY - clickY);
             if (dist < minDist)
             {
                 minDist = dist;
-                nearest = cursor;
+                nearest = slot;
             }
         }
 
@@ -1181,7 +1105,7 @@ public partial class ViolinPlotControl : UserControl
     private void OnCursorColumnPointerMoved(object? sender, PointerEventArgs e)
     {
         if (!_isDraggingCursor || _draggingCursor == null) return;
-        if (DataContext is not ViolinPlotViewModel vm || vm.Cursors == null) return;
+        if (DataContext is not ViolinPlotViewModel vm || vm.GradingSession is not { } session) return;
 
         var height = CursorColumnCanvas.Bounds.Height;
         if (height <= 0) return;
@@ -1203,25 +1127,9 @@ public partial class ViolinPlotControl : UserControl
         // Convert to raw score (can be beyond MinScore/MaxScore)
         var newScore = vm.NormalizedToScore(normalized);
 
-        // Pre-clamp via legacy spacing rules so the visual lags the
-        // mouse smoothly past adjacent neighbors.
-        var allCutoffs = vm.Cursors
-            .Where(c => c.IsEnabled)
-            .Select(c => new GradeCutoff(c.Grade, c == _draggingCursor ? newScore : c.Score))
-            .ToList();
-        var clamped = _cursorValidation.ValidateMovement(
-            _draggingCursor.Grade, newScore, allCutoffs, int.MinValue, int.MaxValue);
-
-        // Slice 3: route the commit through GradingSession (issue #6
-        // ADR-0010). Mirror sync in MainWindowViewModel reflects the
-        // change back into vm.Cursors so existing rendering keeps
-        // working until issue #14's cleanup. Guard non-draggable
-        // grades (catch-all, zero-range): session throws on those.
-        if (vm.GradingSession is not null
-            && vm.GradingSession.Slots.Any(s => s.Grade.Equals(_draggingCursor.Grade)))
-        {
-            vm.GradingSession.MoveCutoff(_draggingCursor.Grade, clamped, this);
-        }
+        // Validation lives on the session — invalid moves are rejected and
+        // leave the slot at its last valid position.
+        session.MoveCutoff(_draggingCursor.Grade, newScore, this);
         e.Handled = true;
     }
 

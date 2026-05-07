@@ -42,9 +42,6 @@ public partial class ViolinPlotViewModel : ViewModelBase
     private int? _hoveredStudentId;
 
     [ObservableProperty]
-    private ObservableCollection<CursorViewModel>? _cursors;
-
-    [ObservableProperty]
     private ObservableCollection<ComplianceRowViewModel>? _complianceRows;
 
     [ObservableProperty]
@@ -55,10 +52,8 @@ public partial class ViolinPlotViewModel : ViewModelBase
 
     /// <summary>
     /// The active GradingSession, pushed in from MainWindowViewModel after
-    /// every load. The violin's drag handlers commit through this; the
-    /// legacy <see cref="Cursors"/> collection is mirror-synced from
-    /// session by MainWindowViewModel and remains the source for
-    /// rendering until the slice 3 cleanup follow-up (issue #14).
+    /// every load. The violin's drag handlers commit through this and its
+    /// cursor strip binds directly to <see cref="GradingSession.Slots"/>.
     /// </summary>
     [ObservableProperty]
     private GradingSession? _gradingSession;
@@ -487,32 +482,26 @@ public partial class ViolinPlotViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Gets the letter grade for a given score based on cursor thresholds.
+    /// Gets the letter grade for a given score based on the session's
+    /// current cutoffs. Returns empty string if no session is set.
     /// </summary>
-    /// <param name="score">The score to evaluate</param>
-    /// <returns>The grade display name (e.g., "A", "B+"), or empty string if no cursors</returns>
     public string GetGradeForScore(double score)
     {
-        if (Cursors == null || !Cursors.Any(c => c.IsEnabled))
-            return "";
+        if (GradingSession is null) return "";
 
-        // Check cursors from highest score to lowest - first match wins
-        var enabledCursors = Cursors.Where(c => c.IsEnabled).OrderByDescending(c => c.Score).ToList();
+        var state = GradingSession.CurrentState;
+        var enabledCutoffs = state.Cutoffs
+            .Where(c => state.EnabledGrades.Contains(c.Grade))
+            .OrderByDescending(c => c.Score)
+            .ToList();
 
-        foreach (var cursor in enabledCursors)
+        if (enabledCutoffs.Count == 0) return "";
+
+        foreach (var cutoff in enabledCutoffs)
         {
-            if (score >= cursor.Score)
-            {
-                return cursor.Grade.DisplayName;
-            }
+            if (score >= cutoff.Score) return cutoff.Grade.DisplayName;
         }
 
-        // If below all cutoffs, return the lowest grade (highest Order)
-        var lowestGrade = Cursors
-            .Where(c => c.IsEnabled)
-            .OrderByDescending(c => c.Grade.Order)
-            .FirstOrDefault();
-
-        return lowestGrade?.Grade.DisplayName ?? "";
+        return enabledCutoffs.OrderByDescending(c => c.Grade.Order).First().Grade.DisplayName;
     }
 }

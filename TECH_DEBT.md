@@ -58,9 +58,9 @@ binding that displays MuppetName, and the generation logic in
 constructed `GradingSession` now provides the single seam from "no
 grading state" to "valid grading state" on every load (Excel and
 saved state), so the duplicate-append path no longer affects the
-canonical state. The legacy `_cursors` and `InitializeComplianceGrid`
-mechanics still exist but are slated for removal in slices #3 and
-#4 of the issue #6 refactor.
+canonical state. The legacy `_cursors` mirror collection was removed
+by issue #14; `InitializeComplianceGrid` remains until issue #10
+extracts `ComplianceGridViewModel`.
 
 ---
 
@@ -116,7 +116,7 @@ include in the same change to amortise the move.
 
 ### TD006 — Compliance panel exposes no per-Grade enable/disable affordance
 
-**Why it's debt:** `CursorViewModel.IsEnabled` and the new
+**Why it's debt:** `CutoffSlot.IsEnabled` and the
 `GradingSession.EnableGrade` / `DisableGrade` mutators support
 toggling individual Grades on and off, but the live UI has no
 discoverable control to drive them — no checkbox or toggle in the
