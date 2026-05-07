@@ -389,6 +389,62 @@ public class GradingSessionTests
     }
 
     [Fact]
+    public void Slots_IncludeAllGradesFromDefaultCurveExceptStructuralCatchAll()
+    {
+        // Diagnostic for issue #17 follow-on: per ADR-0008/0011 the
+        // structural catch-all is the lowest-Order grade in the
+        // *DefaultCurve* — not the lowest in initial cutoffs. Every
+        // other grade in DefaultCurve gets a Slot, including those with
+        // zero-bound CutoffCountRange, so they can be enabled and
+        // dragged later (real grading flows: instructor enables a
+        // CMinus row that started as untargeted, expects to drag it).
+        //
+        // Fixture DefaultCurve: A(10,10), B(20,20), C(20,20), F(0,0).
+        // Lowest Order in DefaultCurve = F → F is catch-all.
+        // Expected Slots: [A, B, C] (3 entries). C, despite being the
+        // lowest *targeted* grade, is still a draggable slot.
+        var session = TestFixtures.SessionForGrading();
+
+        Assert.Equal(3, session.Slots.Count);
+        var slotGrades = session.Slots.Select(s => s.Grade).ToHashSet();
+        Assert.Contains(TestFixtures.GradeA, slotGrades);
+        Assert.Contains(TestFixtures.GradeB, slotGrades);
+        Assert.Contains(TestFixtures.GradeC, slotGrades);
+        Assert.DoesNotContain(TestFixtures.GradeF, slotGrades);
+    }
+
+    [Fact]
+    public void StructuralCatchAll_IsLowestOrderGradeInDefaultCurve_NotInitialCutoffs()
+    {
+        // The catch-all is the grade in EnabledGrades that has no Slot.
+        // In the fixture, that should be F — not C (which is currently
+        // the buggy choice because slice 1 derived catch-all from
+        // initial cutoffs after the zero-range filter dropped F).
+        var session = TestFixtures.SessionForGrading();
+        var slotGrades = session.Slots.Select(s => s.Grade).ToHashSet();
+        var catchAllGrade = session.CurrentState.EnabledGrades
+            .Single(g => !slotGrades.Contains(g));
+
+        Assert.Equal(LetterGrade.F, catchAllGrade.LetterGrade);
+    }
+
+    [Fact]
+    public void MoveCutoff_OnLowestTargetedGradeWhenItIsNotCatchAll_IsAccepted()
+    {
+        // C is the lowest *targeted* grade in the fixture (lowest with
+        // non-zero range) but the structural catch-all is F. So C must
+        // be a draggable slot. MoveCutoff on it should succeed.
+        var session = TestFixtures.SessionForGrading();
+        var slotC = session.Slots.First(s => s.Grade.LetterGrade == LetterGrade.C);
+        var validScore = slotC.Score + 5;
+
+        var result = session.MoveCutoff(slotC.Grade, validScore, new object());
+
+        Assert.True(result.Success);
+        Assert.Equal(validScore, slotC.Score);
+    }
+
+    [Fact]
     public void CurrentState_FiresPropertyChangedAlongsideLastChange()
     {
         var session = TestFixtures.SessionForGrading();
