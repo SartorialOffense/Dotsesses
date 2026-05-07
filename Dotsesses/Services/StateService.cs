@@ -195,23 +195,4 @@ public class StateService
         return (cutoffs, enabledGrades);
     }
 
-    /// <summary>
-    /// Applies saved cursor positions to existing cursor ViewModels.
-    /// </summary>
-    public void ApplyCursors(SavedState state, IEnumerable<CursorViewModel> cursors)
-    {
-        var cursorList = cursors.ToList();
-
-        foreach (var savedCursor in state.Cursors)
-        {
-            var cursor = cursorList.FirstOrDefault(c =>
-                c.Grade.DisplayName == savedCursor.Grade);
-
-            if (cursor != null)
-            {
-                cursor.Score = savedCursor.Score;
-                cursor.IsEnabled = savedCursor.Enabled;
-            }
-        }
-    }
 }

@@ -107,95 +107,17 @@ public sealed class GradingSession : ObservableObject
         _structuralCatchAll = allCurveGrades[^1];
         var slotGrades = allCurveGrades
             .Where(g => !g.Equals(_structuralCatchAll))
+            .OrderBy(g => g.Order)
             .ToList();
 
-        // Targeted slots get positions from InitialCutoffCalculator
-        // (curves with non-zero range, excluding the catch-all).
-        var midpointCurve = classAssessment.DefaultCurve
-            .Where(r => r.LowerBound > 0 || r.UpperBound > 0)
-            .Where(r => !r.Grade.Equals(_structuralCatchAll))
-            .Select(r => new CutoffCount(r.Grade, r.Midpoint))
-            .OrderBy(c => c.Grade.Order)
-            .ToList();
-
-        if (midpointCurve.Count == 0)
-        {
-            throw new InvalidOperationException(
-                "DefaultCurve has no targeted slot grades (all non-catch-all " +
-                "ranges are zero); GradingSession requires at least one " +
-                "targeted slot grade to seed initial positions.");
-        }
-
-        var seededCutoffs = _initialCutoffCalculator
-            .Calculate(classAssessment.Assessments, midpointCurve)
-            .ToDictionary(c => c.Grade);
-
-        // Untargeted slots (zero-range CutoffCountRange) get fallback
-        // positions in a band below the data envelope — visible and
-        // draggable but not positioned to catch students by default.
-        // Match the legacy SeedCursorsFromDefaults "Second pass"
-        // algorithm exactly so the initial visible positions agree
-        // between the legacy `_cursors` collection and `session.Slots`.
-        // Otherwise the mirror sync after the first drag yanks
-        // untargeted cursors from their legacy positions to session
-        // positions, producing a visible "jump."
-        //
-        // Legacy stack order (descending Order):
-        //   i=0 → catch-all (basePosition)
-        //   i=1 → next-lowest grade (basePosition + spacing)
-        //   i=2 → ...                  (basePosition + 2*spacing)
-        //   ...
-        var minStudentScore = classAssessment.Assessments.Min(a => a.AggregateGrade);
-        var maxStudentScore = classAssessment.Assessments.Max(a => a.AggregateGrade);
-        var fallbackScoreRange = maxStudentScore - minStudentScore;
-        var fallbackBaseScore = (int)Math.Round(minStudentScore - fallbackScoreRange * 0.25);
-
-        // Spacing formula copied verbatim from
-        // MainWindowViewModel.SeedCursorsFromDefaults so the two
-        // placements match. When issue #14's cleanup deletes the
-        // legacy path, this formula can be replaced with something
-        // simpler (it currently encodes a 400px-plot pixel
-        // assumption, which is a layout detail that doesn't belong
-        // here).
-        const double BarbellHandlePixels = 8.0;
-        const double SpacingPixels = BarbellHandlePixels * 2;
-        const double EstimatedPlotHeight = 400.0 * 0.8;
-        var fallbackCursorSpacing = (int)Math.Ceiling(
-            SpacingPixels * fallbackScoreRange / Math.Max(1, EstimatedPlotHeight));
-
-        var untargetedSlotGrades = slotGrades
-            .Where(g => !seededCutoffs.ContainsKey(g))
-            .OrderByDescending(g => g.Order)
-            .ToList();
-
-        var fallbackScores = new Dictionary<Grade, int>();
-        for (int i = 0; i < untargetedSlotGrades.Count; i++)
-        {
-            // i=0 is reserved for the catch-all; slot positions start
-            // at i=1 and stack upward with descending Order. So the
-            // highest-Order untargeted slot gets the lowest score
-            // above the catch-all, and the lowest-Order untargeted
-            // slot tops the fallback band.
-            fallbackScores[untargetedSlotGrades[i]] =
-                fallbackBaseScore + (i + 1) * fallbackCursorSpacing;
-        }
+        var (initialScores, initialCatchAllScore) = ComputeDefaultLayout(slotGrades);
 
         _slots = new ObservableCollection<CutoffSlot>(
-            slotGrades
-                .OrderBy(g => g.Order)
-                .Select(g => new CutoffSlot(
-                    g,
-                    seededCutoffs.TryGetValue(g, out var seeded) ? seeded.Score : fallbackScores[g],
-                    isEnabled: true)));
+            slotGrades.Select(g => new CutoffSlot(g, initialScores[g], isEnabled: true)));
 
         Slots = new ReadOnlyObservableCollection<CutoffSlot>(_slots);
 
-        // Catch-all sits at the legacy "i=0" position — basePosition.
-        // This stays below all slot positions whether or not there are
-        // untargeted slots, since untargeted slots stack above
-        // basePosition and targeted slots are seeded inside the data
-        // envelope (above basePosition by construction).
-        _catchAllScore = fallbackBaseScore;
+        _catchAllScore = initialCatchAllScore;
 
         var initialCutoffs = BuildCurrentCutoffs();
         var enabledGrades = _slots
@@ -279,18 +201,134 @@ public sealed class GradingSession : ObservableObject
 
     public void ReseedFromDefaults(object? originator = null)
     {
+        var slotGrades = _slots.Select(s => s.Grade).OrderBy(g => g.Order).ToList();
+        var (scores, catchAllScore) = ComputeDefaultLayout(slotGrades);
+
+        // Narrow-aggregate fallback (M002/S05/T03): when the default
+        // layout produces a non-monotonic sequence by Grade.Order
+        // (mandatory cutoffs interleaving with the fallback band on
+        // very narrow aggregate ranges), GradeAssigner..ctor inside
+        // EmitNewState would throw "Cutoffs are out of order". Detect
+        // here and replace the layout with an even-spacing rebalance
+        // across [minStudentScore, maxStudentScore] so the session
+        // always emits a valid state.
+        if (!AreScoresMonotonicByGrade(slotGrades, scores))
+        {
+            var minStudentScore = _classAssessment.Assessments.Min(a => a.AggregateGrade);
+            var maxStudentScore = _classAssessment.Assessments.Max(a => a.AggregateGrade);
+            var rebalanced = _cursorPlacement
+                .ResetToEvenSpacingMonotonic(slotGrades, minStudentScore, maxStudentScore);
+            scores = rebalanced.ToDictionary(c => c.Grade, c => c.Score);
+            // Catch-all stays at the fallback base position computed above.
+        }
+
+        foreach (var slot in _slots)
+        {
+            slot.Score = scores[slot.Grade];
+            slot.IsEnabled = true;
+        }
+        _catchAllScore = catchAllScore;
+
+        EmitNewState(originator);
+    }
+
+    private static bool AreScoresMonotonicByGrade(
+        IReadOnlyList<Grade> slotGrades,
+        IReadOnlyDictionary<Grade, int> scores)
+    {
+        // GradeAssigner.ValidateCutoffOrdering — strict less-than fails;
+        // equal scores are tolerated.
+        for (int i = 0; i < slotGrades.Count - 1; i++)
+        {
+            if (scores[slotGrades[i]] < scores[slotGrades[i + 1]]) return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Computes the default cursor layout for every slot grade plus the
+    /// catch-all: targeted slots get scores from
+    /// <see cref="InitialCutoffCalculator"/> against the current
+    /// student aggregates; untargeted (zero-range) slots get fallback
+    /// positions stacked above the catch-all base. Used by both the
+    /// constructor and <see cref="ReseedFromDefaults"/> so the two
+    /// paths agree on positions and never silently disable a slot.
+    /// </summary>
+    private (Dictionary<Grade, int> SlotScores, int CatchAllScore) ComputeDefaultLayout(
+        IReadOnlyList<Grade> slotGrades)
+    {
+        // Targeted slots get positions from InitialCutoffCalculator
+        // (curves with non-zero range, excluding the catch-all).
         var midpointCurve = _classAssessment.DefaultCurve
             .Where(r => r.LowerBound > 0 || r.UpperBound > 0)
+            .Where(r => !r.Grade.Equals(_structuralCatchAll))
             .Select(r => new CutoffCount(r.Grade, r.Midpoint))
             .OrderBy(c => c.Grade.Order)
             .ToList();
 
-        var seeded = _initialCutoffCalculator
+        if (midpointCurve.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "DefaultCurve has no targeted slot grades (all non-catch-all " +
+                "ranges are zero); GradingSession requires at least one " +
+                "targeted slot grade to seed initial positions.");
+        }
+
+        var seededCutoffs = _initialCutoffCalculator
             .Calculate(_classAssessment.Assessments, midpointCurve)
+            .ToDictionary(c => c.Grade);
+
+        // Untargeted slots (zero-range CutoffCountRange) get fallback
+        // positions in a band below the data envelope — visible and
+        // draggable but not positioned to catch students by default.
+        //
+        // Stack order (descending Grade.Order):
+        //   i=0 → catch-all (basePosition)
+        //   i=1 → next-lowest grade (basePosition + spacing)
+        //   i=2 → ...                  (basePosition + 2*spacing)
+        var minStudentScore = _classAssessment.Assessments.Min(a => a.AggregateGrade);
+        var maxStudentScore = _classAssessment.Assessments.Max(a => a.AggregateGrade);
+        var fallbackScoreRange = maxStudentScore - minStudentScore;
+        var fallbackBaseScore = (int)Math.Round(minStudentScore - fallbackScoreRange * 0.25);
+
+        // Spacing formula encodes a 400px-plot pixel assumption — a
+        // layout detail that ideally would not live in domain code.
+        // Left as-is to keep the initial-load cursor positions stable
+        // for users; safe to replace with something simpler when a
+        // dedicated layout owner emerges.
+        const double BarbellHandlePixels = 8.0;
+        const double SpacingPixels = BarbellHandlePixels * 2;
+        const double EstimatedPlotHeight = 400.0 * 0.8;
+        var fallbackCursorSpacing = (int)Math.Ceiling(
+            SpacingPixels * fallbackScoreRange / Math.Max(1, EstimatedPlotHeight));
+
+        var untargetedSlotGrades = slotGrades
+            .Where(g => !seededCutoffs.ContainsKey(g))
+            .OrderByDescending(g => g.Order)
             .ToList();
 
-        ApplyCutoffsToInternalState(seeded, enabledGrades: null);
-        EmitNewState(originator);
+        var slotScores = new Dictionary<Grade, int>();
+        foreach (var grade in slotGrades)
+        {
+            if (seededCutoffs.TryGetValue(grade, out var seeded))
+            {
+                slotScores[grade] = seeded.Score;
+            }
+        }
+        for (int i = 0; i < untargetedSlotGrades.Count; i++)
+        {
+            // i=0 is reserved for the catch-all; slot positions start
+            // at i=1 and stack upward with descending Order.
+            slotScores[untargetedSlotGrades[i]] =
+                fallbackBaseScore + (i + 1) * fallbackCursorSpacing;
+        }
+
+        // Catch-all sits at the "i=0" position — basePosition. This
+        // stays below all slot positions whether or not there are
+        // untargeted slots, since untargeted slots stack above
+        // basePosition and targeted slots are seeded inside the data
+        // envelope (above basePosition by construction).
+        return (slotScores, fallbackBaseScore);
     }
 
     public void LoadCutoffs(

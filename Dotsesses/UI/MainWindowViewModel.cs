@@ -46,7 +46,7 @@ public partial class MainWindowViewModel : ViewModelBase
     /// </summary>
     public GradeAssigner GradeAssigner => _gradeAssigner;
 
-    private CursorViewModel? _draggingCursor;
+    private CutoffSlot? _draggingCursor;
     private bool _isDraggingCursor;
     private string? _currentSourceFile;
 
@@ -67,18 +67,13 @@ public partial class MainWindowViewModel : ViewModelBase
     /// <summary>
     /// Live grading state for the loaded Class. Constructed in lockstep
     /// with <see cref="ClassAssessment"/> on every file load (see
-    /// ADR-0008). Drag, Compliance, and persistence migrate onto this
-    /// in slices #3–#5; until then the legacy <c>_cursors</c> /
-    /// <c>ClassAssessment.CurrentCutoffs</c> paths still drive the UI.
+    /// ADR-0008). Drag, Compliance, and persistence all flow through this.
     /// </summary>
     [ObservableProperty]
     private GradingSession _gradingSession = null!;
 
     [ObservableProperty]
     private PlotModel _dotplotModel = null!;
-
-    [ObservableProperty]
-    private ObservableCollection<CursorViewModel> _cursors = null!;
 
     [ObservableProperty]
     private ObservableCollection<ComplianceRowViewModel> _complianceRows = null!;
@@ -129,49 +124,19 @@ public partial class MainWindowViewModel : ViewModelBase
     public StateService StateService => _stateService;
 
     /// <summary>
-    /// Mirrors the GradingSession's slot state into the legacy
-    /// <see cref="Cursors"/> collection so existing OxyPlot rendering
-    /// and Compliance recalc paths keep working while drag goes
-    /// through the session. Called when GradingSession swaps in
-    /// (file load) and on every session.LastChange notification.
-    /// Slice 3 of issue #6 — minimal scope. Future cleanup slice will
-    /// remove _cursors entirely (see issue #14).
+    /// Re-renders dotplot annotations and refreshes Compliance counts
+    /// from the session's current state. Invoked whenever the session
+    /// emits a LastChange notification (drag commit, enable/disable,
+    /// reseed, load).
     /// </summary>
-    private void SyncCursorsFromSession()
+    private void OnSessionStateChanged()
     {
         if (GradingSession is null) return;
+        if (DotplotModel is null) return; // Test factory path
 
-        // Atomic mirror: suppress per-cursor PropertyChanged reactions
-        // during the loop so RecalculateGradeCounts (called from
-        // OnCursorPropertyChanged) doesn't see a mid-loop mixed state
-        // where some cursors have new session values and others still
-        // hold legacy values — that combination can violate
-        // GradeAssigner's ordering invariant. Issue #18.
-        var wasUpdating = _isUpdatingCursorsFromSubscription;
-        _isUpdatingCursorsFromSubscription = true;
-        try
-        {
-            foreach (var slot in GradingSession.Slots)
-            {
-                var cursor = Cursors.FirstOrDefault(c => c.Grade.Equals(slot.Grade));
-                if (cursor is null) continue;
-                if (cursor.Score != slot.Score) cursor.Score = slot.Score;
-                if (cursor.IsEnabled != slot.IsEnabled) cursor.IsEnabled = slot.IsEnabled;
-            }
-        }
-        finally
-        {
-            _isUpdatingCursorsFromSubscription = wasUpdating;
-        }
-
-        // Run the downstream pipeline once with the fully-mirrored state.
-        // Guard DotplotModel for the test factory path where it may be null.
-        if (DotplotModel is not null)
-        {
-            UpdateCursors();
-            RecalculateGradeCounts();
-            HasUnsavedChanges = true;
-        }
+        RecalculateGradeCounts();
+        UpdateCursors();
+        HasUnsavedChanges = true;
     }
 
     partial void OnGradingSessionChanged(GradingSession? oldValue, GradingSession newValue)
@@ -194,7 +159,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private void OnGradingSessionPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName != nameof(GradingSession.LastChange)) return;
-        SyncCursorsFromSession();
+        OnSessionStateChanged();
     }
 
     public MainWindowViewModel()
@@ -223,7 +188,6 @@ public partial class MainWindowViewModel : ViewModelBase
         _initialCutoffCalculator = new InitialCutoffCalculator();
         _cursorValidation = new CursorValidation();
 
-        _cursors = new ObservableCollection<CursorViewModel>();
         _complianceRows = new ObservableCollection<ComplianceRowViewModel>();
 
         Log("MainWindowViewModel: Registering message handlers");
@@ -778,15 +742,19 @@ public partial class MainWindowViewModel : ViewModelBase
         var statsAnnotations = DotplotModel.Annotations
             .Where(a => a.YAxisKey == "StatsY")
             .ToList();
-        
+
         DotplotModel.Annotations.Clear();
-        
+
         foreach (var ann in statsAnnotations)
         {
             DotplotModel.Annotations.Add(ann);
         }
 
-        var enabledCursors = Cursors.Where(c => c.IsEnabled).OrderBy(c => c.Score).ToList();
+        // Slots structurally exclude the catch-all (ADR-0011).
+        var enabledSlots = GradingSession.Slots
+            .Where(s => s.IsEnabled)
+            .OrderBy(s => s.Score)
+            .ToList();
         var minRawScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade);
         var maxRawScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade);
         var scoreRange = maxRawScore - minRawScore;
@@ -832,15 +800,15 @@ public partial class MainWindowViewModel : ViewModelBase
         DotplotModel.Annotations.Add(cursorBottomLine);
 
         // ===== Vertical Cursor Lines with Square Handles =====
-        // Skip the lowest grade (highest Order) - it has no cursor, just a label
-        var lowestGrade = enabledCursors.OrderByDescending(c => c.Grade.Order).FirstOrDefault();
-        foreach (var cursor in enabledCursors.Where(c => c != lowestGrade))
+        // Every enabled slot gets a cursor line — Slots already excludes
+        // the structural catch-all, so no lowest-Order filter is needed.
+        foreach (var slot in enabledSlots)
         {
             // Thin vertical line in the Dot area (behind dots)
             var line = new LineAnnotation
             {
                 Type = LineAnnotationType.Vertical,
-                X = cursor.Score,
+                X = slot.Score,
                 Color = OxyColor.FromAColor(128, OxyColors.White), // 50% transparency
                 LineStyle = LineStyle.Solid,
                 StrokeThickness = 1,
@@ -856,7 +824,7 @@ public partial class MainWindowViewModel : ViewModelBase
             var cursorLine = new LineAnnotation
             {
                 Type = LineAnnotationType.Vertical,
-                X = cursor.Score,
+                X = slot.Score,
                 Color = OxyColor.FromAColor(128, OxyColors.White), // 50% transparency
                 LineStyle = LineStyle.Solid,
                 StrokeThickness = 1,
@@ -870,7 +838,7 @@ public partial class MainWindowViewModel : ViewModelBase
             // Square handle at bottom of cursor area using PointAnnotation (fixed screen-space size), hollow
             var handle = new PointAnnotation
             {
-                X = cursor.Score,
+                X = slot.Score,
                 Y = 0.5, // Center of cursor area
                 Size = 3, // Screen pixels
                 Shape = MarkerType.Square,
@@ -884,10 +852,8 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         // ===== Grade Labels Below Cursors =====
-        // Get all enabled grades sorted by order (best to worst)
-        var enabledGrades = Cursors
-            .Where(c => c.IsEnabled)
-            .Select(c => c.Grade)
+        // Labels include the catch-all (it's in EnabledGrades but not in Slots).
+        var enabledGrades = GradingSession.CurrentState.EnabledGrades
             .OrderBy(g => g.Order)
             .ToList();
 
@@ -902,13 +868,13 @@ public partial class MainWindowViewModel : ViewModelBase
                 if (i == 0)
                 {
                     // Highest grade (best, e.g., A): between last cursor and right boundary
-                    labelX = (enabledCursors.Last().Score + maxScore) / 2;
+                    labelX = (enabledSlots.Last().Score + maxScore) / 2;
                 }
                 else if (i == enabledGrades.Count - 1)
                 {
-                    // Lowest grade (worst): between left boundary and first cursor WITH A LINE
-                    // (The lowest grade's cursor doesn't have a line drawn, so use the next one)
-                    var firstCursorWithLine = enabledCursors.Where(c => c != lowestGrade).OrderBy(c => c.Score).FirstOrDefault();
+                    // Lowest grade (catch-all): between left boundary and the
+                    // lowest-score cursor line.
+                    var firstCursorWithLine = enabledSlots.FirstOrDefault();
                     if (firstCursorWithLine != null)
                     {
                         labelX = (minScore + firstCursorWithLine.Score) / 2;
@@ -921,18 +887,17 @@ public partial class MainWindowViewModel : ViewModelBase
                 }
                 else
                 {
-                    // Middle grades: between cursor for this grade and the next higher grade's cursor
-                    // Find cursor for this grade (it's the lower bound)
-                    var cursorForThisGrade = enabledCursors.FirstOrDefault(c => c.Grade.Order == grade.Order);
-                    var cursorForNextGrade = enabledCursors.FirstOrDefault(c => c.Grade.Order == enabledGrades[i - 1].Order);
-                    
-                    if (cursorForThisGrade != null && cursorForNextGrade != null)
+                    // Middle grades: between this grade's slot and the next higher grade's slot.
+                    var slotForThisGrade = enabledSlots.FirstOrDefault(s => s.Grade.Order == grade.Order);
+                    var slotForNextGrade = enabledSlots.FirstOrDefault(s => s.Grade.Order == enabledGrades[i - 1].Order);
+
+                    if (slotForThisGrade != null && slotForNextGrade != null)
                     {
-                        labelX = (cursorForThisGrade.Score + cursorForNextGrade.Score) / 2;
+                        labelX = (slotForThisGrade.Score + slotForNextGrade.Score) / 2;
                     }
                     else
                     {
-                        continue; // Skip if we can't find the cursors
+                        continue; // Skip if we can't find the slots
                     }
                 }
 
@@ -1111,97 +1076,11 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    private bool _isUpdatingCursorsFromSubscription;
-
-    private void InitializeCursors()
-    {
-        // Create cursors for ALL grades, all enabled at startup
-        var allGrades = new DefaultCurveGenerator().GetAllGrades();
-
-        // Grades with defined percentage ranges have non-zero bounds
-        var gradesWithRanges = ClassAssessment.DefaultCurve
-            .Where(cc => cc.LowerBound > 0 || cc.UpperBound > 0)
-            .Select(cc => cc.Grade)
-            .ToHashSet();
-
-        // First pass: create all cursors, initially enabled
-        // Note: Don't subscribe to PropertyChanged yet - DotplotModel isn't created yet
-        foreach (var grade in allGrades)
-        {
-            var cutoff = ClassAssessment.CurrentCutoffs.FirstOrDefault(c => c.Grade.Equals(grade));
-            int score = cutoff?.Score ?? 0; // Will be calculated for non-default grades below
-
-            var cursor = new CursorViewModel(grade, score, isEnabled: true);
-            Cursors.Add(cursor);
-        }
-
-        // Second pass: position grades without defined percentages (C-, D+, D, F)
-        // Start at -0.25 of score range and stack upward, with lowest grade (F) at bottom
-        var gradesWithoutRanges = allGrades.Where(g => !gradesWithRanges.Contains(g)).ToList();
-
-        if (gradesWithoutRanges.Any())
-        {
-            // Calculate cursor spacing: 2x barbell handle size (8px * 2 = 16px) converted to score units
-            const double barbellHandlePixels = 8.0;
-            const double spacingPixels = barbellHandlePixels * 2;
-            var minScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade);
-            var maxScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade);
-            var scoreRange = maxScore - minScore;
-            // Use a reasonable default plot height estimate
-            const double estimatedPlotHeight = 400.0 * 0.8; // 80% of 400px
-            var cursorSpacing = (int)Math.Ceiling(spacingPixels * scoreRange / Math.Max(1, estimatedPlotHeight));
-
-            // Calculate base position at -0.25 of score range (below minimum score)
-            var basePosition = minScore - (scoreRange * 0.25);
-
-            // Sort grades by Order descending (F=10 first, then D=9, D+=8, C-=7, etc.)
-            // This puts lowest grade at the bottom position
-            var sortedGrades = gradesWithoutRanges.OrderByDescending(g => g.Order).ToList();
-
-            // Position each grade starting from base, stacking upward
-            for (int i = 0; i < sortedGrades.Count; i++)
-            {
-                var grade = sortedGrades[i];
-                var cursor = Cursors.First(c => c.Grade.Equals(grade));
-                cursor.Score = (int)Math.Round(basePosition + (i * cursorSpacing));
-            }
-        }
-
-        // Subscribe to property changes after all positioning is done
-        foreach (var cursor in Cursors)
-        {
-            cursor.PropertyChanged += OnCursorPropertyChanged;
-        }
-    }
-
-    private void OnCursorPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
-    {
-        if (_isUpdatingCursorsFromSubscription) return; // Prevent re-entrancy
-        if (DotplotModel == null) return; // Not yet initialized
-
-        if (e.PropertyName == nameof(CursorViewModel.Score) ||
-            e.PropertyName == nameof(CursorViewModel.IsEnabled))
-        {
-            // Cursor was moved or enabled/disabled
-            _isUpdatingCursorsFromSubscription = true;
-            try
-            {
-                UpdateCursors(); // Refresh dot plot annotations
-                RecalculateGradeCounts(); // Update compliance grid counts
-                HasUnsavedChanges = true; // Mark as changed
-            }
-            finally
-            {
-                _isUpdatingCursorsFromSubscription = false;
-            }
-        }
-    }
-
-    private void WireCursorsToViolinPlot()
+    private void WireViolinPlot()
     {
         if (ViolinPlotViewModel == null) return;
 
-        ViolinPlotViewModel.Cursors = Cursors;
+        ViolinPlotViewModel.GradingSession = GradingSession;
         ViolinPlotViewModel.ComplianceRows = ComplianceRows;
         ViolinPlotViewModel.MinScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade);
         ViolinPlotViewModel.MaxScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade);
@@ -1234,324 +1113,81 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Re-seeds cursor positions, compliance rows, and the supporting curve/cutoff/compliance
-    /// state from the default-curve pipeline at the current student aggregate range.
-    ///
-    /// Owns the full default-curve seeding sequence that is shared by initial load
-    /// (<see cref="LoadFromExcelFile"/>, <see cref="LoadStateAsync"/>) and — once T02 lands —
-    /// by the aggregate-set-changed branch of <see cref="ApplyScoreSelections"/>.
-    ///
-    /// Safe to call repeatedly on the same VM: it unsubscribes <see cref="OnCursorPropertyChanged"/>
-    /// from every existing cursor, clears <see cref="Cursors"/> and <see cref="ComplianceRows"/>,
-    /// then re-runs the seeding pipeline so MEM023's append-not-clear gotcha cannot fire on
-    /// repeated invocations. Mutation of cursors/compliance rows is guarded by
-    /// <see cref="_isUpdatingCursorsFromSubscription"/> so any PropertyChanged signal that does
-    /// slip through (e.g. during Score reassignment) does not re-enter <see cref="OnCursorPropertyChanged"/>
-    /// and throw "Cutoffs are out of order" while the collection is mid-rebuild.
-    ///
-    /// Pipeline order (matches the inline code that previously lived in LoadFromExcelFile/LoadStateAsync):
-    /// 1. Recompute defaultCurve via <see cref="DefaultCurveGenerator.GenerateRanges"/> for the
-    ///    current student count.
-    /// 2. Project to midpoint-targeted curve using <see cref="CutoffCount"/>.
-    /// 3. Compute initialCutoffs via <see cref="InitialCutoffCalculator.Calculate"/>.
-    /// 4. Compute current grade counts via <see cref="CutoffCountCalculator.Calculate"/>.
-    /// 5. Push CurrentCutoffs and Current onto <see cref="ClassAssessment"/>. (DefaultCurve is
-    ///    immutable once <see cref="ClassAssessment"/> is constructed; both load paths build it
-    ///    correctly via the constructor, so no update is needed here.)
-    /// 6. Rebuild <see cref="_gradeAssigner"/>.
-    /// 7. Reset cursors safely (unsubscribe -> clear -> re-add -> reposition non-range grades ->
-    ///    re-subscribe).
-    /// 8. Reset compliance rows (clear -> re-init).
-    /// 9. Rewire violin plot references / score range.
+    /// Re-seeds the session from the default curve and refreshes the
+    /// compliance grid + violin wiring. Used by initial load
+    /// (<see cref="LoadFromExcelFile"/>, <see cref="LoadStateAsync"/>) and by
+    /// the aggregate-set-changed branch of <see cref="ApplyScoreSelections"/>.
+    /// The session itself owns the narrow-aggregate fallback (M002/S05/T03)
+    /// inside <see cref="GradingSession.ReseedFromDefaults"/>, so the call
+    /// here always emits a valid state.
     /// </summary>
     private void SeedCursorsFromDefaults()
     {
-        // 1-2: Default curve and midpoint projection.
-        var defaultCurve = new DefaultCurveGenerator().GenerateRanges(ClassAssessment.Assessments.Count);
-        var midpointCurve = defaultCurve
-            .Where(r => r.LowerBound > 0 || r.UpperBound > 0)
-            .Select(r => new CutoffCount(r.Grade, r.Midpoint))
-            .ToList();
+        GradingSession.ReseedFromDefaults();
 
-        // 3-4: Compute initialCutoffs and current grade distribution against the live
-        //      AggregateGrade values on ClassAssessment.Assessments.
-        var initialCutoffs = _initialCutoffCalculator.Calculate(ClassAssessment.Assessments, midpointCurve);
-        var current = _cutoffCountCalculator.Calculate(ClassAssessment.Assessments, initialCutoffs);
+        // RecalculateGradeCounts has already fired via session.LastChange,
+        // but compliance rows are rebuilt below — refresh again so they
+        // pick up counts now that they exist.
+        ComplianceRows.Clear();
+        InitializeComplianceGrid();
+        SyncComplianceCountsFromSession();
 
-        // 5: Push the recomputed grids back onto ClassAssessment. DefaultCurve is read-only
-        //    on the model and was already populated by the ClassAssessment constructor in
-        //    both load paths, so we leave it alone here. T02 will revisit if the
-        //    aggregate-set-changed branch needs to mutate it.
-        ClassAssessment.CurrentCutoffs = initialCutoffs;
-        ClassAssessment.Current = current;
-
-        // 6: Rebuild the grade assigner so any subsequent grade lookups see the new cutoffs.
-        _gradeAssigner = new GradeAssigner(initialCutoffs);
-
-        // 7: Reset cursors. Guard with _isUpdatingCursorsFromSubscription so no stray
-        //    PropertyChanged event re-enters OnCursorPropertyChanged while the collection
-        //    is being rebuilt (MEM023 — re-entrancy can throw "Cutoffs are out of order"
-        //    when a partially-rebuilt cursor list contains both old and new cursors for
-        //    the same grade).
-        var wasUpdating = _isUpdatingCursorsFromSubscription;
-        _isUpdatingCursorsFromSubscription = true;
-        try
-        {
-            // Unsubscribe BEFORE Clear so no late PropertyChanged on a removed cursor fires
-            // back into our handler.
-            foreach (var cursor in Cursors)
-            {
-                cursor.PropertyChanged -= OnCursorPropertyChanged;
-            }
-            Cursors.Clear();
-
-            // 8: Reset compliance rows up-front; InitializeComplianceGrid below appends and
-            //    is safe now that we cleared first.
-            ComplianceRows.Clear();
-
-            // Re-run the cursor seeding pipeline (the InitializeCursors body, inlined so the
-            // post-clear/pre-resubscribe sequencing stays inside this guard).
-            var allGrades = new DefaultCurveGenerator().GetAllGrades();
-
-            var gradesWithRanges = ClassAssessment.DefaultCurve
-                .Where(cc => cc.LowerBound > 0 || cc.UpperBound > 0)
-                .Select(cc => cc.Grade)
-                .ToHashSet();
-
-            foreach (var grade in allGrades)
-            {
-                var cutoff = ClassAssessment.CurrentCutoffs.FirstOrDefault(c => c.Grade.Equals(grade));
-                int score = cutoff?.Score ?? 0; // Will be repositioned below for non-default grades.
-                var cursor = new CursorViewModel(grade, score, isEnabled: true);
-                Cursors.Add(cursor);
-            }
-
-            // Second pass: position grades without defined percentages (C-, D+, D, F).
-            var gradesWithoutRanges = allGrades.Where(g => !gradesWithRanges.Contains(g)).ToList();
-            if (gradesWithoutRanges.Any())
-            {
-                const double barbellHandlePixels = 8.0;
-                const double spacingPixels = barbellHandlePixels * 2;
-                var minScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade);
-                var maxScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade);
-                var scoreRange = maxScore - minScore;
-                const double estimatedPlotHeight = 400.0 * 0.8;
-                var cursorSpacing = (int)Math.Ceiling(spacingPixels * scoreRange / Math.Max(1, estimatedPlotHeight));
-
-                var basePosition = minScore - (scoreRange * 0.25);
-                var sortedGrades = gradesWithoutRanges.OrderByDescending(g => g.Order).ToList();
-
-                for (int i = 0; i < sortedGrades.Count; i++)
-                {
-                    var grade = sortedGrades[i];
-                    var cursor = Cursors.First(c => c.Grade.Equals(grade));
-                    cursor.Score = (int)Math.Round(basePosition + (i * cursorSpacing));
-                }
-            }
-
-            // M002/S05/T03 defensive fallback: if the combined first-pass (range-driven) +
-            // second-pass (no-range catch-all) cursor positions produce a non-monotonic
-            // sequence by Grade.Order, GradeAssigner..ctor will throw "Cutoffs are out of
-            // order" on the next RecalculateGradeCounts. This happens on narrow aggregate
-            // ranges — e.g. when the user reduces the Aggregate selection to a single
-            // narrow non-Total component (SC1 Case 7 repro: aggregate range collapsed to
-            // 0–10, no way to fit 13 monotonic cutoffs). Fall back to even spacing across
-            // [minScore, maxScore] mirroring MEM028's Count > 0 guard for the empty case.
-            if (!AreCursorsMonotonicByGrade())
-            {
-                Log("MainWindowViewModel: SeedCursorsFromDefaults — non-monotonic cursors " +
-                    "after default-curve placement (narrow aggregate range); falling back to " +
-                    "even spacing across [minScore, maxScore]");
-                ApplyEvenSpacingFallback();
-            }
-
-            // 8 (continued): rebuild the compliance grid from the freshly-cleared list.
-            InitializeComplianceGrid();
-
-            // Re-subscribe AFTER all positioning is complete and AFTER ComplianceRows
-            // is rebuilt, so the first PropertyChanged event from a user drag in the
-            // future doesn't try to recalculate against a half-formed grid.
-            foreach (var cursor in Cursors)
-            {
-                cursor.PropertyChanged += OnCursorPropertyChanged;
-            }
-        }
-        finally
-        {
-            _isUpdatingCursorsFromSubscription = wasUpdating;
-        }
-
-        // 9: Wire the (possibly new) Cursors / ComplianceRows references and refreshed
-        //    MinScore/MaxScore through to the violin plot.
-        WireCursorsToViolinPlot();
-    }
-
-    /// <summary>
-    /// Returns true when every cursor's Score is monotonically non-increasing as Grade.Order
-    /// increases (i.e. better grades have ≥ scores than worse grades). GradeAssigner..ctor
-    /// rejects any violation, so this predicate gates the T03 even-spacing fallback.
-    /// </summary>
-    private bool AreCursorsMonotonicByGrade()
-    {
-        var sorted = Cursors.OrderBy(c => c.Grade.Order).ToList();
-        for (int i = 0; i < sorted.Count - 1; i++)
-        {
-            // Mirror GradeAssigner.ValidateCutoffOrdering — strict less-than fails the check;
-            // equal scores are tolerated.
-            if (sorted[i].Score < sorted[i + 1].Score) return false;
-        }
-        return true;
-    }
-
-    /// <summary>
-    /// Defensive fallback for narrow aggregate ranges (M002/S05/T03). Replaces every cursor's
-    /// Score with an even-spacing layout across the current [minScore, maxScore] derived from
-    /// ClassAssessment.Assessments. Uses CursorPlacementCalculator.ResetToEvenSpacingMonotonic
-    /// so best grade lands at maxScore, worst at minScore, and intermediates spread linearly.
-    /// </summary>
-    private void ApplyEvenSpacingFallback()
-    {
-        if (Cursors.Count == 0) return;
-        var minScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade);
-        var maxScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade);
-        var grades = Cursors.Select(c => c.Grade).ToList();
-        var rebalanced = new CursorPlacementCalculator()
-            .ResetToEvenSpacingMonotonic(grades, minScore, maxScore);
-        foreach (var cutoff in rebalanced)
-        {
-            var cursor = Cursors.FirstOrDefault(c => c.Grade.Equals(cutoff.Grade));
-            if (cursor != null)
-            {
-                cursor.Score = cutoff.Score;
-            }
-        }
-        // Mirror back into ClassAssessment.CurrentCutoffs so RecalculateGradeCounts (which
-        // rebuilds from Cursors anyway) and any downstream readers see the rebalanced values.
-        ClassAssessment.CurrentCutoffs = Cursors
-            .Select(c => new GradeCutoff(c.Grade, c.Score))
-            .ToList();
+        WireViolinPlot();
     }
 
     private void OnComplianceCheckboxChanged()
     {
         UpdateCursorsFromComplianceGrid();
-        RecalculateGradeCounts();
         UpdateDotplotPoints();
     }
 
     private void UpdateCursorsFromComplianceGrid()
     {
-        // Track which grades were newly enabled (before changing IsEnabled)
-        var newlyEnabledGrades = new List<Grade>();
-
-        // First pass: identify what changed without modifying state
+        // Compliance rows are still built for every grade (including the
+        // structural catch-all). The catch-all is not a session slot and
+        // is always considered enabled — its checkbox is inert until
+        // slice 4 (#10) extracts the ComplianceGridViewModel and limits
+        // the rows to draggable grades. Skip non-slot rows so we don't
+        // call session.EnableGrade/DisableGrade on the catch-all (which
+        // would throw).
+        var slotGrades = GradingSession.Slots.Select(s => s.Grade).ToHashSet();
         foreach (var row in ComplianceRows)
         {
-            var cursor = Cursors.FirstOrDefault(c => c.Grade.Equals(row.Grade));
-            if (cursor != null && row.IsEnabled && !cursor.IsEnabled)
+            if (!slotGrades.Contains(row.Grade)) continue;
+
+            var slot = GradingSession.Slots.First(s => s.Grade.Equals(row.Grade));
+            if (row.IsEnabled && !slot.IsEnabled)
             {
-                newlyEnabledGrades.Add(cursor.Grade);
+                GradingSession.EnableGrade(row.Grade, this);
+            }
+            else if (!row.IsEnabled && slot.IsEnabled)
+            {
+                GradingSession.DisableGrade(row.Grade, this);
             }
         }
-
-        // Capture the currently positioned grades BEFORE enabling new ones
-        var positionedGrades = new HashSet<Grade>(
-            Cursors.Where(c => c.IsEnabled).Select(c => c.Grade));
-
-        // Second pass: update IsEnabled state
-        foreach (var row in ComplianceRows)
-        {
-            var cursor = Cursors.FirstOrDefault(c => c.Grade.Equals(row.Grade));
-            if (cursor != null && cursor.IsEnabled != row.IsEnabled)
-            {
-                cursor.IsEnabled = row.IsEnabled;
-            }
-        }
-
-        // If grades were enabled, position them relative to existing cursors
-        if (newlyEnabledGrades.Any())
-        {
-            // Calculate cursor spacing: 2x barbell handle size (8px * 2 = 16px) converted to score units
-            const double barbellHandlePixels = 8.0;
-            const double spacingPixels = barbellHandlePixels * 2;
-            var scoreRange = ViolinPlotViewModel?.MaxScore - ViolinPlotViewModel?.MinScore ?? 100;
-            var plotAreaFraction = (ViolinPlotViewModel?.GetPlotAreaBottomFraction() ?? 0.9) -
-                                   (ViolinPlotViewModel?.GetPlotAreaTopFraction() ?? 0.1);
-            var estimatedPlotHeight = 400.0 * plotAreaFraction;
-            var cursorSpacing = (int)Math.Ceiling(spacingPixels * scoreRange / Math.Max(1, estimatedPlotHeight));
-
-            // Process new grades in order (top grades first)
-            foreach (var newGrade in newlyEnabledGrades.OrderBy(g => g.Order))
-            {
-                var newCursor = Cursors.First(c => c.Grade.Equals(newGrade));
-
-                // Find adjacent positioned cursors
-                var higherCursor = Cursors
-                    .Where(c => positionedGrades.Contains(c.Grade) && c.Grade.Order < newGrade.Order)
-                    .OrderByDescending(c => c.Grade.Order)
-                    .FirstOrDefault();
-
-                var lowerCursor = Cursors
-                    .Where(c => positionedGrades.Contains(c.Grade) && c.Grade.Order > newGrade.Order)
-                    .OrderBy(c => c.Grade.Order)
-                    .FirstOrDefault();
-
-                if (higherCursor != null)
-                {
-                    // Place new cursor one spacing below the higher cursor
-                    newCursor.Score = higherCursor.Score - cursorSpacing;
-
-                    // Reposition all cursors below the new one to be evenly spaced
-                    var currentScore = newCursor.Score;
-                    foreach (var cursor in Cursors
-                        .Where(c => c.IsEnabled && c.Grade.Order > newGrade.Order)
-                        .OrderBy(c => c.Grade.Order))
-                    {
-                        currentScore -= cursorSpacing;
-                        cursor.Score = currentScore;
-                    }
-                }
-                else if (lowerCursor != null)
-                {
-                    // Adding at top - place above the highest positioned cursor
-                    var highestScore = Cursors
-                        .Where(c => positionedGrades.Contains(c.Grade))
-                        .Max(c => c.Score);
-                    newCursor.Score = highestScore + cursorSpacing;
-                }
-                else
-                {
-                    // First cursor - use middle of score range
-                    var minScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade);
-                    var maxScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade);
-                    newCursor.Score = (minScore + maxScore) / 2;
-                }
-
-                // Mark this grade as positioned for subsequent iterations
-                positionedGrades.Add(newGrade);
-            }
-        }
-
-        UpdateCursors();
     }
 
+    /// <summary>
+    /// Refreshes ClassAssessment cutoffs/counts and ComplianceRows.CurrentCount
+    /// from the session's current state. The session is the canonical source —
+    /// this method just propagates derived state into the legacy
+    /// ClassAssessment fields and the compliance UI.
+    /// </summary>
     private void RecalculateGradeCounts()
     {
-        // Build cutoffs from enabled cursors
-        var enabledCutoffs = Cursors
-            .Where(c => c.IsEnabled)
-            .Select(c => new GradeCutoff(c.Grade, c.Score))
-            .ToList();
+        var state = GradingSession.CurrentState;
+        ClassAssessment.CurrentCutoffs = state.Cutoffs;
+        ClassAssessment.Current = state.Counts;
+        _gradeAssigner = new GradeAssigner(state.Cutoffs);
+        SyncComplianceCountsFromSession();
+    }
 
-        ClassAssessment.CurrentCutoffs = enabledCutoffs;
-        _gradeAssigner = new GradeAssigner(enabledCutoffs);
-        var newCurrent = _cutoffCountCalculator.Calculate(ClassAssessment.Assessments, enabledCutoffs);
-        ClassAssessment.Current = newCurrent;
-
-        // Update compliance grid with new counts
+    private void SyncComplianceCountsFromSession()
+    {
+        var counts = GradingSession.CurrentState.Counts;
         foreach (var row in ComplianceRows)
         {
-            var currentEntry = ClassAssessment.Current.FirstOrDefault(cc => cc.Grade.Equals(row.Grade));
+            var currentEntry = counts.FirstOrDefault(cc => cc.Grade.Equals(row.Grade));
             row.CurrentCount = currentEntry?.Count ?? 0;
         }
     }
@@ -1678,16 +1314,16 @@ public partial class MainWindowViewModel : ViewModelBase
             _currentSourceFile = state.SourceFile;
             CurrentSaveFilePath = filePath;
 
-            // Helper owns: recompute curves/cutoffs against post-seed aggregates,
-            // build _gradeAssigner, reset Cursors + ComplianceRows safely, and rewire
-            // the violin plot. ApplyCursors below overlays any saved cursor positions
-            // on top of the freshly-seeded defaults so a .dots load keeps user state.
+            // SeedCursorsFromDefaults rebuilds compliance rows + violin
+            // wiring against the loaded session. The session was already
+            // hydrated above via GradingSession.LoadCutoffs, so saved
+            // cursor positions are preserved without an additional overlay.
             Log("LoadStateAsync: Seeding cursors from default curve");
             SeedCursorsFromDefaults();
 
-            // Apply saved cursor positions AFTER the helper has populated Cursors
-            // with the default-seeded entries so saved positions overlay the defaults.
-            _stateService.ApplyCursors(state, Cursors);
+            // Re-apply the saved cutoffs after SeedCursorsFromDefaults
+            // (which calls ReseedFromDefaults and overwrites them).
+            GradingSession.LoadCutoffs(savedCutoffs, savedEnabledGrades);
 
             Log("LoadStateAsync: Recalculating grade counts");
             RecalculateGradeCounts();
@@ -1963,7 +1599,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var cursorYAxis = DotplotModel.Axes.FirstOrDefault(a => a.Key == "CursorY");
 
         // Check if we're in the cursor area by transforming with the cursor axis
-        if (cursorYAxis != null && nearestCursor.cursor != null && nearestCursor.distance < 3)
+        if (cursorYAxis != null && nearestCursor.slot != null && nearestCursor.distance < 3)
         {
             // Transform the Y position using the cursor Y axis
             var cursorY = cursorYAxis.InverseTransform(e.Position.Y);
@@ -1972,7 +1608,7 @@ public partial class MainWindowViewModel : ViewModelBase
             if (cursorY >= cursorYAxis.Minimum && cursorY <= cursorYAxis.Maximum)
             {
                 // Start dragging cursor
-                _draggingCursor = nearestCursor.cursor;
+                _draggingCursor = nearestCursor.slot;
                 _isDraggingCursor = true;
                 e.Handled = true;
                 return;
@@ -1997,7 +1633,7 @@ public partial class MainWindowViewModel : ViewModelBase
             var nearestCursor = FindNearestCursor(pos.X);
             var cursorYAxis = DotplotModel.Axes.FirstOrDefault(a => a.Key == "CursorY");
 
-            if (cursorYAxis != null && nearestCursor.cursor != null && nearestCursor.distance < 3)
+            if (cursorYAxis != null && nearestCursor.slot != null && nearestCursor.distance < 3)
             {
                 var cursorY = cursorYAxis.InverseTransform(e.Position.Y);
                 IsResizeCursor = cursorY >= cursorYAxis.Minimum && cursorY <= cursorYAxis.Maximum;
@@ -2025,34 +1661,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
         var newScore = (int)Math.Round(pos.X);
 
-        // Pre-clamp to legacy bounds so the visual continues to track the
-        // mouse smoothly past the data envelope. Session.MoveCutoff applies
-        // its own canonical bounds (see ScoreBoundsMargin{Below,Above} in
-        // GradingSession); rejected moves leave the cursor at its last
-        // valid position, which gives users implicit boundary feedback.
-        var legacyMinBound = ClassAssessment.Assessments.Min(a => a.AggregateGrade) - 20;
-        var legacyMaxBound = ClassAssessment.Assessments.Max(a => a.AggregateGrade) + 20;
-        var allCutoffs = Cursors
-            .Where(c => c.IsEnabled)
-            .Select(c => new GradeCutoff(c.Grade, c == _draggingCursor ? newScore : c.Score))
-            .ToList();
-        var clampedScore = _cursorValidation.ValidateMovement(
-            _draggingCursor.Grade, newScore, allCutoffs, (int)legacyMinBound, (int)legacyMaxBound);
-
-        // Slice 3: route the commit through GradingSession. The session
-        // emits LastChange on success → SyncCursorsFromSession mirrors
-        // back into _cursors → existing cursor PropertyChanged handlers
-        // update OxyPlot annotations and Compliance counts.
-        // Guard against the legacy `Cursors` collection containing
-        // non-draggable grades (the structural catch-all and any
-        // zero-range grades that aren't in `session.Slots`). The session
-        // throws ArgumentException for those (per ADR-0011); the drag
-        // handler must not propagate that to OxyPlot's event pump.
-        if (GradingSession is not null
-            && GradingSession.Slots.Any(s => s.Grade.Equals(_draggingCursor.Grade)))
-        {
-            GradingSession.MoveCutoff(_draggingCursor.Grade, clampedScore, this);
-        }
+        // Validation lives on the session — invalid moves are rejected
+        // and leave the slot at its last valid position. The session
+        // applies its own canonical bounds (see ScoreBoundsMargin{Below,
+        // Above} in GradingSession).
+        GradingSession.MoveCutoff(_draggingCursor.Grade, newScore, this);
         e.Handled = true;
     }
 
@@ -2060,47 +1673,28 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         if (_isDraggingCursor && _draggingCursor != null)
         {
-            // Finalize cursor drag - include all enabled cursors for count calculation
-            var updatedCutoffs = Cursors
-                .Where(c => c.IsEnabled)
-                .Select(c => new GradeCutoff(c.Grade, c.Score))
-                .ToList();
-
-            ClassAssessment.CurrentCutoffs = updatedCutoffs;
-            _gradeAssigner = new GradeAssigner(updatedCutoffs);
-            var newCurrent = _cutoffCountCalculator.Calculate(ClassAssessment.Assessments, updatedCutoffs);
-            ClassAssessment.Current = newCurrent;
-
-            // Update compliance grid
-            foreach (var row in ComplianceRows)
-            {
-                var currentEntry = ClassAssessment.Current.FirstOrDefault(cc => cc.Grade.Equals(row.Grade));
-                if (currentEntry != null)
-                {
-                    row.CurrentCount = currentEntry.Count;
-                }
-            }
-
+            // Session already committed every drag step during pointer-move;
+            // nothing to finalize here.
             _isDraggingCursor = false;
             _draggingCursor = null;
             e.Handled = true;
         }
     }
 
-    private (CursorViewModel? cursor, double distance) FindNearestCursor(double xPos)
+    private (CutoffSlot? slot, double distance) FindNearestCursor(double xPos)
     {
-        CursorViewModel? nearest = null;
+        CutoffSlot? nearest = null;
         double minDistance = double.MaxValue;
 
-        // Exclude the lowest grade (highest Order) - it has no draggable cursor
-        var lowestGrade = Cursors.Where(c => c.IsEnabled).OrderByDescending(c => c.Grade.Order).FirstOrDefault();
-        foreach (var cursor in Cursors.Where(c => c.IsEnabled && c != lowestGrade))
+        // Slots already exclude the structural catch-all (ADR-0011), so
+        // every enabled slot is a candidate.
+        foreach (var slot in GradingSession.Slots.Where(s => s.IsEnabled))
         {
-            double distance = Math.Abs(cursor.Score - xPos);
+            double distance = Math.Abs(slot.Score - xPos);
             if (distance < minDistance)
             {
                 minDistance = distance;
-                nearest = cursor;
+                nearest = slot;
             }
         }
 
