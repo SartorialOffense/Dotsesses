@@ -59,8 +59,11 @@ constructed `GradingSession` now provides the single seam from "no
 grading state" to "valid grading state" on every load (Excel and
 saved state), so the duplicate-append path no longer affects the
 canonical state. The legacy `_cursors` mirror collection was removed
-by issue #14; `InitializeComplianceGrid` remains until issue #10
-extracts `ComplianceGridViewModel`.
+by issue #14; `InitializeComplianceGrid` was deleted by issue #10
+(slice 4 of #6) — the new `ComplianceGridViewModel` builds rows
+once at construction and tracks state via its own
+`GradingSession.PropertyChanged` subscription, so there is no
+append-on-reload path to duplicate.
 
 ---
 
@@ -126,15 +129,15 @@ domain model says "user can disable a Grade" and the persistence
 layer round-trips that state, but a user actually trying it has
 nowhere to click.
 
-**Trigger:** Slice #5 of issue #6 (extract
-`ComplianceGridViewModel`) is the natural place to add the toggle
-control, since that's when Compliance rows become the canonical
-driver for `EnableGrade` / `DisableGrade`. If slice #5 lands without
-addressing this, open a dedicated issue.
+**Trigger:** The toggle wiring is now in place — issue #10 routed
+`ComplianceRowViewModel.IsEnabled` writes through `ComplianceGridViewModel`
+into `GradingSession.EnableGrade` / `DisableGrade`, so adding a
+checkbox in the AXAML row template is a single-binding change. Open a
+dedicated issue when prioritised.
 
-**Touches:** likely `Dotsesses/UI/MainWindow.axaml` (Compliance
-section) and `ComplianceRowViewModel` (already has `IsEnabled`
-shape).
+**Touches:** `Dotsesses/UI/MainWindow.axaml` (Compliance row template)
+— add a `CheckBox IsChecked="{Binding IsEnabled}"`. The catch-all row
+should not show the toggle (its state is structurally fixed).
 
 ---
 

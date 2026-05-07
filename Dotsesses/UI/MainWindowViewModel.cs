@@ -39,12 +39,13 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly HoverDelayService _hoverDelayService = null!;
     private readonly StateService _stateService = new();
 
-    private GradeAssigner _gradeAssigner = null!;
-
     /// <summary>
-    /// Gets the current grade assigner for export purposes.
+    /// Gets a fresh GradeAssigner built from the session's current
+    /// cutoffs. Used by drill-down lookup and export. Constructing
+    /// per call is cheap and removes the stale-cache risk that the
+    /// cursor-mirror era had.
     /// </summary>
-    public GradeAssigner GradeAssigner => _gradeAssigner;
+    public GradeAssigner GradeAssigner => new(GradingSession.CurrentState.Cutoffs);
 
     private CutoffSlot? _draggingCursor;
     private bool _isDraggingCursor;
@@ -76,7 +77,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private PlotModel _dotplotModel = null!;
 
     [ObservableProperty]
-    private ObservableCollection<ComplianceRowViewModel> _complianceRows = null!;
+    private ComplianceGridViewModel? _complianceGrid;
 
     [ObservableProperty]
     private bool _isCompliancePaneOpen = true;
@@ -124,17 +125,17 @@ public partial class MainWindowViewModel : ViewModelBase
     public StateService StateService => _stateService;
 
     /// <summary>
-    /// Re-renders dotplot annotations and refreshes Compliance counts
-    /// from the session's current state. Invoked whenever the session
-    /// emits a LastChange notification (drag commit, enable/disable,
-    /// reseed, load).
+    /// Re-renders dotplot annotations from the session's current state.
+    /// Invoked whenever the session emits a LastChange notification
+    /// (drag commit, enable/disable, reseed, load). Compliance counts
+    /// flow through <see cref="ComplianceGridViewModel"/>'s own
+    /// subscription, not this method.
     /// </summary>
     private void OnSessionStateChanged()
     {
         if (GradingSession is null) return;
         if (DotplotModel is null) return; // Test factory path
 
-        RecalculateGradeCounts();
         UpdateCursors();
         HasUnsavedChanges = true;
     }
@@ -187,8 +188,6 @@ public partial class MainWindowViewModel : ViewModelBase
         _cutoffCountCalculator = new CutoffCountCalculator();
         _initialCutoffCalculator = new InitialCutoffCalculator();
         _cursorValidation = new CursorValidation();
-
-        _complianceRows = new ObservableCollection<ComplianceRowViewModel>();
 
         Log("MainWindowViewModel: Registering message handlers");
         // Subscribe to hover activation from delay service
@@ -296,17 +295,15 @@ public partial class MainWindowViewModel : ViewModelBase
             _cutoffCountCalculator,
             _initialCutoffCalculator);
 
+        ComplianceGrid = new ComplianceGridViewModel(ClassAssessment, GradingSession);
+
         SeedDefaultSelectionsIfEmpty();
 
-        // Helper owns: recompute curves/cutoffs against post-seed aggregates, rebuild
-        // _gradeAssigner, reset Cursors + ComplianceRows safely, and rewire the violin
-        // plot. T02 will reuse the same helper from ApplyScoreSelections when an
-        // aggregate-set change requires a cursor reset.
+        // SeedCursorsFromDefaults reseeds the session and rewires the
+        // violin plot. ApplyScoreSelections reuses it for an
+        // aggregate-set change.
         Log("MainWindowViewModel: Seeding cursors from default curve");
         SeedCursorsFromDefaults();
-
-        Log("MainWindowViewModel: Recalculating grade counts");
-        RecalculateGradeCounts();
 
         Log("MainWindowViewModel: Initializing dotplot");
         InitializeDotplot();
@@ -1076,120 +1073,37 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Pushes the active session and the student-aggregate range onto
+    /// the violin VM. Compliance rows now flow through
+    /// <see cref="ComplianceGrid"/>'s own subscription, so the violin
+    /// reads them via that VM (not via MWVM).
+    /// </summary>
     private void WireViolinPlot()
     {
         if (ViolinPlotViewModel == null) return;
 
         ViolinPlotViewModel.GradingSession = GradingSession;
-        ViolinPlotViewModel.ComplianceRows = ComplianceRows;
+        ViolinPlotViewModel.ComplianceGrid = ComplianceGrid;
         ViolinPlotViewModel.MinScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade);
         ViolinPlotViewModel.MaxScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade);
     }
 
-    private void InitializeComplianceGrid()
-    {
-        var allGrades = new DefaultCurveGenerator().GetAllGrades();
-
-        foreach (var grade in allGrades)
-        {
-            var defaultEntry = ClassAssessment.DefaultCurve.FirstOrDefault(cc => cc.Grade.Equals(grade));
-            var currentEntry = ClassAssessment.Current.FirstOrDefault(cc => cc.Grade.Equals(grade));
-
-            int lowerTarget = defaultEntry?.LowerBound ?? 0;
-            int upperTarget = defaultEntry?.UpperBound ?? 0;
-            int currentCount = currentEntry?.Count ?? 0;
-            // All grades enabled at startup
-            bool isEnabled = true;
-
-            ComplianceRows.Add(new ComplianceRowViewModel(
-                grade,
-                lowerTarget,
-                upperTarget,
-                currentCount,
-                isEnabled,
-                OnComplianceCheckboxChanged
-            ));
-        }
-    }
-
     /// <summary>
-    /// Re-seeds the session from the default curve and refreshes the
-    /// compliance grid + violin wiring. Used by initial load
+    /// Re-seeds the session from the default curve and rewires the
+    /// violin plot. Used by initial load
     /// (<see cref="LoadFromExcelFile"/>, <see cref="LoadStateAsync"/>) and by
     /// the aggregate-set-changed branch of <see cref="ApplyScoreSelections"/>.
     /// The session itself owns the narrow-aggregate fallback (M002/S05/T03)
     /// inside <see cref="GradingSession.ReseedFromDefaults"/>, so the call
-    /// here always emits a valid state.
+    /// here always emits a valid state — and the
+    /// <see cref="ComplianceGridViewModel"/> picks up the new counts via
+    /// its own LastChange subscription.
     /// </summary>
     private void SeedCursorsFromDefaults()
     {
         GradingSession.ReseedFromDefaults();
-
-        // RecalculateGradeCounts has already fired via session.LastChange,
-        // but compliance rows are rebuilt below — refresh again so they
-        // pick up counts now that they exist.
-        ComplianceRows.Clear();
-        InitializeComplianceGrid();
-        SyncComplianceCountsFromSession();
-
         WireViolinPlot();
-    }
-
-    private void OnComplianceCheckboxChanged()
-    {
-        UpdateCursorsFromComplianceGrid();
-        UpdateDotplotPoints();
-    }
-
-    private void UpdateCursorsFromComplianceGrid()
-    {
-        // Compliance rows are still built for every grade (including the
-        // structural catch-all). The catch-all is not a session slot and
-        // is always considered enabled — its checkbox is inert until
-        // slice 4 (#10) extracts the ComplianceGridViewModel and limits
-        // the rows to draggable grades. Skip non-slot rows so we don't
-        // call session.EnableGrade/DisableGrade on the catch-all (which
-        // would throw).
-        var slotGrades = GradingSession.Slots.Select(s => s.Grade).ToHashSet();
-        foreach (var row in ComplianceRows)
-        {
-            if (!slotGrades.Contains(row.Grade)) continue;
-
-            var slot = GradingSession.Slots.First(s => s.Grade.Equals(row.Grade));
-            if (row.IsEnabled && !slot.IsEnabled)
-            {
-                GradingSession.EnableGrade(row.Grade, this);
-            }
-            else if (!row.IsEnabled && slot.IsEnabled)
-            {
-                GradingSession.DisableGrade(row.Grade, this);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Refreshes ClassAssessment cutoffs/counts and ComplianceRows.CurrentCount
-    /// from the session's current state. The session is the canonical source —
-    /// this method just propagates derived state into the legacy
-    /// ClassAssessment fields and the compliance UI.
-    /// </summary>
-    private void RecalculateGradeCounts()
-    {
-        var state = GradingSession.CurrentState;
-        ClassAssessment.CurrentCutoffs = state.Cutoffs;
-        ClassAssessment.Current = state.Counts;
-        _gradeAssigner = new GradeAssigner(state.Cutoffs);
-        SyncComplianceCountsFromSession();
-    }
-
-    private void SyncComplianceCountsFromSession()
-    {
-        var counts = GradingSession.CurrentState.Counts;
-        foreach (var row in ComplianceRows)
-        {
-            var currentEntry = counts.FirstOrDefault(cc => cc.Grade.Equals(row.Grade));
-            row.CurrentCount = currentEntry?.Count ?? 0;
-        }
     }
 
     [RelayCommand]
@@ -1289,6 +1203,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 _cutoffCountCalculator,
                 _initialCutoffCalculator);
 
+            ComplianceGrid = new ComplianceGridViewModel(ClassAssessment, GradingSession);
+
             var (savedCutoffs, savedEnabledGrades) =
                 _stateService.ConvertToGradingState(state, GradingSession);
             GradingSession.LoadCutoffs(savedCutoffs, savedEnabledGrades);
@@ -1314,19 +1230,16 @@ public partial class MainWindowViewModel : ViewModelBase
             _currentSourceFile = state.SourceFile;
             CurrentSaveFilePath = filePath;
 
-            // SeedCursorsFromDefaults rebuilds compliance rows + violin
-            // wiring against the loaded session. The session was already
-            // hydrated above via GradingSession.LoadCutoffs, so saved
-            // cursor positions are preserved without an additional overlay.
+            // SeedCursorsFromDefaults rebuilds violin wiring against the
+            // loaded session. The session was already hydrated above via
+            // GradingSession.LoadCutoffs, so saved cursor positions are
+            // preserved without an additional overlay.
             Log("LoadStateAsync: Seeding cursors from default curve");
             SeedCursorsFromDefaults();
 
             // Re-apply the saved cutoffs after SeedCursorsFromDefaults
             // (which calls ReseedFromDefaults and overwrites them).
             GradingSession.LoadCutoffs(savedCutoffs, savedEnabledGrades);
-
-            Log("LoadStateAsync: Recalculating grade counts");
-            RecalculateGradeCounts();
 
             Log("LoadStateAsync: Initializing dotplot");
             InitializeDotplot();
@@ -1426,29 +1339,22 @@ public partial class MainWindowViewModel : ViewModelBase
         Log($"MainWindowViewModel: ApplyScoreSelections — first-student aggregate after={aggregateAfter} " +
             $"(changed={aggregateBefore != aggregateAfter})");
 
-        // Order matters: the per-student RecalculateAggregate loop above MUST run before
-        // SeedCursorsFromDefaults because the helper reads ClassAssessment.Assessments and
-        // computes new cutoffs against their freshly-updated AggregateGrade values.
-        // RecalculateGradeCounts (called below) MUST run AFTER the reset so it sees the
-        // freshly-seeded cursors, not the stale ones.
+        // The per-student RecalculateAggregate loop above MUST run
+        // before SeedCursorsFromDefaults so the session reseed sees
+        // the freshly-updated AggregateGrade values.
         //
-        // Edge case: when newAggregateKeys is empty, every student's AggregateGrade collapses
-        // to 0. Running the seed helper in that state would have InitialCutoffCalculator
-        // produce a mix of zero cutoffs (for grades whose target count is filled by zero-
-        // aggregate students) and stepping-down catch-all cutoffs (-12, -24, …) for grades
-        // past the last student, which then violates the "better grade ≥ worse grade"
-        // ordering invariant inside GradeAssigner and throws "Cutoffs are out of order"
-        // (per ApplyScoreSelections_WithEmptySelections_DoesNotCrash). The empty-aggregate
-        // configuration is itself a degenerate state — there is no meaningful cursor placement
-        // to be made — so we skip the reset and leave the existing cursors in place. Cursors
-        // remain visible so the user can re-add aggregate components and recover.
+        // Edge case: when newAggregateKeys is empty, every student's
+        // AggregateGrade collapses to 0 — the empty-aggregate
+        // configuration is degenerate (no meaningful cursor placement
+        // exists), so we skip the reset and leave the existing cursors
+        // in place. Cursors remain visible so the user can re-add
+        // aggregate components and recover.
         if (aggregateSetChanged && newAggregateKeys.Count > 0)
         {
             Log("MainWindowViewModel: ApplyScoreSelections — aggregate set changed, re-seeding cursors from default curve");
             SeedCursorsFromDefaults();
         }
 
-        RecalculateGradeCounts();
         UpdateDotplotPoints();
 
         // OxyPlot's PlotView does not auto-refresh when the model is mutated; InvalidatePlot
@@ -1486,8 +1392,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private string GetGradeForStudent(StudentAssessment student)
     {
-        var grade = _gradeAssigner.AssignGrade(student.AggregateGrade);
-        return grade.DisplayName;
+        return GradingSession.AssignedGradeFor(student.Id).DisplayName;
     }
 
     /// <summary>

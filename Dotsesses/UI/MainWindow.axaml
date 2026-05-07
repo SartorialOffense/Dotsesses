@@ -277,7 +277,7 @@
                                 </Grid>
 
                                 <!-- Data Rows -->
-                                <ItemsControl Grid.Row="1" ItemsSource="{Binding ComplianceRows}">
+                                <ItemsControl Grid.Row="1" ItemsSource="{Binding ComplianceGrid.Rows}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="vm:ComplianceRowViewModel">
                                             <Grid ColumnDefinitions="40,50,40,50" Margin="0,1" IsVisible="{Binding IsEnabled}">

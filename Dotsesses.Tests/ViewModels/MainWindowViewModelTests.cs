@@ -108,8 +108,8 @@ public class MainWindowViewModelTests
         var viewModel = CreateViewModel();
 
         // Assert
-        Assert.NotNull(viewModel.ComplianceRows);
-        Assert.Equal(11, viewModel.ComplianceRows.Count); // All grades A through F (including C-, D+)
+        Assert.NotNull(viewModel.ComplianceGrid);
+        Assert.Equal(11, viewModel.ComplianceGrid.Rows.Count); // All grades A through F (including C-, D+)
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public class MainWindowViewModelTests
         // Assert — All grades (A through F) are enabled by default. The
         // catch-all (F in production) is structurally always enabled and
         // not present in Slots; assert via session.CurrentState.EnabledGrades.
-        var fGrade = viewModel.ComplianceRows.FirstOrDefault(r => r.Grade.LetterGrade == LetterGrade.F);
+        var fGrade = viewModel.ComplianceGrid!.Rows.FirstOrDefault(r => r.Grade.LetterGrade == LetterGrade.F);
         Assert.NotNull(fGrade);
         Assert.True(fGrade.IsEnabled, "F compliance row should be enabled by default");
 
@@ -220,7 +220,7 @@ public class MainWindowViewModelTests
         // Arrange
         var vm = CreateViewModel();
         var studentCount = vm.ClassAssessment.Assessments.Count;
-        var beforeSum = vm.ComplianceRows.Sum(r => r.CurrentCount);
+        var beforeSum = vm.ComplianceGrid!.Rows.Sum(r => r.CurrentCount);
         var scores = vm.ClassAssessment.Assessments.First().Scores;
         var newSelections = BuildSelections(scores);
 
@@ -229,7 +229,7 @@ public class MainWindowViewModelTests
 
         // Assert — total count across compliance rows is preserved (== student count),
         // proving grade counts were recomputed without losing any students.
-        var afterSum = vm.ComplianceRows.Sum(r => r.CurrentCount);
+        var afterSum = vm.ComplianceGrid!.Rows.Sum(r => r.CurrentCount);
         Assert.Equal(studentCount, beforeSum);
         Assert.Equal(studentCount, afterSum);
     }
