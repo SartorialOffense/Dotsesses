@@ -143,3 +143,17 @@ is in .gitignore so any record will need be in a summary file in design_history/
 - If I ask you to do something that is more than a simple fix or refinement, and you have
 multiple questions or feel you need clarification, please pose this as a questionnaire file
 for me to answer in.
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues at `SartorialOffense/Dotsesses` via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Five canonical labels — names match the canonical roles. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
