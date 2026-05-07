@@ -64,6 +64,16 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private ClassAssessment _classAssessment = null!;
 
+    /// <summary>
+    /// Live grading state for the loaded Class. Constructed in lockstep
+    /// with <see cref="ClassAssessment"/> on every file load (see
+    /// ADR-0008). Drag, Compliance, and persistence migrate onto this
+    /// in slices #3–#5; until then the legacy <c>_cursors</c> /
+    /// <c>ClassAssessment.CurrentCutoffs</c> paths still drive the UI.
+    /// </summary>
+    [ObservableProperty]
+    private GradingSession _gradingSession = null!;
+
     [ObservableProperty]
     private PlotModel _dotplotModel = null!;
 
@@ -245,6 +255,13 @@ public partial class MainWindowViewModel : ViewModelBase
             muppetNameMap,
             seriesColorMap
         );
+
+        GradingSession = new GradingSession(
+            ClassAssessment,
+            new CursorPlacementCalculator(),
+            _cursorValidation,
+            _cutoffCountCalculator,
+            _initialCutoffCalculator);
 
         SeedDefaultSelectionsIfEmpty();
 
@@ -1502,7 +1519,7 @@ public partial class MainWindowViewModel : ViewModelBase
             await _stateService.SaveAsync(
                 filePath,
                 ClassAssessment.Assessments,
-                Cursors,
+                GradingSession,
                 ClassAssessment.ScoreSelections,
                 _currentSourceFile);
 
@@ -1559,6 +1576,17 @@ public partial class MainWindowViewModel : ViewModelBase
                 current,
                 muppetMap,
                 seriesColorMap);
+
+            GradingSession = new GradingSession(
+                ClassAssessment,
+                new CursorPlacementCalculator(),
+                _cursorValidation,
+                _cutoffCountCalculator,
+                _initialCutoffCalculator);
+
+            var (savedCutoffs, savedEnabledGrades) =
+                _stateService.ConvertToGradingState(state, GradingSession);
+            GradingSession.LoadCutoffs(savedCutoffs, savedEnabledGrades);
 
             // Restore saved score selections from v2 .dots files. v1 files (and brand-new v2
             // files written before the selection feature shipped) deserialize as empty

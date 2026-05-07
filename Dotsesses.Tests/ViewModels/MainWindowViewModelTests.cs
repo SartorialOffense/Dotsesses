@@ -274,29 +274,84 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task LoadStateAsync_V1File_SeedsDefaults()
+    public async Task LoadStateAsync_V1File_ThrowsForUnsupportedVersion()
     {
-        // Arrange — use the parameterless CreateForTesting overload so the .dots load is the
-        // FIRST load on this VM (loading .xlsx then .dots would double-add cursors + compliance
-        // rows, which is a separate pre-existing reload bug unrelated to this slice).
-        var vm = MainWindowViewModel.CreateForTesting();
-        var v1Path = ResolveRepoFile(Path.Combine("Dotsesses", "example", "IP exam scores 2025.dots"));
-
-        // Act — invoke the source-generated AsyncRelayCommand that wraps LoadStateAsync.
-        await vm.LoadStateCommand.ExecuteAsync(v1Path);
-
-        // Assert — same shape as the fresh-xlsx case (closes R012).
-        var firstStudentScores = vm.ClassAssessment.Assessments.First().Scores;
-        var selections = vm.ClassAssessment.ScoreSelections;
-
-        Assert.Equal(firstStudentScores.Count, selections.Count);
-
-        foreach (var sel in selections)
+        // V1 .dots files are no longer supported (ADR-0009). The rejection
+        // happens in StateService.LoadAsync and bubbles up to the caller.
+        var tempDir = Path.Combine(Path.GetTempPath(), $"MainWindowVMTests_{Guid.NewGuid()}");
+        Directory.CreateDirectory(tempDir);
+        try
         {
-            Assert.True(sel.Display);
-            Assert.True(sel.Correlation);
-            var isTotal = string.Equals(sel.Name, "Total", StringComparison.OrdinalIgnoreCase);
-            Assert.Equal(!isTotal, sel.Aggregate);
+            var v1Path = Path.Combine(tempDir, "v1.dots");
+            await File.WriteAllTextAsync(
+                v1Path,
+                """{"version": 1, "savedAt": "2024-01-01T00:00:00Z", "students": [], "cursors": []}""");
+
+            var vm = MainWindowViewModel.CreateForTesting();
+
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                () => vm.LoadStateCommand.ExecuteAsync(v1Path));
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void LoadFromExcelFile_ConstructsGradingSession()
+    {
+        // Slice 2: each Excel load constructs a fresh GradingSession alongside
+        // the ClassAssessment. The session is the canonical owner of the live
+        // grading state going forward.
+        var vm = CreateViewModel();
+
+        Assert.NotNull(vm.GradingSession);
+        Assert.NotEmpty(vm.GradingSession.Slots);
+        Assert.NotEmpty(vm.GradingSession.CurrentState.Cutoffs);
+    }
+
+    [Fact]
+    public void LoadFromExcelFile_TwoLoads_ProduceFreshSession()
+    {
+        // Each load creates a new session — no state from the prior file leaks.
+        var vm = CreateViewModel();
+        var firstSession = vm.GradingSession;
+
+        // Re-load the same Excel; the session should be a new instance.
+        vm.LoadFromExcelFile(
+            ResolveRepoFile(Path.Combine("Dotsesses", "example", "IP exam scores 2025.xlsx")));
+
+        Assert.NotSame(firstSession, vm.GradingSession);
+    }
+
+    [Fact]
+    public async Task LoadStateAsync_V2File_HydratesGradingSession()
+    {
+        // VM-driven round-trip: save a session with a non-default cutoff,
+        // load on a fresh VM, verify the session reflects the saved state.
+        var tempDir = Path.Combine(Path.GetTempPath(), $"MainWindowVMTests_{Guid.NewGuid()}");
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var saveVm = CreateViewModel();
+            var slotA = saveVm.GradingSession.Slots.First(s => s.Grade.LetterGrade == LetterGrade.A);
+            var newAScore = slotA.Score - 5;
+            saveVm.GradingSession.MoveCutoff(slotA.Grade, newAScore, originator: this);
+
+            var savedPath = Path.Combine(tempDir, "saved.dots");
+            await saveVm.SaveStateCommand.ExecuteAsync(savedPath);
+
+            var loadVm = MainWindowViewModel.CreateForTesting();
+            await loadVm.LoadStateCommand.ExecuteAsync(savedPath);
+
+            Assert.Equal(
+                newAScore,
+                loadVm.GradingSession.Slots.First(s => s.Grade.LetterGrade == LetterGrade.A).Score);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
         }
     }
 
