@@ -91,6 +91,13 @@ the slot collection so item identity is preserved across moves (no
 ItemsControl rebuild churn). Slots are read-only from the binding
 side — mutations go through the GradingSession's API.
 
+The **structural catch-all** Grade — the lowest-Order Grade in the
+session's initial cutoffs — has *no* CutoffSlot. It is always
+implicitly enabled, never draggable, and acts purely as a fallback
+for `GradeAssigner` (see ADR-0011). Calls to `MoveCutoff`,
+`EnableGrade`, or `DisableGrade` against the catch-all throw
+`ArgumentException`.
+
 **GradeBin**: The vertical stack of dots in the dotplot at one
 AggregateScore value. Students sharing an AggregateScore stack into the
 same GradeBin.
