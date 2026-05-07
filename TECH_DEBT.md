@@ -69,3 +69,32 @@ that work.
 
 **Touches:** `MainWindowViewModel.cs` (the two `Initialize*` methods
 and their callers).
+
+---
+
+### TD004 — `CursorPlacementCalculator.ResetToEvenSpacing` produces inverted Score-vs-Order ordering
+
+**Why it's debt:** The private fallback used when `PlaceNewCursor`
+detects an overlap sorts grades by `Order` ascending and then assigns
+`minScore + spacing * (i + 1)` left-to-right. Because A has the
+lowest `Order` (0) and F the highest (10), this gives A the *smallest*
+score and F the *largest* — the opposite of the intended grade →
+score relationship. `GradeAssigner.ValidateCutoffOrdering` would
+throw on the result, so any caller that triggers the reseed path is
+broken. The existing
+`CursorPlacementCalculatorTests.PlaceNewCursor_CausesOverlap_ResetsAllToEvenSpacing`
+only checks that spacing is roughly even and so does not catch this.
+
+The public `ResetToEvenSpacingMonotonic` overload (used by
+`SeedCursorsFromDefaults` per M002/S05) gets the orientation right —
+it inverts the fraction so best grade lands at `maxScore`. The
+private fallback should adopt the same orientation.
+
+**Trigger:** Slice #3 of issue #6 (cursor drag migration). The
+GradingSession's `EnableGrade` exercises this path; the related
+"EnableGrade triggers reseed" test in `GradingSessionTests` is
+deferred until this is fixed.
+
+**Touches:** `Calculators/CursorPlacementCalculator.cs` (the private
+`ResetToEvenSpacing`), and the existing test should be tightened to
+assert orientation, not just even spacing.
