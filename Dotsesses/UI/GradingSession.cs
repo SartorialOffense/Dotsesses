@@ -25,15 +25,19 @@ public sealed class GradingSession : ObservableObject
     private int _catchAllScore;
     private GradingStateChange _lastChange = null!;
 
-    // Asymmetric margin around the AggregateGrade envelope: cursors
-    // can sit well below the lowest student score (so the lowest
-    // enabled cursor has room to drop further when lower grades are
-    // disabled — e.g. pushing the catch-all band so a data-floor
-    // student still falls into a real letter grade) and above the
-    // highest score (so the A boundary can be pushed past the top
-    // scorer to make A unattainable). Slice 3 of issue #6 used
-    // [-1, +5]; issue #17 widened the lower margin to -8 after a
-    // smoke-test showed -1 was too tight in real grading flows.
+    // Asymmetric drag bounds: only the upper side has an `OutOfRange`
+    // limit (max + 5, so A can be pushed past the top scorer to make A
+    // unattainable). The lower side has no `OutOfRange` floor — issue
+    // #18 surfaced that untargeted slot grades start in a fallback band
+    // below `minStudentScore - ScoreBoundsMarginBelow`, so a hard lower
+    // bound traps them out-of-reach. The catch-all (or whichever worse
+    // neighbor is enabled) is now the only floor on cursor drag, via
+    // the existing `OrderingViolation` / `WouldOverlap` checks.
+    //
+    // `_minScore` is still computed for `CursorPlacementCalculator.PlaceNewCursor`
+    // (used by `EnableGrade` to seat re-enabled grades) but no longer
+    // affects `ValidateMove`. Slice 3 of #6 used [-1, +5]; issue #17
+    // widened to [-8, +5]; issue #18 dropped the lower bound entirely.
     private const int ScoreBoundsMarginBelow = 8;
     private const int ScoreBoundsMarginAbove = 5;
 
@@ -341,7 +345,9 @@ public sealed class GradingSession : ObservableObject
         if (!slot.IsEnabled)
             return CutoffMoveResult.Fail(CutoffMoveFailure.GradeNotEnabled);
 
-        if (newScore < _minScore || newScore > _maxScore)
+        // Only the upper side enforces OutOfRange. See the
+        // `ScoreBoundsMargin*` comment for why the lower bound is open.
+        if (newScore > _maxScore)
             return CutoffMoveResult.Fail(CutoffMoveFailure.OutOfRange);
 
         var (better, worse) = FindAdjacentEnabledCutoffs(slot.Grade);

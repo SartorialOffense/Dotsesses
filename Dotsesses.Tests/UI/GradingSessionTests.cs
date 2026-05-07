@@ -81,21 +81,6 @@ public class GradingSessionTests
     }
 
     [Fact]
-    public void MoveCutoff_BelowMinAggregateMinusMargin_FailsWithOutOfRange()
-    {
-        // Fixture: AggregateGrades 50..540 → min − 8 = 42 (issue #17).
-        var session = TestFixtures.SessionForGrading();
-        var slotB = session.Slots.First(s => s.Grade.LetterGrade == LetterGrade.B);
-        var stateBefore = session.LastChange.State;
-
-        var result = session.MoveCutoff(slotB.Grade, 0, new object());
-
-        Assert.False(result.Success);
-        Assert.Equal(CutoffMoveFailure.OutOfRange, result.Failure);
-        Assert.Same(stateBefore, session.LastChange.State);
-    }
-
-    [Fact]
     public void MoveCutoff_AtUpperBoundExactly_IsAccepted_OnePastFails()
     {
         // Fixture: max=540 → max+5=545 (inclusive). 546 is OutOfRange.
@@ -111,28 +96,38 @@ public class GradingSessionTests
     }
 
     [Fact]
-    public void MoveCutoff_AtLowerBoundExactly_IsAccepted_OnePastFails()
+    public void MoveCutoff_HasNoLowerOutOfRangeBound_NeighborSpacingIsTheOnlyFloor()
     {
-        // Fixture: min=50 → min−8=42 (inclusive, issue #17).
-        // Cutoff state: A=450, B=250, C=50 (catch-all). To exercise the
-        // OutOfRange branch on the lower side we drag B (lowest slot) past
-        // 42 — but B's neighbor-spacing constraint is C (catch-all at 50),
-        // so the validation order is OutOfRange first (newScore < 42 →
-        // OutOfRange), neighbors-second.
+        // Issue #18 follow-up: the lower OutOfRange bound is gone so
+        // untargeted slots whose initial seed sits in the fallback band
+        // below `min - 8` can be dragged back up, AND a targeted slot
+        // can be dragged below `min - 8` whenever its lower neighbor
+        // permits. The catch-all (or whichever worse neighbor is
+        // enabled) is now the only floor, via OrderingViolation /
+        // WouldOverlap.
+        //
+        // Fixture: A=450, B=250, C=50, F catch-all at 38. Disable C so
+        // B's worse neighbor is the catch-all directly.
         var session = TestFixtures.SessionForGrading();
         var slotB = session.Slots.First(s => s.Grade.LetterGrade == LetterGrade.B);
+        session.DisableGrade(TestFixtures.GradeC);
 
-        // Disable the catch-all-adjacent neighbor implicitly by addressing
-        // the OutOfRange branch directly: pass a score below the bound and
-        // assert OutOfRange wins over OrderingViolation. ValidateMove
-        // checks IsEnabled → OutOfRange → neighbors, in that order.
-        var oneUnderBound = session.MoveCutoff(slotB.Grade, 41, new object());
-        Assert.False(oneUnderBound.Success);
-        Assert.Equal(CutoffMoveFailure.OutOfRange, oneUnderBound.Failure);
+        // 39 is just above the catch-all (38). Pre-#18 this would have
+        // failed with OutOfRange because 39 < 42 (the old lower bound).
+        // Post-#18 it succeeds — neighbor spacing is satisfied.
+        var lowMove = session.MoveCutoff(slotB.Grade, 39, new object());
+        Assert.True(lowMove.Success);
+        Assert.Equal(39, slotB.Score);
 
-        // 42 itself sits below the catch-all (50), so it fails neighbor
-        // ordering — but we've shown 41 fails as OutOfRange specifically,
-        // proving the lower bound has moved from 49 to 42.
+        // Same score as catch-all → WouldOverlap (not OutOfRange).
+        var atCatchAll = session.MoveCutoff(slotB.Grade, 38, new object());
+        Assert.False(atCatchAll.Success);
+        Assert.Equal(CutoffMoveFailure.WouldOverlap, atCatchAll.Failure);
+
+        // Below the catch-all → OrderingViolation (not OutOfRange).
+        var belowCatchAll = session.MoveCutoff(slotB.Grade, 37, new object());
+        Assert.False(belowCatchAll.Success);
+        Assert.Equal(CutoffMoveFailure.OrderingViolation, belowCatchAll.Failure);
     }
 
     [Fact]
