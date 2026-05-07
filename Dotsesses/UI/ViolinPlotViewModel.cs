@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
 using Avalonia;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -42,7 +41,7 @@ public partial class ViolinPlotViewModel : ViewModelBase
     private int? _hoveredStudentId;
 
     [ObservableProperty]
-    private ObservableCollection<ComplianceRowViewModel>? _complianceRows;
+    private ComplianceGridViewModel? _complianceGrid;
 
     [ObservableProperty]
     private int _minScore;

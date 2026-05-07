@@ -361,7 +361,7 @@ public partial class MainWindow : Window
                 violinPlotControl,
                 correlationPlotControl,
                 vm.PlotTabContainerViewModel,
-                vm.ComplianceRows,
+                vm.ComplianceGrid?.Rows ?? Enumerable.Empty<Dotsesses.UI.ComplianceRowViewModel>(),
                 className);
 
             // Show success message with option to open
@@ -510,7 +510,7 @@ public partial class MainWindow : Window
                     fileNameStem,
                     vm.ClassAssessment.Assessments,
                     vm.GradeAssigner,
-                    vm.ComplianceRows);
+                    vm.ComplianceGrid?.Rows ?? Enumerable.Empty<Dotsesses.UI.ComplianceRowViewModel>());
 
                 // Show success message
                 var successBox = MessageBoxManager.GetMessageBoxCustom(new MessageBoxCustomParams

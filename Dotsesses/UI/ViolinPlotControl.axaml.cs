@@ -205,7 +205,6 @@ public partial class ViolinPlotControl : UserControl
             }
 
             SubscribeToSession(vm.GradingSession);
-            SubscribeToComplianceRows(vm);
 
             vm.PropertyChanged += (s, args) =>
             {
@@ -215,9 +214,8 @@ public partial class ViolinPlotControl : UserControl
                     RenderRegionBands();
                     RenderCursorColumn();
                 }
-                else if (args.PropertyName == nameof(ViolinPlotViewModel.ComplianceRows))
+                else if (args.PropertyName == nameof(ViolinPlotViewModel.ComplianceGrid))
                 {
-                    SubscribeToComplianceRows(vm);
                     RenderCursorColumn();
                 }
             };
@@ -239,28 +237,14 @@ public partial class ViolinPlotControl : UserControl
 
     private void OnSessionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        // Session emits LastChange whenever cursor positions or enabled
+        // grades shift. Re-render both surfaces so handles AND the
+        // count/deviation column track the change without an extra
+        // ComplianceRow subscription — the counts are read from
+        // ComplianceGrid.Rows during RenderCursorColumn.
         if (e.PropertyName != nameof(GradingSession.LastChange)) return;
         RenderRegionBands();
         RenderCursorColumn();
-    }
-
-    private void SubscribeToComplianceRows(ViolinPlotViewModel vm)
-    {
-        if (vm.ComplianceRows == null) return;
-
-        foreach (var row in vm.ComplianceRows)
-        {
-            row.PropertyChanged += OnComplianceRowPropertyChanged;
-        }
-    }
-
-    private void OnComplianceRowPropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(ComplianceRowViewModel.CurrentCount) ||
-            e.PropertyName == nameof(ComplianceRowViewModel.SignedDeviation))
-        {
-            RenderCursorColumn();   // Update Canvas cursor column with new counts
-        }
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -930,7 +914,7 @@ public partial class ViolinPlotControl : UserControl
             var grade = enabledGrades[i];
 
             // Get compliance data for this grade
-            var compliance = vm.ComplianceRows?.FirstOrDefault(r => r.Grade.Equals(grade));
+            var compliance = vm.ComplianceGrid?.Rows.FirstOrDefault(r => r.Grade.Equals(grade));
             var currentCount = compliance?.CurrentCount ?? 0;
             var deviation = compliance?.SignedDeviation ?? 0;
 
