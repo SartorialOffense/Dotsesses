@@ -92,11 +92,15 @@ ItemsControl rebuild churn). Slots are read-only from the binding
 side — mutations go through the GradingSession's API.
 
 The **structural catch-all** Grade — the lowest-Order Grade in the
-session's initial cutoffs — has *no* CutoffSlot. It is always
+session's `DefaultCurve`, regardless of whether that Grade has a
+non-zero `CutoffCountRange` — has *no* CutoffSlot. It is always
 implicitly enabled, never draggable, and acts purely as a fallback
 for `GradeAssigner` (see ADR-0011). Calls to `MoveCutoff`,
 `EnableGrade`, or `DisableGrade` against the catch-all throw
-`ArgumentException`.
+`ArgumentException`. Every other Grade in `DefaultCurve` gets a
+Slot, including those that started with a zero target range — they
+sit in a fallback band below the data envelope and are draggable
+into the data range whenever the user wants to use them.
 
 **GradeBin**: The vertical stack of dots in the dotplot at one
 AggregateScore value. Students sharing an AggregateScore stack into the

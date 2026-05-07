@@ -138,12 +138,13 @@ public class GradingSessionTests
     [Fact]
     public void MoveCutoff_OnStructuralCatchAll_ThrowsArgumentException()
     {
-        // Arrange — in this fixture C is the structural catch-all (lowest Order in initial cutoffs)
+        // Per ADR-0011 the catch-all is the lowest-Order grade in
+        // DefaultCurve. Fixture: DefaultCurve = [A, B, C, F] → F is
+        // the catch-all (never draggable).
         var session = TestFixtures.SessionForGrading();
 
-        // Act & Assert — caller is asking for something the API doesn't support
         Assert.Throws<ArgumentException>(() =>
-            session.MoveCutoff(TestFixtures.GradeC, 100, new object()));
+            session.MoveCutoff(TestFixtures.GradeF, 100, new object()));
     }
 
     [Fact]
@@ -275,19 +276,21 @@ public class GradingSessionTests
     [Fact]
     public void DisableGrade_OnStructuralCatchAll_ThrowsArgumentException()
     {
+        // F is the catch-all per ADR-0011 (lowest-Order in DefaultCurve).
         var session = TestFixtures.SessionForGrading();
 
         Assert.Throws<ArgumentException>(() =>
-            session.DisableGrade(TestFixtures.GradeC));
+            session.DisableGrade(TestFixtures.GradeF));
     }
 
     [Fact]
     public void EnableGrade_OnStructuralCatchAll_ThrowsArgumentException()
     {
+        // F is the catch-all per ADR-0011 (lowest-Order in DefaultCurve).
         var session = TestFixtures.SessionForGrading();
 
         Assert.Throws<ArgumentException>(() =>
-            session.EnableGrade(TestFixtures.GradeC));
+            session.EnableGrade(TestFixtures.GradeF));
     }
 
     [Fact]

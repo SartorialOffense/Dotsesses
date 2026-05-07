@@ -77,8 +77,10 @@ public class StateServiceTests : IDisposable
         Assert.Equal(2, loadedState.Version);
         Assert.Equal("original_source.xlsx", loadedState.SourceFile);
         Assert.Equal(2, loadedState.Students.Count);
-        // Slots are A and B (C is the catch-all and is appended); 3 cursor entries total.
-        Assert.Equal(3, loadedState.Cursors.Count);
+        // Slots are A, B, C (post-#18 fix: catch-all is F, lowest in
+        // DefaultCurve). SaveAsync iterates Slots and appends the
+        // catch-all → 4 cursor entries total.
+        Assert.Equal(4, loadedState.Cursors.Count);
     }
 
     [Fact]
