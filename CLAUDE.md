@@ -144,6 +144,21 @@ is in .gitignore so any record will need be in a summary file in design_history/
 multiple questions or feel you need clarification, please pose this as a questionnaire file
 for me to answer in.
 
+- **Git push, PR open, and PR merge each need explicit per-action
+  approval — every time.** Approval for one PR does not carry forward
+  to the next, even within the same session and even for hot-fixes.
+  Specifically:
+  - Do not run `git push` until I say so.
+  - Do not run `gh pr create` until I say so.
+  - Do not run `gh pr merge` (or any other merge / accept-pr / squash
+    action) until I say so. The "manual smoke test" checkbox in PR
+    descriptions belongs to me — never assume it's checked.
+  - "Commit, push, open PR, merge" said for slice N does **not**
+    authorize the same flow for slice N+1 or for an unrelated
+    hot-fix. Ask again.
+  - This rule overrides any auto / autonomous mode. Auto mode is for
+    local work, not for shared-system writes.
+
 ## Agent skills
 
 ### Issue tracker
