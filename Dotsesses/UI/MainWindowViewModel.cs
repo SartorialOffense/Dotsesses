@@ -2018,7 +2018,16 @@ public partial class MainWindowViewModel : ViewModelBase
         // emits LastChange on success → SyncCursorsFromSession mirrors
         // back into _cursors → existing cursor PropertyChanged handlers
         // update OxyPlot annotations and Compliance counts.
-        GradingSession?.MoveCutoff(_draggingCursor.Grade, clampedScore, this);
+        // Guard against the legacy `Cursors` collection containing
+        // non-draggable grades (the structural catch-all and any
+        // zero-range grades that aren't in `session.Slots`). The session
+        // throws ArgumentException for those (per ADR-0011); the drag
+        // handler must not propagate that to OxyPlot's event pump.
+        if (GradingSession is not null
+            && GradingSession.Slots.Any(s => s.Grade.Equals(_draggingCursor.Grade)))
+        {
+            GradingSession.MoveCutoff(_draggingCursor.Grade, clampedScore, this);
+        }
         e.Handled = true;
     }
 

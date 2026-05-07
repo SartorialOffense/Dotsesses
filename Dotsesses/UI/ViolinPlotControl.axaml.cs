@@ -943,8 +943,13 @@ public partial class ViolinPlotControl : UserControl
         // applies canonical out-of-range bounds (issue #9 / Q3: -1, +5);
         // rejected moves leave the cursor at its last valid position,
         // and the mirror sync in MainWindowViewModel updates vm.Cursors
-        // on success.
-        vm.GradingSession?.MoveCutoff(_draggingBarbellCursor.Grade, clamped, this);
+        // on success. Guard non-draggable grades (catch-all, zero-range)
+        // since session.MoveCutoff throws ArgumentException for those.
+        if (vm.GradingSession is not null
+            && vm.GradingSession.Slots.Any(s => s.Grade.Equals(_draggingBarbellCursor.Grade)))
+        {
+            vm.GradingSession.MoveCutoff(_draggingBarbellCursor.Grade, clamped, this);
+        }
         e.Handled = true;
     }
 
@@ -1210,8 +1215,13 @@ public partial class ViolinPlotControl : UserControl
         // Slice 3: route the commit through GradingSession (issue #6
         // ADR-0010). Mirror sync in MainWindowViewModel reflects the
         // change back into vm.Cursors so existing rendering keeps
-        // working until issue #14's cleanup.
-        vm.GradingSession?.MoveCutoff(_draggingCursor.Grade, clamped, this);
+        // working until issue #14's cleanup. Guard non-draggable
+        // grades (catch-all, zero-range): session throws on those.
+        if (vm.GradingSession is not null
+            && vm.GradingSession.Slots.Any(s => s.Grade.Equals(_draggingCursor.Grade)))
+        {
+            vm.GradingSession.MoveCutoff(_draggingCursor.Grade, clamped, this);
+        }
         e.Handled = true;
     }
 
