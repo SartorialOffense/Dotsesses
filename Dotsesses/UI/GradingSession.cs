@@ -82,8 +82,34 @@ public sealed class GradingSession : ObservableObject
         _minScore = classAssessment.Assessments.Min(a => a.AggregateGrade) - ScoreBoundsMarginBelow;
         _maxScore = classAssessment.Assessments.Max(a => a.AggregateGrade) + ScoreBoundsMarginAbove;
 
+        // Catch-all is the lowest-Order grade in DefaultCurve, regardless
+        // of targeting (ADR-0011). Issue #18 corrected this from slice 1's
+        // mistaken "lowest-Order in initial cutoffs" — the previous logic
+        // dropped zero-range grades before picking the catch-all, leaving
+        // production grades like CMinus, DPlus, D, F structurally absent
+        // from `Slots` and undraggable.
+        var allCurveGrades = classAssessment.DefaultCurve
+            .Select(r => r.Grade)
+            .OrderBy(g => g.Order)
+            .ToList();
+
+        if (allCurveGrades.Count < 2)
+        {
+            throw new InvalidOperationException(
+                "DefaultCurve must contain at least two grades " +
+                "(one structural catch-all plus at least one slot).");
+        }
+
+        _structuralCatchAll = allCurveGrades[^1];
+        var slotGrades = allCurveGrades
+            .Where(g => !g.Equals(_structuralCatchAll))
+            .ToList();
+
+        // Targeted slots get positions from InitialCutoffCalculator
+        // (curves with non-zero range, excluding the catch-all).
         var midpointCurve = classAssessment.DefaultCurve
             .Where(r => r.LowerBound > 0 || r.UpperBound > 0)
+            .Where(r => !r.Grade.Equals(_structuralCatchAll))
             .Select(r => new CutoffCount(r.Grade, r.Midpoint))
             .OrderBy(c => c.Grade.Order)
             .ToList();
@@ -91,30 +117,60 @@ public sealed class GradingSession : ObservableObject
         if (midpointCurve.Count == 0)
         {
             throw new InvalidOperationException(
-                "DefaultCurve has no targeted grades (all ranges are zero); " +
-                "GradingSession requires at least one targeted grade.");
+                "DefaultCurve has no targeted slot grades (all non-catch-all " +
+                "ranges are zero); GradingSession requires at least one " +
+                "targeted slot grade to seed initial positions.");
         }
 
-        var initialCutoffs = _initialCutoffCalculator
+        var seededCutoffs = _initialCutoffCalculator
             .Calculate(classAssessment.Assessments, midpointCurve)
-            .OrderBy(c => c.Grade.Order)
+            .ToDictionary(c => c.Grade);
+
+        // Untargeted slots (zero-range CutoffCountRange) get fallback
+        // positions in a band below the data envelope — visible and
+        // draggable but not positioned to catch students by default.
+        // Mirrors the legacy SeedCursorsFromDefaults "Second pass" so
+        // the legacy `_cursors` mirror sync stays consistent during
+        // the slice-3 transition.
+        var minStudentScore = classAssessment.Assessments.Min(a => a.AggregateGrade);
+        var maxStudentScore = classAssessment.Assessments.Max(a => a.AggregateGrade);
+        var fallbackScoreRange = maxStudentScore - minStudentScore;
+        var fallbackBaseScore = (int)Math.Round(minStudentScore - fallbackScoreRange * 0.25);
+
+        var untargetedSlotGrades = slotGrades
+            .Where(g => !seededCutoffs.ContainsKey(g))
+            .OrderBy(g => g.Order)
             .ToList();
 
-        // The lowest-Order grade in the initial cutoffs is the structural
-        // catch-all (Q1=C): it has no Slot and is always implicitly
-        // enabled. Per ADR-0008, this designation is fixed at construction.
-        _structuralCatchAll = initialCutoffs[^1].Grade;
-        _catchAllScore = initialCutoffs[^1].Score;
+        var fallbackScores = new Dictionary<Grade, int>();
+        for (int i = 0; i < untargetedSlotGrades.Count; i++)
+        {
+            // Lower-Order grades sit higher in the fallback band so the
+            // overall (Order, Score) relationship stays monotonic
+            // descending across all slots.
+            fallbackScores[untargetedSlotGrades[i]] = fallbackBaseScore - i * DefaultCursorSpacing;
+        }
 
         _slots = new ObservableCollection<CutoffSlot>(
-            initialCutoffs
-                .Where(c => !c.Grade.Equals(_structuralCatchAll))
-                .Select(c => new CutoffSlot(c.Grade, c.Score, isEnabled: true)));
+            slotGrades
+                .OrderBy(g => g.Order)
+                .Select(g => new CutoffSlot(
+                    g,
+                    seededCutoffs.TryGetValue(g, out var seeded) ? seeded.Score : fallbackScores[g],
+                    isEnabled: true)));
 
         Slots = new ReadOnlyObservableCollection<CutoffSlot>(_slots);
 
-        var enabledGrades = initialCutoffs
-            .Select(c => c.Grade)
+        // Catch-all sits below the lowest slot so it remains the
+        // assignment fallback (until a user drags a slot below it,
+        // which ValidateMove rejects via OrderingViolation).
+        _catchAllScore = _slots.Min(s => s.Score) - DefaultCursorSpacing;
+
+        var initialCutoffs = BuildCurrentCutoffs();
+        var enabledGrades = _slots
+            .Where(s => s.IsEnabled)
+            .Select(s => s.Grade)
+            .Append(_structuralCatchAll)
             .ToHashSet();
 
         var counts = _cutoffCountCalculator
@@ -129,6 +185,12 @@ public sealed class GradingSession : ObservableObject
 
         _lastChange = new GradingStateChange(Originator: null, State: initialState);
     }
+
+    // Matches CursorPlacementCalculator's DefaultCursorSpacing — the
+    // minimum safe gap between adjacent cutoffs that still respects
+    // ordering. Used to space the fallback band for untargeted slots
+    // and to position the catch-all below them.
+    private const int DefaultCursorSpacing = 12;
 
     public CutoffMoveResult CanMoveCutoff(Grade grade, int newScore)
     {

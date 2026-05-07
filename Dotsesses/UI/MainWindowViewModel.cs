@@ -140,12 +140,37 @@ public partial class MainWindowViewModel : ViewModelBase
     private void SyncCursorsFromSession()
     {
         if (GradingSession is null) return;
-        foreach (var slot in GradingSession.Slots)
+
+        // Atomic mirror: suppress per-cursor PropertyChanged reactions
+        // during the loop so RecalculateGradeCounts (called from
+        // OnCursorPropertyChanged) doesn't see a mid-loop mixed state
+        // where some cursors have new session values and others still
+        // hold legacy values — that combination can violate
+        // GradeAssigner's ordering invariant. Issue #18.
+        var wasUpdating = _isUpdatingCursorsFromSubscription;
+        _isUpdatingCursorsFromSubscription = true;
+        try
         {
-            var cursor = Cursors.FirstOrDefault(c => c.Grade.Equals(slot.Grade));
-            if (cursor is null) continue;
-            if (cursor.Score != slot.Score) cursor.Score = slot.Score;
-            if (cursor.IsEnabled != slot.IsEnabled) cursor.IsEnabled = slot.IsEnabled;
+            foreach (var slot in GradingSession.Slots)
+            {
+                var cursor = Cursors.FirstOrDefault(c => c.Grade.Equals(slot.Grade));
+                if (cursor is null) continue;
+                if (cursor.Score != slot.Score) cursor.Score = slot.Score;
+                if (cursor.IsEnabled != slot.IsEnabled) cursor.IsEnabled = slot.IsEnabled;
+            }
+        }
+        finally
+        {
+            _isUpdatingCursorsFromSubscription = wasUpdating;
+        }
+
+        // Run the downstream pipeline once with the fully-mirrored state.
+        // Guard DotplotModel for the test factory path where it may be null.
+        if (DotplotModel is not null)
+        {
+            UpdateCursors();
+            RecalculateGradeCounts();
+            HasUnsavedChanges = true;
         }
     }
 

@@ -1,13 +1,23 @@
 # `GradingSession.Slots` excludes the structural catch-all Grade
 
 The `Slots` collection on a `GradingSession` exposes a `CutoffSlot`
-for every Grade in the session's structural set **except** the
-structural catch-all — i.e. the lowest-Order Grade in the initial
-cutoffs at construction time. The catch-all has no slot, is always
-present in `GradingState.EnabledGrades`, and cannot be moved,
-disabled, or re-enabled. Its score lives on a private field inside
-the session and is only mutated by `LoadCutoffs` /
-`ReseedFromDefaults` / a reseed inside `EnableGrade`.
+for every Grade in the session's `DefaultCurve` **except** the
+structural catch-all — the lowest-Order Grade in `DefaultCurve` at
+construction time, regardless of whether that Grade has a non-zero
+`CutoffCountRange`. The catch-all has no slot, is always present
+in `GradingState.EnabledGrades`, and cannot be moved, disabled, or
+re-enabled. Its score lives on a private field inside the session
+and is only mutated by `LoadCutoffs` / `ReseedFromDefaults` / a
+reseed inside `EnableGrade`.
+
+> **2026-05-07 (issue #18)**: Earlier wording said "lowest-Order in
+> the *initial cutoffs*." That implementation post-filtered the
+> curve and dropped zero-range grades before picking the catch-all,
+> so production (where CMinus, DPlus, D, F all have zero range)
+> ended up with `C` as the catch-all and four grades structurally
+> absent from `Slots`. The intended structure has always been
+> "lowest-Order in `DefaultCurve`" — issue #18 corrected the code
+> and this paragraph to match.
 
 ## Why
 
