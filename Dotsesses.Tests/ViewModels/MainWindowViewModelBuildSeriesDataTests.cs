@@ -1,6 +1,7 @@
 namespace Dotsesses.Tests.ViewModels;
 
 using Dotsesses.Models;
+using Dotsesses.Tests.Fixtures;
 using Dotsesses.UI;
 
 /// <summary>
@@ -13,24 +14,7 @@ using Dotsesses.UI;
 public class MainWindowViewModelBuildSeriesDataTests
 {
     private static MainWindowViewModel CreateViewModel()
-    {
-        return MainWindowViewModel.CreateForTesting(
-            ResolveRepoFile(Path.Combine("Dotsesses", "example", "IP exam scores 2025.xlsx")));
-    }
-
-    private static string ResolveRepoFile(string relativePath)
-    {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "Dotsesses.sln")))
-        {
-            dir = dir.Parent;
-        }
-        if (dir == null)
-        {
-            throw new InvalidOperationException("Could not locate Dotsesses.sln walking up from " + AppContext.BaseDirectory);
-        }
-        return Path.Combine(dir.FullName, relativePath);
-    }
+        => MainWindowViewModel.CreateForTesting(TestFixtures.IpExamScoresXlsx());
 
     private static string DisplayName(Score score) =>
         score.Index.HasValue ? $"{score.Name} {score.Index}" : score.Name;

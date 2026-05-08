@@ -249,19 +249,6 @@ public class StateServiceTests : IDisposable
         Assert.Contains("v1", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string ResolveRepoFile(string relativePath)
-    {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "Dotsesses.sln")))
-        {
-            dir = dir.Parent;
-        }
-        if (dir == null)
-        {
-            throw new InvalidOperationException("Could not locate Dotsesses.sln walking up from " + AppContext.BaseDirectory);
-        }
-        return Path.Combine(dir.FullName, relativePath);
-    }
 
     private static List<ScoreSelection> CreateTestScoreSelections()
     {

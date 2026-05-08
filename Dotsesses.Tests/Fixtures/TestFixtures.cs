@@ -1,5 +1,6 @@
 namespace Dotsesses.Tests.Fixtures;
 
+using System.IO;
 using Dotsesses.Calculators;
 using Dotsesses.Models;
 using Dotsesses.UI;
@@ -11,6 +12,30 @@ using Dotsesses.UI;
 /// </summary>
 public static class TestFixtures
 {
+    /// <summary>
+    /// Absolute path to the IP exam Excel fixture used by the
+    /// MainWindowViewModel test suite. Resolved by walking up from
+    /// the test binary to the repo root (located by <c>Dotsesses.sln</c>).
+    /// Lives under <c>Dotsesses.Tests/TestData/</c> per TD005.
+    /// </summary>
+    public static string IpExamScoresXlsx() => ResolveRepoFile(
+        Path.Combine("Dotsesses.Tests", "TestData", "IP exam scores 2025.xlsx"));
+
+    private static string ResolveRepoFile(string relativePath)
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "Dotsesses.sln")))
+        {
+            dir = dir.Parent;
+        }
+        if (dir == null)
+        {
+            throw new InvalidOperationException(
+                "Could not locate Dotsesses.sln walking up from " + AppContext.BaseDirectory);
+        }
+        return Path.Combine(dir.FullName, relativePath);
+    }
+
     public static readonly Grade GradeA = new(LetterGrade.A, 0);
     public static readonly Grade GradeB = new(LetterGrade.B, 3);
     public static readonly Grade GradeC = new(LetterGrade.C, 6);

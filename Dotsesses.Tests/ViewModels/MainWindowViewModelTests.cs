@@ -3,6 +3,7 @@ namespace Dotsesses.Tests.ViewModels;
 using CommunityToolkit.Mvvm.Messaging;
 using Dotsesses.Calculators;
 using Dotsesses.Services;
+using Dotsesses.Tests.Fixtures;
 using Dotsesses.UI;
 using Dotsesses.Models;
 using OxyPlot;
@@ -10,24 +11,7 @@ using OxyPlot;
 public class MainWindowViewModelTests
 {
     private static MainWindowViewModel CreateViewModel()
-    {
-        return MainWindowViewModel.CreateForTesting(
-            ResolveRepoFile(Path.Combine("Dotsesses", "example", "IP exam scores 2025.xlsx")));
-    }
-
-    private static string ResolveRepoFile(string relativePath)
-    {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "Dotsesses.sln")))
-        {
-            dir = dir.Parent;
-        }
-        if (dir == null)
-        {
-            throw new InvalidOperationException("Could not locate Dotsesses.sln walking up from " + AppContext.BaseDirectory);
-        }
-        return Path.Combine(dir.FullName, relativePath);
-    }
+        => MainWindowViewModel.CreateForTesting(TestFixtures.IpExamScoresXlsx());
 
     [Fact]
     public void Constructor_BuildsDotplotModelWithExpectedShape()
@@ -244,8 +228,7 @@ public class MainWindowViewModelTests
         var vm = CreateViewModel();
         var firstSession = vm.GradingSession;
 
-        vm.LoadFromExcelFile(
-            ResolveRepoFile(Path.Combine("Dotsesses", "example", "IP exam scores 2025.xlsx")));
+        vm.LoadFromExcelFile(TestFixtures.IpExamScoresXlsx());
 
         Assert.NotSame(firstSession, vm.GradingSession);
     }
