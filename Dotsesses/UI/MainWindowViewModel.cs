@@ -260,14 +260,6 @@ public partial class MainWindowViewModel : ViewModelBase
         var curveGenerator = new DefaultCurveGenerator();
         var defaultCurve = curveGenerator.GenerateRanges(students.Count);
 
-        var midpointCurve = defaultCurve
-            .Where(r => r.LowerBound > 0 || r.UpperBound > 0)
-            .Select(r => new CutoffCount(r.Grade, r.Midpoint))
-            .ToList();
-
-        var initialCutoffs = _initialCutoffCalculator.Calculate(students, midpointCurve);
-        var current = _cutoffCountCalculator.Calculate(students, initialCutoffs);
-
         var muppetNameGenerator = new MuppetNameGenerator();
         var studentIds = students.Select(s => s.Id).OrderBy(id => id);
         var muppetNameMap = muppetNameGenerator.Generate(studentIds);
@@ -281,9 +273,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         ClassAssessment = new ClassAssessment(
             students,
-            initialCutoffs,
             defaultCurve,
-            current,
             muppetNameMap,
             seriesColorMap
         );
@@ -1173,14 +1163,6 @@ public partial class MainWindowViewModel : ViewModelBase
             var curveGenerator = new DefaultCurveGenerator();
             var defaultCurve = curveGenerator.GenerateRanges(students.Count);
 
-            var midpointCurve = defaultCurve
-                .Where(r => r.LowerBound > 0 || r.UpperBound > 0)
-                .Select(r => new CutoffCount(r.Grade, r.Midpoint))
-                .ToList();
-
-            var initialCutoffs = _initialCutoffCalculator.Calculate(students, midpointCurve);
-            var current = _cutoffCountCalculator.Calculate(students, initialCutoffs);
-
             // Generate series color map from first student's scores
             var firstStudent = students.First();
             var seriesNames = firstStudent.Scores
@@ -1190,9 +1172,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
             ClassAssessment = new ClassAssessment(
                 students,
-                initialCutoffs,
                 defaultCurve,
-                current,
                 muppetMap,
                 seriesColorMap);
 

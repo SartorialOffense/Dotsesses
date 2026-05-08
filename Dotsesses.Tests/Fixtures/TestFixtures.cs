@@ -40,17 +40,9 @@ public static class TestFixtures
             new CutoffCountRange(GradeF, 0, 0),
         };
 
-        // ClassAssessment ctor still requires non-null currentCutoffs and
-        // current today; the session computes its own initial state from
-        // DefaultCurve and Assessments, so these placeholders are unused.
-        var placeholderCutoffs = new[] { new GradeCutoff(GradeC, 0) };
-        var placeholderCounts = new[] { new CutoffCount(GradeC, 0) };
-
         return new ClassAssessment(
             assessments: assessments,
-            currentCutoffs: placeholderCutoffs,
             defaultCurve: defaultCurve,
-            current: placeholderCounts,
             muppetNameMap: new Dictionary<int, MuppetNameInfo>(),
             seriesColorMap: new Dictionary<string, string>());
     }
