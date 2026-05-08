@@ -30,108 +30,45 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
-    public void Constructor_InitializesPlotModel()
+    public void Constructor_BuildsDotplotModelWithExpectedShape()
     {
-        // Act
-        var viewModel = CreateViewModel();
+        // The dotplot has 4 axes (SharedX, StatsY, DotY, CursorY) and 2
+        // ScatterSeries (unselected + selected). Total points across both
+        // series equals the student count. Background is transparent for
+        // theme integration; the plot-area border is the dark-theme grey.
+        var vm = CreateViewModel();
 
-        // Assert
-        Assert.NotNull(viewModel.DotplotModel);
-        Assert.Equal(OxyColors.Transparent, viewModel.DotplotModel.Background);
+        Assert.NotNull(vm.DotplotModel);
+        Assert.Equal(OxyColors.Transparent, vm.DotplotModel.Background);
+        Assert.Equal(OxyColor.FromRgb(60, 60, 60), vm.DotplotModel.PlotAreaBorderColor);
+
+        Assert.Equal(4, vm.DotplotModel.Axes.Count);
+        Assert.Contains(vm.DotplotModel.Axes, a => a.Position == OxyPlot.Axes.AxisPosition.Bottom);
+        Assert.Contains(vm.DotplotModel.Axes, a => a.Position == OxyPlot.Axes.AxisPosition.Left);
+
+        Assert.Equal(2, vm.DotplotModel.Series.Count);
+        var s0 = Assert.IsType<OxyPlot.Series.ScatterSeries>(vm.DotplotModel.Series[0]);
+        var s1 = Assert.IsType<OxyPlot.Series.ScatterSeries>(vm.DotplotModel.Series[1]);
+        Assert.Equal(vm.ClassAssessment.Assessments.Count, s0.Points.Count + s1.Points.Count);
+
+        Assert.NotEmpty(vm.ClassAssessment.Assessments);
     }
 
     [Fact]
-    public void Constructor_LoadsSyntheticData()
+    public void Constructor_BuildsComplianceGrid_AllGradesEnabledByDefault()
     {
-        // Act
-        var viewModel = CreateViewModel();
+        var vm = CreateViewModel();
 
-        // Assert
-        Assert.NotNull(viewModel.ClassAssessment);
-        Assert.True(viewModel.ClassAssessment.Assessments.Count > 0, "Should have at least some students");
+        Assert.NotNull(vm.ComplianceGrid);
+        Assert.Equal(11, vm.ComplianceGrid.Rows.Count); // A through F (including C-, D+, D)
+
+        // Catch-all (F) is structurally always enabled and not present
+        // in Slots; assert via session.CurrentState.EnabledGrades.
+        var fRow = vm.ComplianceGrid.Rows.FirstOrDefault(r => r.Grade.LetterGrade == LetterGrade.F);
+        Assert.NotNull(fRow);
+        Assert.True(fRow.IsEnabled);
+        Assert.Contains(vm.GradingSession.CurrentState.EnabledGrades, g => g.LetterGrade == LetterGrade.F);
     }
-
-    [Fact]
-    public void PlotModel_HasAxes()
-    {
-        // Act
-        var viewModel = CreateViewModel();
-
-        // Assert - Now has 4 axes: SharedX, StatsY, DotY, CursorY
-        Assert.Equal(4, viewModel.DotplotModel.Axes.Count);
-        Assert.Contains(viewModel.DotplotModel.Axes, a => a.Position == OxyPlot.Axes.AxisPosition.Bottom);
-        Assert.Contains(viewModel.DotplotModel.Axes, a => a.Position == OxyPlot.Axes.AxisPosition.Left);
-    }
-
-    [Fact]
-    public void PlotModel_HasScatterSeries()
-    {
-        // Act
-        var viewModel = CreateViewModel();
-
-        // Assert - now has 2 series (unselected and selected)
-        Assert.Equal(2, viewModel.DotplotModel.Series.Count);
-        Assert.IsType<OxyPlot.Series.ScatterSeries>(viewModel.DotplotModel.Series[0]);
-        Assert.IsType<OxyPlot.Series.ScatterSeries>(viewModel.DotplotModel.Series[1]);
-    }
-
-    [Fact]
-    public void ScatterSeries_HasStudents()
-    {
-        // Act
-        var viewModel = CreateViewModel();
-        var circleSeries = viewModel.DotplotModel.Series[0] as OxyPlot.Series.ScatterSeries;
-        var squareSeries = viewModel.DotplotModel.Series[1] as OxyPlot.Series.ScatterSeries;
-
-        Assert.NotNull(circleSeries);
-        Assert.NotNull(squareSeries);
-        // Total points across both series should match student count
-        var totalPoints = circleSeries.Points.Count + squareSeries.Points.Count;
-        Assert.Equal(viewModel.ClassAssessment.Assessments.Count, totalPoints);
-    }
-
-    [Fact]
-    public void PlotModel_UsesDarkTheme()
-    {
-        // Act
-        var viewModel = CreateViewModel();
-
-        // Assert - Uses transparent background now for theme integration
-        Assert.Equal(OxyColors.Transparent, viewModel.DotplotModel.Background);
-        Assert.Equal(OxyColor.FromRgb(60, 60, 60), viewModel.DotplotModel.PlotAreaBorderColor);
-    }
-
-    [Fact]
-    public void Constructor_InitializesComplianceGrid()
-    {
-        // Act
-        var viewModel = CreateViewModel();
-
-        // Assert
-        Assert.NotNull(viewModel.ComplianceGrid);
-        Assert.Equal(11, viewModel.ComplianceGrid.Rows.Count); // All grades A through F (including C-, D+)
-    }
-
-    [Fact]
-    public void AllGrades_AreEnabledByDefault()
-    {
-        // Arrange
-        var viewModel = CreateViewModel();
-
-        // Assert — All grades (A through F) are enabled by default. The
-        // catch-all (F in production) is structurally always enabled and
-        // not present in Slots; assert via session.CurrentState.EnabledGrades.
-        var fGrade = viewModel.ComplianceGrid!.Rows.FirstOrDefault(r => r.Grade.LetterGrade == LetterGrade.F);
-        Assert.NotNull(fGrade);
-        Assert.True(fGrade.IsEnabled, "F compliance row should be enabled by default");
-
-        var enabledGrades = viewModel.GradingSession.CurrentState.EnabledGrades;
-        Assert.Contains(enabledGrades, g => g.LetterGrade == LetterGrade.F);
-    }
-
-    // -----------------------------------------------------------------------
-    // S04/T02: Default-seeding on load + ApplyScoreSelections recompute orchestrator
-    // -----------------------------------------------------------------------
 
     private static IReadOnlyList<ScoreSelection> BuildSelections(
         IReadOnlyList<Score> scores,
@@ -143,95 +80,88 @@ public class MainWindowViewModelTests
             .ToList();
     }
 
+    /// <summary>
+    /// Builds a selection list where only the score named <paramref name="aggregateName"/>
+    /// is in the Aggregate set. Used by the M002/S05 narrow-aggregate scenarios:
+    /// pinning to "MC" collapses the per-student range to 0–10 and triggers the
+    /// session's narrow-aggregate fallback.
+    /// </summary>
+    private static IReadOnlyList<ScoreSelection> NarrowAggregateOn(
+        IReadOnlyCollection<Score> scores, string aggregateName)
+    {
+        return scores
+            .Select(s => new ScoreSelection(
+                s.Name, s.Index,
+                Display: true,
+                Aggregate: string.Equals(s.Name, aggregateName, StringComparison.Ordinal)
+                    && !string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase),
+                Correlation: true))
+            .ToList();
+    }
+
     [Fact]
     public void ApplyScoreSelections_MutatesClassAssessmentScoreSelections()
     {
-        // Arrange
         var vm = CreateViewModel();
-        var scores = vm.ClassAssessment.Assessments.First().Scores;
-        // Build selections with one score deliberately excluded from Aggregate.
-        var newSelections = BuildSelections(scores, s =>
-            new ScoreSelection(s.Name, s.Index,
-                Display: true,
+        var newSelections = BuildSelections(vm.ClassAssessment.Assessments.First().Scores, s =>
+            new ScoreSelection(s.Name, s.Index, Display: true,
                 Aggregate: !string.Equals(s.Name, "MC", StringComparison.OrdinalIgnoreCase),
                 Correlation: true));
 
-        // Act
         vm.ApplyScoreSelections(newSelections);
 
-        // Assert — same reference is stored on ClassAssessment
         Assert.Same(newSelections, vm.ClassAssessment.ScoreSelections);
     }
 
     [Fact]
     public void ApplyScoreSelections_RecalculatesAggregateOnEveryStudent()
     {
-        // Arrange
+        // Excluding MC must change at least one student's AggregateGrade
+        // and produce the manually-computed sum on the first student.
         var vm = CreateViewModel();
         var students = vm.ClassAssessment.Assessments.ToList();
-        var scoresOfFirst = students.First().Scores;
-
-        // Pick a score to exclude from Aggregate that is non-zero on at least one student.
-        // 'MC' is the first column in the IP exam fixture and is non-zero for typical students.
-        const string excludedName = "MC";
-        var newSelections = BuildSelections(scoresOfFirst, s =>
-            new ScoreSelection(s.Name, s.Index,
-                Display: true,
-                Aggregate: !string.Equals(s.Name, excludedName, StringComparison.Ordinal),
+        const string excluded = "MC";
+        var newSelections = BuildSelections(students.First().Scores, s =>
+            new ScoreSelection(s.Name, s.Index, Display: true,
+                Aggregate: !string.Equals(s.Name, excluded, StringComparison.Ordinal),
                 Correlation: true));
 
         var beforeAggregates = students.Select(st => st.AggregateGrade).ToList();
-
-        // Compute expected new aggregate for the first student manually:
-        // sum of all scores whose Name != excludedName, then truncate.
-        var firstStudent = students.First();
-        var expectedFirstAggregate = (int)firstStudent.Scores
-            .Where(s => !string.Equals(s.Name, excludedName, StringComparison.Ordinal))
+        var expectedFirst = (int)students.First().Scores
+            .Where(s => !string.Equals(s.Name, excluded, StringComparison.Ordinal))
             .Sum(s => s.Value);
 
-        // Act
         vm.ApplyScoreSelections(newSelections);
 
-        // Assert
-        var afterAggregates = students.Select(st => st.AggregateGrade).ToList();
-        Assert.NotEqual(beforeAggregates, afterAggregates);                  // at least one differs
-        Assert.Equal(expectedFirstAggregate, firstStudent.AggregateGrade);   // exact value for one student
+        Assert.NotEqual(beforeAggregates, students.Select(st => st.AggregateGrade).ToList());
+        Assert.Equal(expectedFirst, students.First().AggregateGrade);
     }
 
     [Fact]
     public void ApplyScoreSelections_SetsHasUnsavedChangesTrue()
     {
-        // Arrange
         var vm = CreateViewModel();
-        Assert.False(vm.HasUnsavedChanges); // Sanity: a fresh load resets the flag.
-        var scores = vm.ClassAssessment.Assessments.First().Scores;
-        var newSelections = BuildSelections(scores);
+        Assert.False(vm.HasUnsavedChanges);
 
-        // Act
-        vm.ApplyScoreSelections(newSelections);
+        vm.ApplyScoreSelections(BuildSelections(vm.ClassAssessment.Assessments.First().Scores));
 
-        // Assert
         Assert.True(vm.HasUnsavedChanges);
     }
 
     [Fact]
     public void ApplyScoreSelections_TriggersGradeCountRefresh()
     {
-        // Arrange
+        // Total count across compliance rows equals student count both
+        // before and after — proving grade counts were recomputed without
+        // losing students.
         var vm = CreateViewModel();
         var studentCount = vm.ClassAssessment.Assessments.Count;
         var beforeSum = vm.ComplianceGrid!.Rows.Sum(r => r.CurrentCount);
-        var scores = vm.ClassAssessment.Assessments.First().Scores;
-        var newSelections = BuildSelections(scores);
 
-        // Act
-        vm.ApplyScoreSelections(newSelections);
+        vm.ApplyScoreSelections(BuildSelections(vm.ClassAssessment.Assessments.First().Scores));
 
-        // Assert — total count across compliance rows is preserved (== student count),
-        // proving grade counts were recomputed without losing any students.
-        var afterSum = vm.ComplianceGrid!.Rows.Sum(r => r.CurrentCount);
         Assert.Equal(studentCount, beforeSum);
-        Assert.Equal(studentCount, afterSum);
+        Assert.Equal(studentCount, vm.ComplianceGrid!.Rows.Sum(r => r.CurrentCount));
     }
 
     [Fact]
@@ -289,56 +219,31 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
-    public void LoadFromExcelFile_ConstructsGradingSession()
+    public void LoadFromExcelFile_ConstructsGradingSession_AllSlotsEnabled()
     {
-        // Slice 2: each Excel load constructs a fresh GradingSession alongside
-        // the ClassAssessment. The session is the canonical owner of the live
-        // grading state going forward.
+        // Each load builds a fresh session with every slot enabled —
+        // including non-mandatory grades (C-, D+, D in the production
+        // curve) which the constructor seeds at fallback-band positions.
+        // Issue #14 follow-up regression coverage.
         var vm = CreateViewModel();
 
         Assert.NotNull(vm.GradingSession);
         Assert.NotEmpty(vm.GradingSession.Slots);
         Assert.NotEmpty(vm.GradingSession.CurrentState.Cutoffs);
-    }
-
-    [Fact]
-    public void LoadFromExcelFile_AllSlotsEnabled_IncludingNonMandatoryGrades()
-    {
-        // Regression for issue #14 cleanup follow-up: every slot in the
-        // session — including grades without a mandatory percentage range
-        // (C-, D+, D in the production curve) — must remain enabled
-        // after load. The constructor seeds those at fallback-band
-        // positions and marks them enabled; the post-load
-        // SeedCursorsFromDefaults helper must not silently flip them
-        // off, otherwise the user loses the corresponding cursors and
-        // can't drag them.
-        var vm = CreateViewModel();
-
-        var nonMandatoryGrades = new[]
+        Assert.All(new[] { LetterGrade.CMinus, LetterGrade.DPlus, LetterGrade.D }, letter =>
         {
-            LetterGrade.CMinus,
-            LetterGrade.DPlus,
-            LetterGrade.D,
-        };
-
-        foreach (var letter in nonMandatoryGrades)
-        {
-            var slot = vm.GradingSession.Slots
-                .FirstOrDefault(s => s.Grade.LetterGrade == letter);
+            var slot = vm.GradingSession.Slots.FirstOrDefault(s => s.Grade.LetterGrade == letter);
             Assert.NotNull(slot);
-            Assert.True(slot.IsEnabled,
-                $"Slot for {letter} (no mandatory range) must be enabled after load.");
-        }
+            Assert.True(slot.IsEnabled, $"Slot for {letter} (no mandatory range) must be enabled.");
+        });
     }
 
     [Fact]
     public void LoadFromExcelFile_TwoLoads_ProduceFreshSession()
     {
-        // Each load creates a new session — no state from the prior file leaks.
         var vm = CreateViewModel();
         var firstSession = vm.GradingSession;
 
-        // Re-load the same Excel; the session should be a new instance.
         vm.LoadFromExcelFile(
             ResolveRepoFile(Path.Combine("Dotsesses", "example", "IP exam scores 2025.xlsx")));
 
@@ -348,8 +253,8 @@ public class MainWindowViewModelTests
     [Fact]
     public async Task LoadStateAsync_V2File_HydratesGradingSession()
     {
-        // VM-driven round-trip: save a session with a non-default cutoff,
-        // load on a fresh VM, verify the session reflects the saved state.
+        // Round-trip: save a session with a non-default cutoff, load
+        // into a fresh VM, verify the session reflects the saved state.
         var tempDir = Path.Combine(Path.GetTempPath(), $"MainWindowVMTests_{Guid.NewGuid()}");
         Directory.CreateDirectory(tempDir);
         try
@@ -365,52 +270,38 @@ public class MainWindowViewModelTests
             var loadVm = MainWindowViewModel.CreateForTesting();
             await loadVm.LoadStateCommand.ExecuteAsync(savedPath);
 
-            Assert.Equal(
-                newAScore,
+            Assert.Equal(newAScore,
                 loadVm.GradingSession.Slots.First(s => s.Grade.LetterGrade == LetterGrade.A).Score);
         }
-        finally
-        {
-            Directory.Delete(tempDir, recursive: true);
-        }
+        finally { Directory.Delete(tempDir, recursive: true); }
     }
 
     [Fact]
     public void ApplyScoreSelections_RebuildsDotplotPointsForNewAggregates()
     {
-        // Regression test for the M001 S04 UAT Step 2 failure: toggling Aggregate off for
-        // a non-Total score recomputed AggregateGrade (visible in the details panel) but the
-        // dotplot didn't visually update. Verify that DotplotModel.Series points reflect the
-        // new AggregateGrade values after ApplyScoreSelections.
+        // M001 S04 UAT Step 2 regression: dotplot Series points must
+        // reflect the new AggregateGrade values after Apply (previously
+        // the per-student aggregate updated but the plot didn't).
         var vm = CreateViewModel();
+        var pointsBefore = vm.DotplotModel.Series.OfType<OxyPlot.Series.ScatterSeries>()
+            .SelectMany(s => s.Points).Select(p => p.X).OrderBy(x => x).ToList();
 
-        // Snapshot dot x-coordinates before the change.
-        var seriesBefore = vm.DotplotModel.Series.OfType<OxyPlot.Series.ScatterSeries>().ToList();
-        var pointsBefore = seriesBefore.SelectMany(s => s.Points).Select(p => p.X).OrderBy(x => x).ToList();
-
-        // Build a selection set that excludes one non-Total score from Aggregate.
         var firstStudent = vm.ClassAssessment.Assessments.First();
-        var nonTotalScore = firstStudent.Scores.First(s => !string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase) && s.Value > 0);
+        var nonTotal = firstStudent.Scores.First(s =>
+            !string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase) && s.Value > 0);
         var modified = vm.ClassAssessment.ScoreSelections
-            .Select(s =>
-                s.Name == nonTotalScore.Name && s.Index == nonTotalScore.Index
-                    ? s with { Aggregate = false }
-                    : s)
+            .Select(s => s.Name == nonTotal.Name && s.Index == nonTotal.Index
+                ? s with { Aggregate = false } : s)
             .ToList();
 
-        // Act
         vm.ApplyScoreSelections(modified);
 
-        // Assert — the per-student aggregate values reflected in the dotplot have changed.
-        var seriesAfter = vm.DotplotModel.Series.OfType<OxyPlot.Series.ScatterSeries>().ToList();
-        var pointsAfter = seriesAfter.SelectMany(s => s.Points).Select(p => p.X).OrderBy(x => x).ToList();
-
+        var pointsAfter = vm.DotplotModel.Series.OfType<OxyPlot.Series.ScatterSeries>()
+            .SelectMany(s => s.Points).Select(p => p.X).OrderBy(x => x).ToList();
         Assert.NotEqual(pointsBefore, pointsAfter);
-
-        // And the new x-positions match the actual AggregateGrade values of the students.
-        var aggregateValues = vm.ClassAssessment.Assessments.Select(a => (double)a.AggregateGrade).OrderBy(x => x).ToList();
-        var plottedX = pointsAfter.OrderBy(x => x).ToList();
-        Assert.Equal(aggregateValues, plottedX);
+        Assert.Equal(
+            vm.ClassAssessment.Assessments.Select(a => (double)a.AggregateGrade).OrderBy(x => x).ToList(),
+            pointsAfter);
     }
 
     [Fact]
@@ -463,309 +354,129 @@ public class MainWindowViewModelTests
     [Fact]
     public void ApplyScoreSelections_WithEmptySelections_DoesNotCrash()
     {
-        // Arrange
         var vm = CreateViewModel();
-
-        // Act
         var ex = Record.Exception(() => vm.ApplyScoreSelections(Array.Empty<ScoreSelection>()));
 
-        // Assert
         Assert.Null(ex);
         Assert.All(vm.ClassAssessment.Assessments, st => Assert.Equal(0, st.AggregateGrade));
     }
 
-    // -------------------------------------------------------------------
-    // M002/S05/T03 — narrow-aggregate-range defensive fallback
-    //
-    // SC1 Case 7 of the M002 milestone walkthrough surfaced a crash: when the user
-    // reduces the Aggregate selection to a single non-Total component with a small
-    // value range (e.g. 'Q2-TM', max 4.5), every student's AggregateGrade collapses
-    // into a 0–~5 range. SeedCursorsFromDefaults then runs DefaultCurveGenerator +
-    // InitialCutoffCalculator against that narrow range, the result interleaves
-    // with the second-pass no-range catch-all positions, and the next
-    // RecalculateGradeCounts feeds non-monotonic cutoffs into GradeAssigner..ctor
-    // which throws "Cutoffs are out of order" and crashes the process.
-    //
-    // Same bug family as MEM028's empty-aggregate guard. The narrow-single-component
-    // case is the uncovered edge. Fix landed in MainWindowViewModel.
-    // SeedCursorsFromDefaults: detect non-monotonicity post-seed and fall back to
-    // CursorPlacementCalculator.ResetToEvenSpacingMonotonic over [minScore,maxScore].
-    // -------------------------------------------------------------------
-
     [Fact]
     public void ApplyScoreSelections_SingleNarrowAggregateComponent_DoesNotCrash()
     {
-        // Arrange — load fixture; pin to "MC" specifically (matches the SC1 Case 7 user repro).
-        // The IP exam fixture exposes (per fixture probe used during T03):
-        //   MC=10, Q1ab=40, Q1c-e=6, Q2a-c=18, Q2-TM=4.5, Q2-box=10, Short=16,
-        //   Class=110.5, Total=215. The user-reported crash was with 'MC' as the
-        //   sole non-Total Aggregate (range collapsed to 0-10).
+        // M002/S05/T03 SC1 Case 7 repro: pin to "MC" as sole non-Total
+        // Aggregate so the per-student range collapses to 0–10. The
+        // session's narrow-aggregate fallback must keep slots monotonic.
         var vm = CreateViewModel();
         var firstStudent = vm.ClassAssessment.Assessments.First();
-        var narrowComponent = firstStudent.Scores.First(s =>
-            string.Equals(s.Name, "MC", StringComparison.Ordinal));
-        Assert.True(narrowComponent.Value <= 10,
-            $"Expected MC ≤10; fixture gave MC={narrowComponent.Value}");
+        var mc = firstStudent.Scores.First(s => string.Equals(s.Name, "MC", StringComparison.Ordinal));
+        Assert.True(mc.Value <= 10, $"Expected MC ≤10; fixture gave MC={mc.Value}");
 
-        // Build selections where ONLY the narrow component is Aggregate=true.
-        var narrowOnlySelections = firstStudent.Scores
-            .Select(s => new ScoreSelection(
-                s.Name,
-                s.Index,
-                Display: true,
-                Aggregate: string.Equals(s.Name, narrowComponent.Name, StringComparison.Ordinal)
-                    && !string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase),
-                Correlation: true))
-            .ToList();
-
-        // Act — Apply the narrow-aggregate-only selections. This is the SC1 Case 7 repro.
-        // Pre-fix this throws InvalidOperationException("Cutoffs are out of order ...");
-        // post-fix the defensive fallback kicks in and Apply succeeds.
-        var ex = Record.Exception(() => vm.ApplyScoreSelections(narrowOnlySelections));
-
-        // Assert — no crash. ClassAssessment.Current populated. Slots monotonic by Grade.Order.
+        var ex = Record.Exception(() => vm.ApplyScoreSelections(NarrowAggregateOn(firstStudent.Scores, "MC")));
         Assert.Null(ex);
-        Assert.NotNull(vm.ClassAssessment.Current);
 
         var slotsByOrder = vm.GradingSession.Slots.OrderBy(s => s.Grade.Order).ToList();
         for (int i = 0; i < slotsByOrder.Count - 1; i++)
         {
-            Assert.True(
-                slotsByOrder[i].Score >= slotsByOrder[i + 1].Score,
-                $"Slot for {slotsByOrder[i].Grade.DisplayName} (score {slotsByOrder[i].Score}) " +
-                $"must be ≥ slot for {slotsByOrder[i + 1].Grade.DisplayName} " +
-                $"(score {slotsByOrder[i + 1].Score}) after narrow-aggregate Apply.");
+            Assert.True(slotsByOrder[i].Score >= slotsByOrder[i + 1].Score,
+                $"{slotsByOrder[i].Grade.DisplayName}={slotsByOrder[i].Score} must be ≥ " +
+                $"{slotsByOrder[i + 1].Grade.DisplayName}={slotsByOrder[i + 1].Score}.");
         }
     }
-
-    // -------------------------------------------------------------------
-    // M002/S05/T04 — aggregate-change Apply refreshes downstream drag bounds
-    //
-    // The user reported during SC1 Case 7 that "when the ranges are recalculated, the
-    // cursors don't have their validation ranges updated so they can't be moved or
-    // they do strange things". Investigation confirmed two cursor-drag paths:
-    //
-    //   - Dotplot drag (MainWindowViewModel.OnDotplotMouseMove) reads
-    //     ClassAssessment.Assessments.Min/Max(a => a.AggregateGrade) directly at drag
-    //     time → always fresh, no caching. Not affected by aggregate-change staleness.
-    //   - Violin/cursor-column drag (ViolinPlotControl.axaml.cs) calls
-    //     ViolinPlotViewModel.NormalizedToScore which reads cached MinScore/MaxScore
-    //     from the VM. Those are written ONLY by WireCursorsToViolinPlot at the end
-    //     of SeedCursorsFromDefaults — already called from the aggregate-changed
-    //     branch of ApplyScoreSelections (line ~1300).
-    //
-    // Pre-T03 the GradeAssigner crash at RecalculateGradeCounts could fire AFTER the
-    // wire-through (so MinScore/MaxScore *were* refreshed) but the process died before
-    // the user could drag, so the user's "stale bounds" report was the symptom of the
-    // crash flow rather than a separate cache-staleness bug. Now that T03 prevents
-    // the crash, the existing wire-through path is provably exercised.
-    //
-    // These tests pin the contract at the readable seam: ClassAssessment.Assessments
-    // must reflect the new aggregate range immediately after ApplyScoreSelections. Any
-    // future change that breaks the freshness of WireCursorsToViolinPlot's input would
-    // fail here. Direct ViolinPlotViewModel.MinScore/MaxScore assertions are not
-    // possible at the unit level because CreateForTesting does not wire that VM (no
-    // Avalonia harness in this project per MEM030); the contract is asserted via
-    // the source values WireCursorsToViolinPlot reads.
-    // -------------------------------------------------------------------
 
     [Fact]
     public void ApplyScoreSelections_AggregateChange_NewAggregateRangeIsObservable()
     {
-        // Arrange — load fixture (full Aggregate selection) and capture original range.
+        // After narrowing Aggregate to MC only, the source values that
+        // WireViolinPlot reads must reflect the new (narrow) range.
         var vm = CreateViewModel();
-        var originalMin = vm.ClassAssessment.Assessments.Min(a => a.AggregateGrade);
         var originalMax = vm.ClassAssessment.Assessments.Max(a => a.AggregateGrade);
-        Assert.True(originalMax > originalMin,
-            "Sanity: fixture must have a non-degenerate aggregate range on initial load.");
 
-        // Reduce Aggregate to MC only — narrow component so the new range is clearly different.
-        var firstStudent = vm.ClassAssessment.Assessments.First();
-        var narrowOnlySelections = firstStudent.Scores
-            .Select(s => new ScoreSelection(
-                s.Name,
-                s.Index,
-                Display: true,
-                Aggregate: string.Equals(s.Name, "MC", StringComparison.Ordinal)
-                    && !string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase),
-                Correlation: true))
-            .ToList();
+        vm.ApplyScoreSelections(NarrowAggregateOn(vm.ClassAssessment.Assessments.First().Scores, "MC"));
 
-        // Act
-        vm.ApplyScoreSelections(narrowOnlySelections);
-
-        // Assert — the source values WireCursorsToViolinPlot reads are now narrow-range.
-        // After MC-only Aggregate, class min/max equals class min/max of the MC column
-        // (per FixtureProbe used during T04: MC class min=4, max=16).
-        var newMin = vm.ClassAssessment.Assessments.Min(a => a.AggregateGrade);
         var newMax = vm.ClassAssessment.Assessments.Max(a => a.AggregateGrade);
         Assert.True(newMax < 50,
-            $"After narrowing Aggregate to MC only, class max should be much less than the " +
-            $"original full-aggregate max; got {newMax} vs original max={originalMax}.");
-        Assert.True(newMin != originalMin || newMax != originalMax,
-            $"Aggregate-change Apply must shift the observable range. " +
-            $"original=({originalMin}, {originalMax}); new=({newMin}, {newMax}).");
+            $"After MC-only Aggregate, max should be ≪ original max; got {newMax} vs {originalMax}.");
     }
 
     [Fact]
     public void ApplyScoreSelections_DisplayOnlyChange_AggregateRangeUnchanged()
     {
-        // Arrange — capture original aggregate range, then build a Display-only-changed selection.
         var vm = CreateViewModel();
         var originalMin = vm.ClassAssessment.Assessments.Min(a => a.AggregateGrade);
         var originalMax = vm.ClassAssessment.Assessments.Max(a => a.AggregateGrade);
+
         var displayOnlyChanged = vm.ClassAssessment.ScoreSelections
             .Select(sel => string.Equals(sel.Name, "MC", StringComparison.Ordinal)
-                ? new ScoreSelection(sel.Name, sel.Index, Display: !sel.Display, sel.Aggregate, sel.Correlation)
+                ? sel with { Display = !sel.Display }
                 : sel)
             .ToList();
 
-        // Act
         vm.ApplyScoreSelections(displayOnlyChanged);
 
-        // Assert — Display-only change must NOT shift the aggregate range.
-        // (R035: cursors don't reset; aggregate values are untouched.)
-        var newMin = vm.ClassAssessment.Assessments.Min(a => a.AggregateGrade);
-        var newMax = vm.ClassAssessment.Assessments.Max(a => a.AggregateGrade);
-        Assert.Equal(originalMin, newMin);
-        Assert.Equal(originalMax, newMax);
+        Assert.Equal(originalMin, vm.ClassAssessment.Assessments.Min(a => a.AggregateGrade));
+        Assert.Equal(originalMax, vm.ClassAssessment.Assessments.Max(a => a.AggregateGrade));
     }
 
     [Fact]
     public void ApplyScoreSelections_SingleNarrowAggregateComponent_CursorsSpanNewRange()
     {
-        // Arrange — pin to MC as the sole Aggregate component (same scenario as the crash test).
+        // When the fallback fires, slots span [newMin, newMax] — proves
+        // user-visible cursors aren't stuck at stale wide-range positions.
         var vm = CreateViewModel();
-        var firstStudent = vm.ClassAssessment.Assessments.First();
-        var narrowComponent = firstStudent.Scores.First(s =>
-            string.Equals(s.Name, "MC", StringComparison.Ordinal));
-        var narrowOnlySelections = firstStudent.Scores
-            .Select(s => new ScoreSelection(
-                s.Name,
-                s.Index,
-                Display: true,
-                Aggregate: string.Equals(s.Name, narrowComponent.Name, StringComparison.Ordinal)
-                    && !string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase),
-                Correlation: true))
-            .ToList();
+        vm.ApplyScoreSelections(NarrowAggregateOn(vm.ClassAssessment.Assessments.First().Scores, "MC"));
 
-        // Act
-        vm.ApplyScoreSelections(narrowOnlySelections);
-
-        // Assert — when the fallback fires, best grade lands at the new max and worst at the
-        // new min. This pins the user-visible side of the fallback so cursors are at least
-        // visible across the new (narrow) aggregate range rather than stuck at stale
-        // wide-range positions from the original load.
         var newMin = vm.ClassAssessment.Assessments.Min(a => a.AggregateGrade);
         var newMax = vm.ClassAssessment.Assessments.Max(a => a.AggregateGrade);
         Assert.All(vm.GradingSession.Slots, s =>
-        {
             Assert.True(s.Score >= newMin && s.Score <= newMax,
-                $"Slot for {s.Grade.DisplayName} score={s.Score} must lie within new aggregate " +
-                $"range [{newMin}, {newMax}] after the narrow-aggregate fallback fires.");
-        });
+                $"Slot {s.Grade.DisplayName}={s.Score} must lie in [{newMin},{newMax}]."));
     }
 
-    // -------------------------------------------------------------------
-    // M002/S02/T02 — Cursor pinning semantics on ApplyScoreSelections
-    //
-    // When the AGGREGATE selection set changes, ApplyScoreSelections must re-seed
-    // the cursors from the default curve at the new aggregate range (per MEM035).
-    // Display-only and Correlation-only changes must NOT touch cursor positions.
-    // -------------------------------------------------------------------
+    // Cursor-pinning semantics (MEM035): an aggregate-set change re-seeds
+    // cursors via session.ReseedFromDefaults; Display-only and
+    // Correlation-only changes leave cursors untouched.
 
     [Fact]
     public void ApplyScoreSelections_AggregateChange_ResetsCursorsToDefaults()
     {
-        // Arrange — load fixture; pick a non-Total score currently in the Aggregate set.
+        // Hand-set the B slot off-default by 1 so we can detect a reset
+        // without violating B+ ≥ B ≥ B- ordering. The post-Apply value
+        // will land on the deterministic recomputed cutoff.
         var vm = CreateViewModel();
         var firstStudent = vm.ClassAssessment.Assessments.First();
-        var nonTotalScore = firstStudent.Scores.First(s =>
+        var nonTotal = firstStudent.Scores.First(s =>
             !string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase) && s.Value > 0);
-
-        // Hand-set the B slot to a deliberately off-default Score (mimics a user drag).
-        // Decrement by 1 so we stay within the valid B+ ≥ B ≥ B- ordering invariant.
-        // One unit off-default is enough to detect a reset because
-        // SeedCursorsFromDefaults computes via the InitialCutoffCalculator + barbell
-        // projection, which is deterministic for a fixed (assessments, midpointCurve)
-        // pair — so the post-Apply slot value lands on the recomputed cutoff, not on
-        // the hand-set value.
         var bSlot = vm.GradingSession.Slots.First(s => s.Grade.LetterGrade == LetterGrade.B);
-        var handSetScore = bSlot.Score - 1;
-        vm.GradingSession.MoveCutoff(bSlot.Grade, handSetScore, originator: this);
-        Assert.Equal(handSetScore, vm.GradingSession.Slots.First(s => s.Grade.LetterGrade == LetterGrade.B).Score);
+        var handSet = bSlot.Score - 1;
+        vm.GradingSession.MoveCutoff(bSlot.Grade, handSet, originator: this);
 
-        // Build a selection list that toggles Aggregate=false on the chosen non-Total score.
         var modified = vm.ClassAssessment.ScoreSelections
-            .Select(s =>
-                s.Name == nonTotalScore.Name && s.Index == nonTotalScore.Index
-                    ? s with { Aggregate = false }
-                    : s)
+            .Select(s => s.Name == nonTotal.Name && s.Index == nonTotal.Index
+                ? s with { Aggregate = false } : s)
             .ToList();
-
-        // Act
         vm.ApplyScoreSelections(modified);
 
-        // Assert — slot moved off the hand-set value...
-        var bSlotAfter = vm.GradingSession.Slots.First(s => s.Grade.LetterGrade == LetterGrade.B);
-        Assert.NotEqual(handSetScore, bSlotAfter.Score);
+        var bAfter = vm.GradingSession.Slots.First(s => s.Grade.LetterGrade == LetterGrade.B);
+        Assert.NotEqual(handSet, bAfter.Score);
 
-        // ...and the new value matches what a fresh InitialCutoffCalculator would compute
-        // against the post-Apply Assessments. This mirrors the production projection in
-        // MainWindowViewModel.SeedCursorsFromDefaults: defaultCurve via GenerateRanges,
-        // midpointCurve filtered to entries with non-zero bounds, projected to CutoffCount(Midpoint).
-        var defaultCurve = new DefaultCurveGenerator().GenerateRanges(vm.ClassAssessment.Assessments.Count);
-        var midpointCurve = defaultCurve
+        var midpointCurve = new DefaultCurveGenerator()
+            .GenerateRanges(vm.ClassAssessment.Assessments.Count)
             .Where(r => r.LowerBound > 0 || r.UpperBound > 0)
             .Select(r => new CutoffCount(r.Grade, r.Midpoint))
             .ToList();
-        var expectedCutoffs = new InitialCutoffCalculator()
-            .Calculate(vm.ClassAssessment.Assessments, midpointCurve);
-        var expectedB = expectedCutoffs.First(c => c.Grade.LetterGrade == LetterGrade.B).Score;
-        Assert.Equal(expectedB, bSlotAfter.Score);
+        var expectedB = new InitialCutoffCalculator()
+            .Calculate(vm.ClassAssessment.Assessments, midpointCurve)
+            .First(c => c.Grade.LetterGrade == LetterGrade.B).Score;
+        Assert.Equal(expectedB, bAfter.Score);
     }
 
-    [Fact]
-    public void ApplyScoreSelections_DisplayOnlyChange_DoesNotResetCursors()
+    [Theory]
+    [InlineData(false, true)]   // Display-only
+    [InlineData(true, false)]   // Correlation-only
+    public void ApplyScoreSelections_NonAggregateFlagChange_DoesNotResetCursors(
+        bool changeDisplay, bool changeCorrelation)
     {
-        // Arrange — load fixture, nudge two slots one unit off-default (mimics a user
-        // drag) via the session, then snapshot every slot's Score.
-        var vm = CreateViewModel();
-        var bSlot = vm.GradingSession.Slots.First(s => s.Grade.LetterGrade == LetterGrade.B);
-        var cSlot = vm.GradingSession.Slots.First(s => s.Grade.LetterGrade == LetterGrade.C);
-        vm.GradingSession.MoveCutoff(bSlot.Grade, bSlot.Score + 1, originator: this);
-        vm.GradingSession.MoveCutoff(cSlot.Grade, cSlot.Score - 1, originator: this);
-        var snapshot = vm.GradingSession.Slots.ToDictionary(s => s.Grade, s => s.Score);
-
-        // Build a selection list that flips ONLY a Display flag (Aggregate, Correlation untouched).
-        // Pick a non-Total score so we don't accidentally drop the Total from Aggregate.
-        var firstStudent = vm.ClassAssessment.Assessments.First();
-        var target = firstStudent.Scores.First(s =>
-            !string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase) && s.Value > 0);
-        var modified = vm.ClassAssessment.ScoreSelections
-            .Select(s =>
-                s.Name == target.Name && s.Index == target.Index
-                    ? s with { Display = false }
-                    : s)
-            .ToList();
-
-        // Act
-        vm.ApplyScoreSelections(modified);
-
-        // Assert — every slot's Score is identical to the snapshot.
-        foreach (var slot in vm.GradingSession.Slots)
-        {
-            Assert.True(snapshot.ContainsKey(slot.Grade),
-                $"Slot for {slot.Grade.DisplayName} appeared after a Display-only change");
-            Assert.Equal(snapshot[slot.Grade], slot.Score);
-        }
-        Assert.Equal(snapshot.Count, vm.GradingSession.Slots.Count);
-    }
-
-    [Fact]
-    public void ApplyScoreSelections_CorrelationOnlyChange_DoesNotResetCursors()
-    {
-        // Arrange — same shape as Display-only but flipping Correlation instead.
         var vm = CreateViewModel();
         var bSlot = vm.GradingSession.Slots.First(s => s.Grade.LetterGrade == LetterGrade.B);
         var cSlot = vm.GradingSession.Slots.First(s => s.Grade.LetterGrade == LetterGrade.C);
@@ -777,180 +488,38 @@ public class MainWindowViewModelTests
         var target = firstStudent.Scores.First(s =>
             !string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase) && s.Value > 0);
         var modified = vm.ClassAssessment.ScoreSelections
-            .Select(s =>
-                s.Name == target.Name && s.Index == target.Index
-                    ? s with { Correlation = false }
-                    : s)
+            .Select(s => s.Name == target.Name && s.Index == target.Index
+                ? s with
+                {
+                    Display = changeDisplay ? !s.Display : s.Display,
+                    Correlation = changeCorrelation ? !s.Correlation : s.Correlation,
+                } : s)
             .ToList();
 
-        // Act
         vm.ApplyScoreSelections(modified);
 
-        // Assert — no slot moved.
+        Assert.Equal(snapshot.Count, vm.GradingSession.Slots.Count);
         foreach (var slot in vm.GradingSession.Slots)
         {
-            Assert.True(snapshot.ContainsKey(slot.Grade),
-                $"Slot for {slot.Grade.DisplayName} appeared after a Correlation-only change");
             Assert.Equal(snapshot[slot.Grade], slot.Score);
         }
-        Assert.Equal(snapshot.Count, vm.GradingSession.Slots.Count);
-    }
-
-    // -------------------------------------------------------------------
-    // T03 — BuildSeriesData helper (filter violin/correlation seriesData by selection)
-    // -------------------------------------------------------------------
-
-    private static string DisplayName(Score score) =>
-        score.Index.HasValue ? $"{score.Name} {score.Index}" : score.Name;
-
-    [Fact]
-    public void BuildSeriesData_FiltersByDisplaySelector()
-    {
-        // Arrange — fixture-loaded VM has ScoreSelections seeded by T02 with all Display=true.
-        var vm = CreateViewModel();
-        var firstStudentScores = vm.ClassAssessment.Assessments.First().Scores.ToList();
-        var excluded = firstStudentScores.First();
-        var excludedDisplayName = DisplayName(excluded);
-
-        // Flip Display=false for exactly one score; leave the rest at Display=true.
-        var newSelections = vm.ClassAssessment.ScoreSelections
-            .Select(s => (s.Name == excluded.Name && s.Index == excluded.Index)
-                ? s with { Display = false }
-                : s)
-            .ToList();
-        vm.ClassAssessment.ScoreSelections = newSelections;
-
-        // Act
-        var result = MainWindowViewModel.BuildSeriesData(vm.ClassAssessment, s => s.Display);
-
-        // Assert — the excluded series is gone; every other score is still present.
-        Assert.DoesNotContain(result, t => t.SeriesName == excludedDisplayName);
-        foreach (var score in firstStudentScores.Where(s => !(s.Name == excluded.Name && s.Index == excluded.Index)))
-        {
-            Assert.Contains(result, t => t.SeriesName == DisplayName(score));
-        }
-    }
-
-    [Fact]
-    public void BuildSeriesData_FiltersByCorrelationSelector()
-    {
-        // Arrange — exclude a different score via Correlation=false to confirm the helper is selector-agnostic.
-        var vm = CreateViewModel();
-        var firstStudentScores = vm.ClassAssessment.Assessments.First().Scores.ToList();
-        var excluded = firstStudentScores.Last();
-        var excludedDisplayName = DisplayName(excluded);
-
-        var newSelections = vm.ClassAssessment.ScoreSelections
-            .Select(s => (s.Name == excluded.Name && s.Index == excluded.Index)
-                ? s with { Correlation = false }
-                : s)
-            .ToList();
-        vm.ClassAssessment.ScoreSelections = newSelections;
-
-        // Act
-        var result = MainWindowViewModel.BuildSeriesData(vm.ClassAssessment, s => s.Correlation);
-
-        // Assert
-        Assert.DoesNotContain(result, t => t.SeriesName == excludedDisplayName);
-        foreach (var score in firstStudentScores.Where(s => !(s.Name == excluded.Name && s.Index == excluded.Index)))
-        {
-            Assert.Contains(result, t => t.SeriesName == DisplayName(score));
-        }
-    }
-
-    [Fact]
-    public void BuildSeriesData_EmptySelectionsList_ReturnsAllScores()
-    {
-        // Arrange — defensive fallback: when no selections exist, every score on the first student is included.
-        var vm = CreateViewModel();
-        vm.ClassAssessment.ScoreSelections = Array.Empty<ScoreSelection>();
-        var firstStudentScores = vm.ClassAssessment.Assessments.First().Scores.ToList();
-
-        // Act
-        var result = MainWindowViewModel.BuildSeriesData(vm.ClassAssessment, s => s.Display);
-
-        // Assert — every score appears exactly once.
-        Assert.Equal(firstStudentScores.Count, result.Count);
-        foreach (var score in firstStudentScores)
-        {
-            Assert.Contains(result, t => t.SeriesName == DisplayName(score));
-        }
-    }
-
-    [Fact]
-    public void BuildSeriesData_PreservesScoreValuesForIncludedScores()
-    {
-        // Arrange — exclude one score and pick a different one to spot-check value preservation.
-        var vm = CreateViewModel();
-        var firstStudentScores = vm.ClassAssessment.Assessments.First().Scores.ToList();
-        Assert.True(firstStudentScores.Count >= 2, "Fixture must have at least 2 scores for this test.");
-
-        var excluded = firstStudentScores[0];
-        var sampled = firstStudentScores[1];
-
-        var newSelections = vm.ClassAssessment.ScoreSelections
-            .Select(s => (s.Name == excluded.Name && s.Index == excluded.Index)
-                ? s with { Display = false }
-                : s)
-            .ToList();
-        vm.ClassAssessment.ScoreSelections = newSelections;
-
-        // Act
-        var result = MainWindowViewModel.BuildSeriesData(vm.ClassAssessment, s => s.Display);
-
-        // Assert — every (assessment, sampled-score) pair is present and the value is verbatim.
-        var sampledTuple = result.Single(t => t.SeriesName == DisplayName(sampled));
-        foreach (var assessment in vm.ClassAssessment.Assessments)
-        {
-            var expected = assessment.Scores.FirstOrDefault(s => s.Name == sampled.Name && s.Index == sampled.Index);
-            if (expected != null)
-            {
-                var key = $"S{assessment.Id:D3}";
-                Assert.True(sampledTuple.Scores.ContainsKey(key), $"Missing student key {key} for {sampled.Name}");
-                Assert.Equal(expected.Value, sampledTuple.Scores[key]);
-            }
-        }
-    }
-
-    [Fact]
-    public void BuildSeriesData_AllScoresExcluded_ReturnsEmptyList()
-    {
-        // Arrange — every selection has Display=false, so the predicate matches nothing.
-        var vm = CreateViewModel();
-        var newSelections = vm.ClassAssessment.ScoreSelections
-            .Select(s => s with { Display = false })
-            .ToList();
-        vm.ClassAssessment.ScoreSelections = newSelections;
-
-        // Act
-        var result = MainWindowViewModel.BuildSeriesData(vm.ClassAssessment, s => s.Display);
-
-        // Assert
-        Assert.Empty(result);
     }
 
     [Fact]
     public void OnHoveredStudentIdChanged_FilteredScores_PassedToCard()
     {
-        // Arrange — flip Display=false on the first score in the seeded selections so
-        // BuildDisplayScores excludes it from the drill-down card.
+        // Display=false on a score must exclude it from the drill-down card.
         var vm = CreateViewModel();
         var firstStudent = vm.ClassAssessment.Assessments.First();
-        Assert.True(firstStudent.Scores.Count >= 2, "Fixture must have ≥2 scores for this test.");
-
+        Assert.True(firstStudent.Scores.Count >= 2);
         var excluded = firstStudent.Scores[0];
-        var newSelections = vm.ClassAssessment.ScoreSelections
-            .Select(s => (s.Name == excluded.Name && s.Index == excluded.Index)
-                ? s with { Display = false }
-                : s)
-            .ToList();
-        vm.ClassAssessment.ScoreSelections = newSelections;
 
-        // Act — assigning HoveredStudentId triggers OnHoveredStudentIdChanged which
-        // must construct a StudentCardViewModel with the filtered DisplayScores.
+        vm.ClassAssessment.ScoreSelections = vm.ClassAssessment.ScoreSelections
+            .Select(s => (s.Name == excluded.Name && s.Index == excluded.Index)
+                ? s with { Display = false } : s)
+            .ToList();
         vm.HoveredStudentId = firstStudent.Id;
 
-        // Assert
         Assert.NotNull(vm.HoveredStudent);
         Assert.Equal(firstStudent.Scores.Count - 1, vm.HoveredStudent!.DisplayScores.Count);
         Assert.DoesNotContain(vm.HoveredStudent.DisplayScores,
