@@ -96,24 +96,16 @@ assert orientation, not just even spacing.
 
 ---
 
-### TD005 — Consolidate test fixture files into a dedicated folder
+### TD005 — Consolidate test fixture files into a dedicated folder *(closed)*
 
-**Why it's debt:** Test fixtures (`IP exam scores 2025.xlsx`, the
-v2 example `.dots`, etc.) live under `Dotsesses/example/`, which is
-shared with documentation/demo material and lives inside the main
-project, not the test project. Tests reach into the production
-project's directory via a `ResolveRepoFile` helper and a hard-coded
-relative path. A dedicated test data folder (e.g.
-`Dotsesses.Tests/TestData/` or `tests/fixtures/`) would make the
-boundary explicit and let `Dotsesses/example/` be purely
-user-facing demo material.
-
-**Trigger:** Any time a test fixture needs adding or moving;
-include in the same change to amortise the move.
-
-**Touches:** physical move of fixture files; update the
-`ResolveRepoFile` callers in `MainWindowViewModelTests` and
-`StateServiceTests` to point at the new path.
+**Resolved 2026-05-08.** `IP exam scores 2025.xlsx` (the only fixture
+the test suite actually consumed) moved to
+`Dotsesses.Tests/TestData/`. The `ResolveRepoFile` helper now lives
+on `Dotsesses.Tests.Fixtures.TestFixtures` as a private detail behind
+the public `IpExamScoresXlsx()` accessor — no more duplicated walk-up
+logic in test files. The dead `ResolveRepoFile` in `StateServiceTests`
+was deleted. `Dotsesses/example/` retains the demo `.xlsx`, `.dots`,
+and `.pptx` outputs that ship as user-facing example material.
 
 ---
 
