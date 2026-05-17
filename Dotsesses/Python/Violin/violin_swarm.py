@@ -201,10 +201,18 @@ def create_violin_swarm_plot(
 
     plot_data = pd.DataFrame(rows)
 
-    # Normalize values to same height (0-1 scale per series)
-    plot_data['Normalized Value'] = plot_data.groupby('Series')['Value'].transform(
-        lambda x: (x - x.min()) / (x.max() - x.min())
-    )
+    # Normalize values to same height (0-1 scale per series).
+    # A constant series (max == min, e.g. every student earned the same
+    # extra-credit point) would divide by zero, producing NaN — which
+    # crashes seaborn's KDE downstream. Center those at 0.5 so the
+    # violin renders as a flat midline rather than blowing up.
+    def _normalize(x):
+        lo, hi = x.min(), x.max()
+        if hi == lo:
+            return pd.Series(0.5, index=x.index)
+        return (x - lo) / (hi - lo)
+
+    plot_data['Normalized Value'] = plot_data.groupby('Series')['Value'].transform(_normalize)
 
     t_data_prep = time.perf_counter()
 

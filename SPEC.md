@@ -179,6 +179,13 @@ with swarm overlay.
 - Resize debounce: 300 ms before regenerating the Python plot.
 - Click / double-click / right-click — same comment-editor behavior as
   the dotplot.
+- A series whose Scores are all the same value (e.g. an extra-credit
+  column where every Student earned the same point) renders as a flat
+  midline rather than a violin — the per-series 0-1 normalization has
+  no range to spread.
+- If Python plot generation throws (bad data shape, missing
+  dependency, etc.) the failure is shown in a dialog naming the plot
+  and the underlying error; the rest of the UI stays usable.
 
 ## Correlation matrix
 

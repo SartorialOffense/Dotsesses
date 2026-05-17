@@ -60,6 +60,21 @@ public partial class MainWindow : Window
 
         // Subscribe to theme change messages for DotPlot
         WeakReferenceMessenger.Default.Register<RenderWithThemeMessage>(this, OnRenderWithThemeMessage);
+
+        // Surface background plot-init failures as a dialog instead of
+        // letting an unhandled task exception abort the process.
+        WeakReferenceMessenger.Default.Register<PlotInitErrorMessage>(this, async (r, m) =>
+        {
+            await Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                var errorBox = MessageBoxManager.GetMessageBoxStandard(
+                    $"{m.PlotName} failed",
+                    $"Could not generate the {m.PlotName.ToLowerInvariant()} for this file:\n\n{m.ErrorMessage}",
+                    ButtonEnum.Ok,
+                    MsBoxIcon.Warning);
+                await errorBox.ShowWindowDialogAsync(this);
+            });
+        });
     }
 
     // Current theme for DotPlot

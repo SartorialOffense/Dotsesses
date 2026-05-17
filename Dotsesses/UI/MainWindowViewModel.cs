@@ -381,46 +381,57 @@ public partial class MainWindowViewModel : ViewModelBase
         Log("MainWindowViewModel: Starting async violin plot initialization");
         Task.Run(async () =>
         {
-            Log("MainWindowViewModel: Calling InitializeViolinPlot on background thread");
-
-            // The actual violin plot generation can happen on background thread,
-            // but we need to prepare the data first
-            if (ViolinPlotViewModel == null)
+            try
             {
-                Log("MainWindowViewModel: ViolinPlotViewModel is null, skipping");
-                return;
-            }
+                Log("MainWindowViewModel: Calling InitializeViolinPlot on background thread");
 
-            // Transform student assessment data into violin plot series format (CPU work, can be on background thread).
-            // Filter by Display selection so toggling a Display checkbox in Settings hides the series after Apply.
-            var seriesData = BuildSeriesData(ClassAssessment, s => s.Display);
-
-            // Build comment map: (student ID, series name) -> score comment
-            var commentMap = new Dictionary<(int StudentId, string SeriesName), string>();
-            foreach (var assessment in ClassAssessment.Assessments)
-            {
-                foreach (var score in assessment.Scores)
+                // The actual violin plot generation can happen on background thread,
+                // but we need to prepare the data first
+                if (ViolinPlotViewModel == null)
                 {
-                    var seriesName = score.Index.HasValue ? $"{score.Name} {score.Index}" : score.Name;
-                    if (!string.IsNullOrEmpty(score.Comment))
+                    Log("MainWindowViewModel: ViolinPlotViewModel is null, skipping");
+                    return;
+                }
+
+                // Transform student assessment data into violin plot series format (CPU work, can be on background thread).
+                // Filter by Display selection so toggling a Display checkbox in Settings hides the series after Apply.
+                var seriesData = BuildSeriesData(ClassAssessment, s => s.Display);
+
+                // Build comment map: (student ID, series name) -> score comment
+                var commentMap = new Dictionary<(int StudentId, string SeriesName), string>();
+                foreach (var assessment in ClassAssessment.Assessments)
+                {
+                    foreach (var score in assessment.Scores)
                     {
-                        commentMap[(assessment.Id, seriesName)] = score.Comment;
+                        var seriesName = score.Index.HasValue ? $"{score.Name} {score.Index}" : score.Name;
+                        if (!string.IsNullOrEmpty(score.Comment))
+                        {
+                            commentMap[(assessment.Id, seriesName)] = score.Comment;
+                        }
                     }
                 }
+
+                // Build muppet name map: student ID -> muppet name
+                var muppetNameMap = ClassAssessment.MuppetNameMap
+                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Name);
+
+                // Now update the ViewModel on the UI thread
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    ViolinPlotViewModel.SetClassAssessment(ClassAssessment);
+                    ViolinPlotViewModel.UpdateDataAndRegenerate(seriesData, commentMap, muppetNameMap, 3.0);
+                });
+
+                Log("MainWindowViewModel: Violin plot initialization completed");
             }
-
-            // Build muppet name map: student ID -> muppet name
-            var muppetNameMap = ClassAssessment.MuppetNameMap
-                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Name);
-
-            // Now update the ViewModel on the UI thread
-            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            catch (Exception ex)
             {
-                ViolinPlotViewModel.SetClassAssessment(ClassAssessment);
-                ViolinPlotViewModel.UpdateDataAndRegenerate(seriesData, commentMap, muppetNameMap, 3.0);
-            });
-
-            Log("MainWindowViewModel: Violin plot initialization completed");
+                // Without this catch, a Python-side throw (e.g. seaborn KDE choking on
+                // a constant-value series) becomes an unhandled task exception and
+                // aborts the process. Surface it instead.
+                Log($"MainWindowViewModel: Violin plot init failed: {ex}");
+                _messenger.Send(new Messages.PlotInitErrorMessage("Violin plot", ex.Message));
+            }
         });
     }
 
@@ -433,29 +444,37 @@ public partial class MainWindowViewModel : ViewModelBase
         Log("MainWindowViewModel: Starting async correlation plot initialization");
         Task.Run(async () =>
         {
-            Log("MainWindowViewModel: Calling InitializeCorrelationPlot on background thread");
-
-            if (CorrelationPlotViewModel == null)
+            try
             {
-                Log("MainWindowViewModel: CorrelationPlotViewModel is null, skipping");
-                return;
+                Log("MainWindowViewModel: Calling InitializeCorrelationPlot on background thread");
+
+                if (CorrelationPlotViewModel == null)
+                {
+                    Log("MainWindowViewModel: CorrelationPlotViewModel is null, skipping");
+                    return;
+                }
+
+                // Transform student assessment data into correlation plot series format (CPU work).
+                // Filter by Correlation selection so toggling a Correlation checkbox hides the row/column after Apply.
+                var seriesData = BuildSeriesData(ClassAssessment, s => s.Correlation);
+
+                // Build muppet name map: student ID -> muppet name
+                var muppetNameMap = ClassAssessment.MuppetNameMap
+                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Name);
+
+                // Update ViewModel on UI thread
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    CorrelationPlotViewModel.UpdateDataAndRegenerate(seriesData, muppetNameMap, 3.0);
+                });
+
+                Log("MainWindowViewModel: Correlation plot initialization completed");
             }
-
-            // Transform student assessment data into correlation plot series format (CPU work).
-            // Filter by Correlation selection so toggling a Correlation checkbox hides the row/column after Apply.
-            var seriesData = BuildSeriesData(ClassAssessment, s => s.Correlation);
-
-            // Build muppet name map: student ID -> muppet name
-            var muppetNameMap = ClassAssessment.MuppetNameMap
-                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Name);
-
-            // Update ViewModel on UI thread
-            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            catch (Exception ex)
             {
-                CorrelationPlotViewModel.UpdateDataAndRegenerate(seriesData, muppetNameMap, 3.0);
-            });
-
-            Log("MainWindowViewModel: Correlation plot initialization completed");
+                Log($"MainWindowViewModel: Correlation plot init failed: {ex}");
+                _messenger.Send(new Messages.PlotInitErrorMessage("Correlation matrix", ex.Message));
+            }
         });
     }
 
