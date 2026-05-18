@@ -248,6 +248,32 @@ State (current GradeCutoffs, ScoreSelections, Score Comments, named
 SavedCutoffs) saves to a `.dots` JSON file. Older `.dots` files load
 cleanly and silently migrate on first re-save. See ADR-0002.
 
+## Loading score files
+
+Loading an `.xlsx` score file routes through `ScoreReader`. The reader
+tolerates messy spreadsheets — blank rows are skipped, missing cells
+in a score column drop only that one cell, and rows without a parseable
+ID in column A are skipped. Hard errors (no ID column, no readable
+rows at all) abort the load and surface the existing error dialog.
+
+After a successful load, if the reader detected non-fatal issues, a
+single combined dialog lists each one. The categories it flags:
+
+- **No `Total` column** — one was synthesized as the sum of every
+  numeric column. If the spreadsheet already has an aggregate column
+  named something else (e.g. `ALL`, `Sum`, `Final`), rename it to
+  `Total` so it isn't double-counted in the default aggregate.
+- **Duplicate column headers** — only one of each duplicate is
+  readable.
+- **Orphan `(Notes)` column** — its base name doesn't match any score
+  column, so its comments aren't read.
+- **Duplicate student IDs** — downstream lookups may pick the wrong
+  row.
+- **Skipped rows** — N rows had data but no valid ID in column A.
+- **Sparse column** — values present for only some students.
+- **Constant column** — every student has the same value; the violin
+  for that column renders as a flat midline.
+
 ## Export
 
 - **Excel** export with columns for Student Id, AggregateScore, individual

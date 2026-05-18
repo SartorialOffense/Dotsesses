@@ -255,7 +255,8 @@ public partial class MainWindowViewModel : ViewModelBase
         _currentSourceFile = excelFilePath;
 
         var scoreReader = new ScoreReader();
-        var students = scoreReader.Read(excelFilePath);
+        var readResult = scoreReader.Read(excelFilePath);
+        var students = readResult.Students;
 
         var curveGenerator = new DefaultCurveGenerator();
         var defaultCurve = curveGenerator.GenerateRanges(students.Count);
@@ -302,6 +303,15 @@ public partial class MainWindowViewModel : ViewModelBase
         SourceFileName = Path.GetFileName(excelFilePath);
 
         Log("MainWindowViewModel: Excel file loaded successfully");
+
+        // Surface any non-fatal reader warnings (duplicate columns,
+        // sparse / constant series, skipped rows, etc.) once the load
+        // is otherwise complete. The View renders one combined dialog.
+        if (readResult.Warnings.Count > 0 && _messenger != null)
+        {
+            Log($"MainWindowViewModel: Load surfaced {readResult.Warnings.Count} warning(s)");
+            _messenger.Send(new Messages.LoadWarningsMessage(readResult.Warnings));
+        }
     }
 
     /// <summary>

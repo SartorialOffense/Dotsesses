@@ -75,6 +75,24 @@ public partial class MainWindow : Window
                 await errorBox.ShowWindowDialogAsync(this);
             });
         });
+
+        // Surface non-fatal load warnings (duplicate columns, sparse /
+        // constant series, skipped rows, synthesized Total, etc.) as a
+        // single combined dialog after the file finishes loading.
+        WeakReferenceMessenger.Default.Register<LoadWarningsMessage>(this, async (r, m) =>
+        {
+            await Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                var body = string.Join("\n\n",
+                    m.Warnings.Select(w => $"• {w.Message}"));
+                var box = MessageBoxManager.GetMessageBoxStandard(
+                    $"Loaded with {m.Warnings.Count} warning{(m.Warnings.Count == 1 ? "" : "s")}",
+                    body,
+                    ButtonEnum.Ok,
+                    MsBoxIcon.Info);
+                await box.ShowWindowDialogAsync(this);
+            });
+        });
     }
 
     // Current theme for DotPlot
