@@ -1040,6 +1040,13 @@ public partial class MainWindowViewModel : ViewModelBase
         DotplotModel.Annotations.Add(meanLabel);
 
         // ===== Standard Deviation Labels =====
+        // Skip sigma ticks entirely if the distribution is degenerate
+        // (e.g. every student tied because the aggregate selection is
+        // empty). Without this guard the loops below are infinite, since
+        // mean + N * 0 stays <= maxScore forever, and the host process
+        // OOMs adding annotations.
+        if (stdDev <= 0) return;
+
         // Positive std devs
         int posStdCount = 1;
         while (mean + posStdCount * stdDev <= maxScore)
