@@ -499,23 +499,11 @@ public partial class MainWindowViewModel : ViewModelBase
         // Hook up to updated event to maintain fixed heights
         DotplotModel.Updated += (s, e) => UpdateAxisPositions();
 
-        // Calculate score range with padding (20% on each side, like violin plot's -0.2 to 1.2)
-        var minScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade);
-        var maxScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade);
-        var scoreRange = maxScore - minScore;
-        var xPadding = scoreRange * 0.2;
-
-        // Calculate Y-axis range for Dot Display based on max students in a bin
-        // Use fixed buffer of 2 units on each side to handle single-student bins
-        var scoreGroups = ClassAssessment.Assessments.GroupBy(a => a.AggregateGrade);
-        var maxStudentsInBin = scoreGroups.Max(g => g.Count());
-        var yMax = (maxStudentsInBin - 1) * 2;
-
         // Three-part layout with positioning (0=bottom, 1=top in OxyPlot)
         // Grade Cursors: bottom 25%
         // Dot Display: middle 60%
         // Statistics Display: top 15%
-        
+
         double cursorStart = 0.0;
         double cursorEnd = 0.25;
         double dotStart = 0.25;
@@ -524,12 +512,12 @@ public partial class MainWindowViewModel : ViewModelBase
         double statsEnd = 1.0;
 
         // ===== Shared X-Axis (hidden, spans all three areas) =====
+        // Bounds set below via RefreshDotplotAxisBounds so that the same logic
+        // re-applies whenever the aggregate selection changes.
         var sharedXAxis = new LinearAxis
         {
             Position = AxisPosition.Bottom,
             Key = "SharedX",
-            Minimum = minScore - xPadding,
-            Maximum = maxScore + xPadding,
             AxislineStyle = LineStyle.None,
             TickStyle = TickStyle.None,
             MajorGridlineStyle = LineStyle.None,
@@ -562,12 +550,13 @@ public partial class MainWindowViewModel : ViewModelBase
         DotplotModel.Axes.Add(statsYAxis);
 
         // ===== Dot Display Y-Axis (middle area) =====
+        // Maximum set below via RefreshDotplotAxisBounds (depends on the
+        // current AggregateGrade distribution's bin density).
         var dotYAxis = new LinearAxis
         {
             Position = AxisPosition.Left,
             Key = "DotY",
             Minimum = -2,
-            Maximum = yMax + 2,
             AxislineStyle = LineStyle.None,
             TickStyle = TickStyle.None,
             MajorGridlineStyle = LineStyle.None,
@@ -599,9 +588,39 @@ public partial class MainWindowViewModel : ViewModelBase
         };
         DotplotModel.Axes.Add(cursorYAxis);
 
+        RefreshDotplotAxisBounds();
         UpdateDotplotPoints();
         UpdateStatistics();
         UpdateCursors();
+    }
+
+    /// <summary>
+    /// Re-derive the SharedX and DotY axis bounds from the current
+    /// AggregateGrade distribution. Called on initial dotplot setup and
+    /// every time the aggregate composition changes — without this,
+    /// changing the aggregate set leaves the X axis pinned to the old
+    /// range and dots silently fall off the visible plot area.
+    /// </summary>
+    private void RefreshDotplotAxisBounds()
+    {
+        var sharedXAxis = DotplotModel.Axes.FirstOrDefault(a => a.Key == "SharedX");
+        var dotYAxis = DotplotModel.Axes.FirstOrDefault(a => a.Key == "DotY");
+        if (sharedXAxis == null || dotYAxis == null) return;
+
+        var minScore = ClassAssessment.Assessments.Min(a => a.AggregateGrade);
+        var maxScore = ClassAssessment.Assessments.Max(a => a.AggregateGrade);
+        var scoreRange = maxScore - minScore;
+        // Degenerate case (empty aggregate set, or every student tied):
+        // a zero-width axis renders nothing, so widen by a fixed unit.
+        var xPadding = scoreRange > 0 ? scoreRange * 0.2 : 1.0;
+        sharedXAxis.Minimum = minScore - xPadding;
+        sharedXAxis.Maximum = maxScore + xPadding;
+
+        var maxStudentsInBin = ClassAssessment.Assessments
+            .GroupBy(a => a.AggregateGrade)
+            .Max(g => g.Count());
+        var yMax = (maxStudentsInBin - 1) * 2;
+        dotYAxis.Maximum = yMax + 2;
     }
 
 
@@ -662,6 +681,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public void UpdateDotplotPoints()
     {
+        // Re-derive axis bounds so dots stay on-screen when the aggregate
+        // selection changes (otherwise the X axis stays pinned to the
+        // initial range and the new dots fall off the plot area).
+        RefreshDotplotAxisBounds();
+
         // Clear existing series (keep axes)
         DotplotModel.Series.Clear();
 
@@ -932,6 +956,19 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void UpdateStatistics()
     {
+        // Drop any prior stats annotations so repeat calls (e.g. after an
+        // aggregate selection change) don't stack duplicates on top of
+        // the old labels. Cursor annotations live on CursorY and are
+        // untouched here — they're refreshed via UpdateCursors.
+        var nonStatsAnnotations = DotplotModel.Annotations
+            .Where(a => a.YAxisKey != "StatsY")
+            .ToList();
+        DotplotModel.Annotations.Clear();
+        foreach (var ann in nonStatsAnnotations)
+        {
+            DotplotModel.Annotations.Add(ann);
+        }
+
         // Calculate statistics from assessments
         var scores = ClassAssessment.Assessments.Select(a => (double)a.AggregateGrade).ToList();
         var mean = scores.Average();
@@ -1355,6 +1392,11 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         UpdateDotplotPoints();
+        // Stats labels (mean / ±σ ticks at the top of the dotplot) are
+        // computed from AggregateGrade, so they need a refresh whenever
+        // the aggregate set changes — otherwise they keep showing the
+        // mean/σ of the prior aggregate composition.
+        UpdateStatistics();
 
         // OxyPlot's PlotView does not auto-refresh when the model is mutated; InvalidatePlot
         // alone is unreliable for compiled-binding scenarios. Force the view to re-bind by
