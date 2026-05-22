@@ -10,7 +10,7 @@
         x:Class="Dotsesses.UI.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="{Binding SourceFileName, StringFormat='Dotsesses - {0}'}"
+        Title="{Binding WindowTitle}"
         Width="1200" Height="800"
         WindowStartupLocation="CenterScreen">
 
