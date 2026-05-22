@@ -81,4 +81,18 @@ public class WorkspaceFactoryTests
         Assert.True(received);
         GC.KeepAlive(receiver);
     }
+
+    [Fact]
+    public void Workspace_DisposeIsIdempotent()
+    {
+        // Window.Closed may fire more than once in degenerate Avalonia
+        // scenarios. Dispose must be safe to call repeatedly.
+        var factory = BuildFactoryWithMinimalRegistrations();
+        var workspace = factory.Create();
+
+        workspace.Dispose();
+        var ex = Record.Exception(() => workspace.Dispose());
+
+        Assert.Null(ex);
+    }
 }

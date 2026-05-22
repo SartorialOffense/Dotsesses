@@ -1255,10 +1255,12 @@ public partial class MainWindowViewModel : ViewModelBase
         var workspace = await _workspaceFactory.CreateForFileAsync(filePath);
         var newVm = workspace.Services.GetRequiredService<MainWindowViewModel>();
 
-        // Tag holds the workspace alive for the window's lifetime. Slice 3
-        // adds a Closed handler that disposes it; today the scope is reclaimed
-        // when the window is GC'd.
-        var window = new MainWindow { DataContext = newVm, Tag = workspace };
+        // The Closed handler closure keeps the workspace alive for the window's
+        // lifetime and disposes the scope deterministically when the user closes
+        // the window — releasing the messenger, hover service, VMs, and loaded
+        // ClassAssessment for GC. See ADR-0012.
+        var window = new MainWindow { DataContext = newVm };
+        window.Closed += (_, _) => workspace.Dispose();
         window.Show();
     }
 
