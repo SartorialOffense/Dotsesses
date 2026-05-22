@@ -40,10 +40,11 @@ public partial class CorrelationPlotControl : UserControl
         // Add button handlers
         CopyCorrelationPlotButton.Click += OnCopyClick;
         DiagonalToggleButton.Click += OnDiagonalToggleClick;
-
-        // Subscribe to theme change messages
-        WeakReferenceMessenger.Default.Register<RenderWithThemeMessage>(this, OnRenderWithThemeMessage);
+        // Theme-change registration moves to OnDataContextChanged — it needs
+        // the scoped IMessenger from the VM (per ADR-0012).
     }
+
+    private bool _messengerRegistered;
 
     private void OnRenderWithThemeMessage(object recipient, RenderWithThemeMessage message)
     {
@@ -144,6 +145,12 @@ public partial class CorrelationPlotControl : UserControl
     {
         if (DataContext is CorrelationPlotViewModel vm)
         {
+            if (!_messengerRegistered)
+            {
+                _messengerRegistered = true;
+                vm.Messenger.Register<RenderWithThemeMessage>(this, OnRenderWithThemeMessage);
+            }
+
             vm.PropertyChanged += OnViewModelPropertyChanged;
 
             if (!string.IsNullOrEmpty(vm.SvgContent))
@@ -358,7 +365,7 @@ public partial class CorrelationPlotControl : UserControl
             // Clicked on empty space - clear hover
             if (position.Properties.IsLeftButtonPressed)
             {
-                WeakReferenceMessenger.Default.Send(new StudentHoverMessage(null, "correlation"));
+                (DataContext as CorrelationPlotViewModel)?.Messenger.Send(new StudentHoverMessage(null, "correlation"));
                 e.Handled = true;
             }
         }
@@ -368,6 +375,8 @@ public partial class CorrelationPlotControl : UserControl
     {
         var position = e.GetCurrentPoint(PointsOverlay);
         var clickedElement = PointsOverlay.InputHitTest(position.Position);
+        var messenger = (DataContext as CorrelationPlotViewModel)?.Messenger;
+        if (messenger == null) return;
 
         int? studentId = null;
         if (clickedElement is Control control && control.Tag is ValueTuple<int, int> tag)
@@ -380,7 +389,7 @@ public partial class CorrelationPlotControl : UserControl
             // Handle right-click - open comment editor
             if (position.Properties.IsRightButtonPressed)
             {
-                WeakReferenceMessenger.Default.Send(new EditStudentMessage(studentId.Value));
+                messenger.Send(new EditStudentMessage(studentId.Value));
                 e.Handled = true;
                 return;
             }
@@ -393,7 +402,7 @@ public partial class CorrelationPlotControl : UserControl
 
                 if (_lastClickedStudentId == studentId && timeSinceLastClick < DoubleClickThresholdMs)
                 {
-                    WeakReferenceMessenger.Default.Send(new EditStudentMessage(studentId.Value));
+                    messenger.Send(new EditStudentMessage(studentId.Value));
                     _lastClickedStudentId = null;
                     e.Handled = true;
                     return;
@@ -409,7 +418,7 @@ public partial class CorrelationPlotControl : UserControl
             // Clicked on empty space - clear hover
             if (position.Properties.IsLeftButtonPressed)
             {
-                WeakReferenceMessenger.Default.Send(new StudentHoverMessage(null, "correlation"));
+                messenger.Send(new StudentHoverMessage(null, "correlation"));
                 e.Handled = true;
             }
         }
@@ -428,7 +437,8 @@ public partial class CorrelationPlotControl : UserControl
         var topLevel = TopLevel.GetTopLevel(this);
         var clipboard = topLevel?.Clipboard;
         if (clipboard == null) return;
+        if (DataContext is not CorrelationPlotViewModel vm) return;
 
-        await ImageCopyService.CopyControlToClipboardAsync(this, clipboard);
+        await ImageCopyService.CopyControlToClipboardAsync(this, clipboard, vm.Messenger);
     }
 }

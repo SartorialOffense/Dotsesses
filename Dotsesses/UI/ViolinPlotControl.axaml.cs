@@ -52,10 +52,11 @@ public partial class ViolinPlotControl : UserControl
 
         // Render cursor column when its layout is updated (bounds become available)
         CursorColumnCanvas.LayoutUpdated += OnCursorColumnLayoutUpdated;
-
-        // Subscribe to theme change messages
-        WeakReferenceMessenger.Default.Register<RenderWithThemeMessage>(this, OnRenderWithThemeMessage);
+        // Theme-change registration moves to OnDataContextChanged — it needs
+        // the scoped IMessenger from the VM (per ADR-0012).
     }
+
+    private bool _messengerRegistered;
 
     private void OnRenderWithThemeMessage(object recipient, RenderWithThemeMessage message)
     {
@@ -196,6 +197,12 @@ public partial class ViolinPlotControl : UserControl
     {
         if (DataContext is ViolinPlotViewModel vm)
         {
+            if (!_messengerRegistered)
+            {
+                _messengerRegistered = true;
+                vm.Messenger.Register<RenderWithThemeMessage>(this, OnRenderWithThemeMessage);
+            }
+
             vm.PropertyChanged += OnViewModelPropertyChanged;
 
             // Check if SVG content already exists (set before this control was created)
@@ -693,12 +700,15 @@ public partial class ViolinPlotControl : UserControl
             studentId = tag.Item2; // Second item is the student ID
         }
 
+        var messenger = (DataContext as ViolinPlotViewModel)?.Messenger;
+        if (messenger == null) return;
+
         if (studentId.HasValue)
         {
             // Handle right-click - open comment editor
             if (position.Properties.IsRightButtonPressed)
             {
-                WeakReferenceMessenger.Default.Send(new EditStudentMessage(studentId.Value));
+                messenger.Send(new EditStudentMessage(studentId.Value));
                 e.Handled = true;
                 return;
             }
@@ -712,7 +722,7 @@ public partial class ViolinPlotControl : UserControl
                 if (_lastClickedStudentId == studentId && timeSinceLastClick < DoubleClickThresholdMs)
                 {
                     // Double-click detected - open comment editor
-                    WeakReferenceMessenger.Default.Send(new EditStudentMessage(studentId.Value));
+                    messenger.Send(new EditStudentMessage(studentId.Value));
                     _lastClickedStudentId = null; // Reset to prevent triple-click
                     e.Handled = true;
                     return;
@@ -729,7 +739,7 @@ public partial class ViolinPlotControl : UserControl
             // Clicked on empty space - clear hover
             if (position.Properties.IsLeftButtonPressed)
             {
-                WeakReferenceMessenger.Default.Send(new StudentHoverMessage(null, "violin"));
+                messenger.Send(new StudentHoverMessage(null, "violin"));
                 e.Handled = true;
             }
         }
@@ -833,7 +843,7 @@ public partial class ViolinPlotControl : UserControl
         else
         {
             // Clicked on empty space - clear hover
-            WeakReferenceMessenger.Default.Send(new StudentHoverMessage(null, "violin"));
+            (DataContext as ViolinPlotViewModel)?.Messenger.Send(new StudentHoverMessage(null, "violin"));
             e.Handled = true;
         }
     }
@@ -1133,8 +1143,9 @@ public partial class ViolinPlotControl : UserControl
         var topLevel = TopLevel.GetTopLevel(this);
         var clipboard = topLevel?.Clipboard;
         if (clipboard == null) return;
+        if (DataContext is not ViolinPlotViewModel vm) return;
 
         // Copy the entire control (includes all overlays)
-        await ImageCopyService.CopyControlToClipboardAsync(this, clipboard);
+        await ImageCopyService.CopyControlToClipboardAsync(this, clipboard, vm.Messenger);
     }
 }

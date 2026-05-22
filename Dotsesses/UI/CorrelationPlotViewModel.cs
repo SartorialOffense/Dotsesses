@@ -40,6 +40,13 @@ public partial class CorrelationPlotViewModel : ViewModelBase
     [ObservableProperty]
     private bool _showCorrelationCoefficients = true;
 
+    /// <summary>
+    /// The scoped messenger for this VM's workspace. Exposed for the
+    /// View code-behind (CorrelationPlotControl) to register/send within
+    /// the same window's scope. See ADR-0012.
+    /// </summary>
+    public IMessenger Messenger => _messenger;
+
     public CorrelationPlotViewModel(
         CorrelationPlotService correlationService,
         IMessenger messenger,

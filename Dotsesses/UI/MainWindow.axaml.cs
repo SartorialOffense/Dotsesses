@@ -34,6 +34,7 @@ namespace Dotsesses.UI;
 public partial class MainWindow : Window
 {
     private HoverDelayService? _hoverDelayService;
+    private bool _messengerRegistered;
 
     /// <summary>
     /// Single-instance gate for the modeless Settings window. Set on <see cref="OpenSettings"/>
@@ -51,48 +52,8 @@ public partial class MainWindow : Window
         Closing += OnWindowClosing;
         PointerMoved += OnGlobalPointerMoved;
         KeyDown += OnGlobalKeyDown;
-
-        // Subscribe to edit student messages
-        WeakReferenceMessenger.Default.Register<EditStudentMessage>(this, async (r, m) =>
-        {
-            await HandleEditStudentRequest(m);
-        });
-
-        // Subscribe to theme change messages for DotPlot
-        WeakReferenceMessenger.Default.Register<RenderWithThemeMessage>(this, OnRenderWithThemeMessage);
-
-        // Surface background plot-init failures as a dialog instead of
-        // letting an unhandled task exception abort the process.
-        WeakReferenceMessenger.Default.Register<PlotInitErrorMessage>(this, async (r, m) =>
-        {
-            await Dispatcher.UIThread.InvokeAsync(async () =>
-            {
-                var errorBox = MessageBoxManager.GetMessageBoxStandard(
-                    $"{m.PlotName} failed",
-                    $"Could not generate the {m.PlotName.ToLowerInvariant()} for this file:\n\n{m.ErrorMessage}",
-                    ButtonEnum.Ok,
-                    MsBoxIcon.Warning);
-                await errorBox.ShowWindowDialogAsync(this);
-            });
-        });
-
-        // Surface non-fatal load warnings (duplicate columns, sparse /
-        // constant series, skipped rows, synthesized Total, etc.) as a
-        // single combined dialog after the file finishes loading.
-        WeakReferenceMessenger.Default.Register<LoadWarningsMessage>(this, async (r, m) =>
-        {
-            await Dispatcher.UIThread.InvokeAsync(async () =>
-            {
-                var body = string.Join("\n\n",
-                    m.Warnings.Select(w => $"• {w.Message}"));
-                var box = MessageBoxManager.GetMessageBoxStandard(
-                    $"Loaded with {m.Warnings.Count} warning{(m.Warnings.Count == 1 ? "" : "s")}",
-                    body,
-                    ButtonEnum.Ok,
-                    MsBoxIcon.Info);
-                await box.ShowWindowDialogAsync(this);
-            });
-        });
+        // Message registrations move to OnDataContextChanged — they need
+        // the scoped IMessenger from the VM (per ADR-0012).
     }
 
     // Current theme for DotPlot
@@ -242,9 +203,10 @@ public partial class MainWindow : Window
     {
         var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
         if (clipboard == null) return;
+        if (DataContext is not MainWindowViewModel vm) return;
 
         // Copy the DotPlotBorder (includes the border, which becomes visible in light mode)
-        await ImageCopyService.CopyControlToClipboardAsync(DotPlotBorder, clipboard);
+        await ImageCopyService.CopyControlToClipboardAsync(DotPlotBorder, clipboard, vm.Messenger);
     }
 
     private async void OnExportPptxButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -395,6 +357,7 @@ public partial class MainWindow : Window
                 correlationPlotControl,
                 vm.PlotTabContainerViewModel,
                 vm.ComplianceGrid?.Rows ?? Enumerable.Empty<Dotsesses.UI.ComplianceRowViewModel>(),
+                vm.Messenger,
                 className);
 
             // Show success message with option to open
@@ -584,10 +547,54 @@ public partial class MainWindow : Window
 
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
-        if (DataContext is MainWindowViewModel vm)
+        if (DataContext is not MainWindowViewModel vm) return;
+
+        vm.PropertyChanged += OnViewModelPropertyChanged;
+
+        if (_messengerRegistered) return;
+        _messengerRegistered = true;
+
+        var messenger = vm.Messenger;
+
+        messenger.Register<EditStudentMessage>(this, async (r, m) =>
         {
-            vm.PropertyChanged += OnViewModelPropertyChanged;
-        }
+            await HandleEditStudentRequest(m);
+        });
+
+        messenger.Register<RenderWithThemeMessage>(this, OnRenderWithThemeMessage);
+
+        // Surface background plot-init failures as a dialog instead of
+        // letting an unhandled task exception abort the process.
+        messenger.Register<PlotInitErrorMessage>(this, async (r, m) =>
+        {
+            await Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                var errorBox = MessageBoxManager.GetMessageBoxStandard(
+                    $"{m.PlotName} failed",
+                    $"Could not generate the {m.PlotName.ToLowerInvariant()} for this file:\n\n{m.ErrorMessage}",
+                    ButtonEnum.Ok,
+                    MsBoxIcon.Warning);
+                await errorBox.ShowWindowDialogAsync(this);
+            });
+        });
+
+        // Surface non-fatal load warnings (duplicate columns, sparse /
+        // constant series, skipped rows, synthesized Total, etc.) as a
+        // single combined dialog after the file finishes loading.
+        messenger.Register<LoadWarningsMessage>(this, async (r, m) =>
+        {
+            await Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                var body = string.Join("\n\n",
+                    m.Warnings.Select(w => $"• {w.Message}"));
+                var box = MessageBoxManager.GetMessageBoxStandard(
+                    $"Loaded with {m.Warnings.Count} warning{(m.Warnings.Count == 1 ? "" : "s")}",
+                    body,
+                    ButtonEnum.Ok,
+                    MsBoxIcon.Info);
+                await box.ShowWindowDialogAsync(this);
+            });
+        });
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -821,7 +828,10 @@ public partial class MainWindow : Window
             totalScore.Comment = newComment;
 
             // Broadcast that the student was edited
-            WeakReferenceMessenger.Default.Send(new StudentEditedMessage(message.StudentId));
+            if (DataContext is MainWindowViewModel mwvm)
+            {
+                mwvm.Messenger.Send(new StudentEditedMessage(message.StudentId));
+            }
         }
     }
 

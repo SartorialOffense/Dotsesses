@@ -1,6 +1,7 @@
 namespace Dotsesses.Tests.ViewModels;
 
 using System.ComponentModel;
+using CommunityToolkit.Mvvm.Messaging;
 using Dotsesses.Models;
 using Dotsesses.UI;
 
@@ -34,7 +35,7 @@ public class StudentCardViewModelTests
         var colors = new Dictionary<string, string> { ["Q1"] = "#000", ["Q2"] = "#111", ["Total"] = "#222" };
 
         // Act — construct with no displayScores arg (back-compat path).
-        using var card = new StudentCardViewModel(assessment, "B", colors);
+        using var card = new StudentCardViewModel(assessment, "B", colors, new WeakReferenceMessenger());
 
         // Assert — DisplayScores is the full Assessment.Scores list.
         Assert.Equal(assessment.Scores.Count, card.DisplayScores.Count);
@@ -50,7 +51,7 @@ public class StudentCardViewModelTests
         var filtered = assessment.Scores.Take(2).ToList();
 
         // Act
-        using var card = new StudentCardViewModel(assessment, "B", colors, clearAction: null, displayScores: filtered);
+        using var card = new StudentCardViewModel(assessment, "B", colors, new WeakReferenceMessenger(), clearAction: null, displayScores: filtered);
 
         // Assert — exactly 2 items, in order, matching the input.
         Assert.Equal(2, card.DisplayScores.Count);
@@ -74,7 +75,7 @@ public class StudentCardViewModelTests
         Assert.False(filtered.Contains(excluded), "Sanity: filter must exclude the third score.");
 
         // Act
-        using var card = new StudentCardViewModel(assessment, "B", colors, clearAction: null, displayScores: filtered);
+        using var card = new StudentCardViewModel(assessment, "B", colors, new WeakReferenceMessenger(), clearAction: null, displayScores: filtered);
 
         // Assert — every score in Assessment.Scores (including the excluded one) has at
         // least one PropertyChanged subscriber attached.

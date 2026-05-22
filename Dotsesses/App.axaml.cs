@@ -61,7 +61,8 @@ public partial class App : Application
                 ConfigureServices(services);
                 Services = services.BuildServiceProvider();
 
-                var viewModel = Services.GetRequiredService<MainWindowViewModel>();
+                var snapshotWorkspace = Services.GetRequiredService<WorkspaceFactory>().Create();
+                var viewModel = snapshotWorkspace.Services.GetRequiredService<MainWindowViewModel>();
 
                 // For snapshot mode, require source file path via StartupConfig
                 if (string.IsNullOrEmpty(StartupConfig.SourceFilePath))
@@ -213,7 +214,11 @@ public partial class App : Application
                         await Dispatcher.UIThread.InvokeAsync(async () =>
                         {
                             Log("Startup: Instantiating MainWindow");
-                            var viewModel = Services.GetRequiredService<MainWindowViewModel>();
+                            // Build a per-window DI scope via WorkspaceFactory (ADR-0012).
+                            // The scope lives as long as the window — held on _initialWorkspace
+                            // so a future slice can dispose it on close.
+                            _initialWorkspace = Services.GetRequiredService<WorkspaceFactory>().Create();
+                            var viewModel = _initialWorkspace.Services.GetRequiredService<MainWindowViewModel>();
 
                             // Load based on file extension
                             var extension = Path.GetExtension(sourceFilePath).ToLowerInvariant();
@@ -320,18 +325,27 @@ public partial class App : Application
         progressCallback?.Invoke("Registering application services...");
         Log("ConfigureServices: Registering application services");
 
-        // Register messenger
-        services.AddSingleton<IMessenger>(WeakReferenceMessenger.Default);
+        // Per-workspace messenger: one instance per scope, never the static
+        // .Default. See ADR-0012 for why scoping is required for multi-window.
+        services.AddScoped<IMessenger>(_ => new WeakReferenceMessenger());
 
-        // Register services
+        // Stateless Python-interop renderers — shared across all workspaces.
         services.AddSingleton<ViolinPlotService>();
         services.AddSingleton<CorrelationPlotService>();
-        services.AddSingleton<HoverDelayService>();
 
-        // Register ViewModels
-        services.AddTransient<MainWindowViewModel>();
-        services.AddTransient<ViolinPlotViewModel>();
-        services.AddTransient<CorrelationPlotViewModel>();
+        // Scoped: one per workspace.
+        services.AddScoped<HoverDelayService>();
+        services.AddScoped<StateService>();
+
+        // Workspace factory — wraps IServiceScopeFactory to produce per-window
+        // scopes. App-singleton so each Open Another call resolves the same
+        // factory instance.
+        services.AddSingleton<WorkspaceFactory>();
+
+        // Per-workspace ViewModels.
+        services.AddScoped<MainWindowViewModel>();
+        services.AddScoped<ViolinPlotViewModel>();
+        services.AddScoped<CorrelationPlotViewModel>();
 
         Log("ConfigureServices: Completed");
     }
@@ -350,6 +364,7 @@ public partial class App : Application
     }
 
     private MainWindow? _mainWindow;
+    private Workspace? _initialWorkspace;
 
     private async void OnSaveClicked(object? sender, EventArgs e)
     {
