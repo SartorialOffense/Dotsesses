@@ -347,7 +347,11 @@ public partial class App : Application
 
         // Scoped: one per workspace.
         services.AddScoped<HoverDelayService>();
-        services.AddScoped<StateService>();
+
+        // StateService is app-singleton so LastUsedDirectory is shared across
+        // windows — saving in one window primes the file picker in any other.
+        // The save/load methods themselves are stateless (no per-window data).
+        services.AddSingleton<StateService>();
 
         // Workspace factory — wraps IServiceScopeFactory to produce per-window
         // scopes. App-singleton so each Open Another call resolves the same

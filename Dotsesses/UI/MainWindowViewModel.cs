@@ -271,6 +271,7 @@ public partial class MainWindowViewModel : ViewModelBase
         Log($"MainWindowViewModel: Loading from Excel file: {excelFilePath}");
 
         _currentSourceFile = excelFilePath;
+        _stateService.LastUsedDirectory = Path.GetDirectoryName(excelFilePath);
 
         var scoreReader = new ScoreReader();
         var readResult = scoreReader.Read(excelFilePath);
@@ -1249,7 +1250,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         if (parent is null || _workspaceFactory is null) return;
 
-        var filePath = await PromptForFile(parent.StorageProvider);
+        var filePath = await PromptForFile(parent.StorageProvider, _stateService.LastUsedDirectory);
         if (string.IsNullOrEmpty(filePath)) return;
 
         var workspace = await _workspaceFactory.CreateForFileAsync(filePath);
@@ -1264,12 +1265,19 @@ public partial class MainWindowViewModel : ViewModelBase
         window.Show();
     }
 
-    private static async Task<string?> PromptForFile(IStorageProvider storageProvider)
+    private static async Task<string?> PromptForFile(IStorageProvider storageProvider, string? suggestedDirectory)
     {
+        IStorageFolder? startLocation = null;
+        if (!string.IsNullOrEmpty(suggestedDirectory) && Directory.Exists(suggestedDirectory))
+        {
+            startLocation = await storageProvider.TryGetFolderFromPathAsync(suggestedDirectory);
+        }
+
         var result = await storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = "Open another file",
             AllowMultiple = false,
+            SuggestedStartLocation = startLocation,
             FileTypeFilter = new[]
             {
                 new FilePickerFileType("Supported files") { Patterns = new[] { "*.xlsx", "*.xls", "*.dots" } },
