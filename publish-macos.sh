@@ -1,20 +1,23 @@
 #!/bin/bash
-# Build and package Dotsesses as a macOS app bundle
+# Build and package Dotsesses as a macOS .app bundle, then code-sign it.
+#
+# Signing identity is taken from the SIGNING_IDENTITY env var. Default is "-",
+# which means ad-hoc signing (no Apple Developer account required, but friends
+# will see a Gatekeeper warning on first launch). To sign for distribution,
+# set SIGNING_IDENTITY to your "Developer ID Application: ..." identity name.
+# See SIGNING.md for the full path from ad-hoc → notarized.
 
-set -e
+set -euo pipefail
 
 APP_NAME="Dotsesses"
-BUNDLE_ID="com.dotsesses.app"
-VERSION="1.0.0"
 OUTPUT_DIR="./publish"
 APP_BUNDLE="$OUTPUT_DIR/$APP_NAME.app"
+SIGNING_IDENTITY="${SIGNING_IDENTITY:--}"
 
 echo "Building $APP_NAME for macOS arm64..."
 
-# Clean previous build
 rm -rf "$OUTPUT_DIR"
 
-# Publish the application
 dotnet publish Dotsesses/Dotsesses.csproj \
     -c Release \
     -r osx-arm64 \
@@ -23,35 +26,32 @@ dotnet publish Dotsesses/Dotsesses.csproj \
     -p:IncludeNativeLibrariesForSelfExtract=true \
     -o "$OUTPUT_DIR/bin"
 
-echo "Creating app bundle structure..."
+echo "Creating .app bundle..."
 
-# Create the .app bundle structure
 mkdir -p "$APP_BUNDLE/Contents/MacOS"
 mkdir -p "$APP_BUNDLE/Contents/Resources"
 
-# Copy the executable and dependencies
 cp -R "$OUTPUT_DIR/bin/"* "$APP_BUNDLE/Contents/MacOS/"
-
-# Copy Info.plist
 cp "Dotsesses/Info.plist" "$APP_BUNDLE/Contents/"
-
-# Copy the icon
 cp "Dotsesses/Assets/dotsesses.icns" "$APP_BUNDLE/Contents/Resources/"
-
-# Make executable
 chmod +x "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 
-# Clean up the intermediate bin folder
 rm -rf "$OUTPUT_DIR/bin"
 
-codesign --force --deep --sign ./publish/Dotsesses.app
-ditto -c -k --sequesterRsrc --keepParent ./publish/Dotsesses.app ./publish/Dotsesses.zip
+echo "Signing with identity: $SIGNING_IDENTITY"
+
+# Ad-hoc signing uses --deep to recursively sign nested binaries in one pass.
+# --deep is deprecated for hardened-runtime / notarization workflows; see
+# SIGNING.md for the inside-out approach required at stage 3.
+codesign --force --deep --sign "$SIGNING_IDENTITY" --timestamp=none "$APP_BUNDLE"
+
+echo "Verifying signature..."
+codesign --verify --verbose=2 "$APP_BUNDLE"
+
+ditto -c -k --sequesterRsrc --keepParent "$APP_BUNDLE" "$OUTPUT_DIR/$APP_NAME.zip"
 
 echo ""
-echo "App bundle created: $APP_BUNDLE"
+echo "App bundle: $APP_BUNDLE"
+echo "Zip:        $OUTPUT_DIR/$APP_NAME.zip"
 echo ""
-echo "To install, drag the app to /Applications or run:"
-echo "  cp -R '$APP_BUNDLE' /Applications/"
-echo ""
-echo "To run directly:"
-echo "  open '$APP_BUNDLE'"
+echo "Run with:   open '$APP_BUNDLE'"

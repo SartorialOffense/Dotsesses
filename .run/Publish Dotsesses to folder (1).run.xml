@@ -1,0 +1,6 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Publish Dotsesses to folder (1)" type="DotNetFolderPublish" factoryName="Publish to folder">
+    <riderPublish configuration="Release" delete_existing_files="true" include_all_content_for_self_extract="true" include_native_libs_for_self_extract="true" platform="Any CPU" produce_single_file="true" ready_to_run="true" self_contained="true" target_folder="$PROJECT_DIR$/Dotsesses/bin/Release/net9.0/publish" target_framework="net9.0" trim_unused_assemblies="true" uuid_high="5403724231757088207" uuid_low="-4720496707387883610" />
+    <method v="2" />
+  </configuration>
+</component>

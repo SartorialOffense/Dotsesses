@@ -269,6 +269,18 @@ dotnet test
 dotnet run --project Dotsesses/Dotsesses.csproj -- --snapshot
 ```
 
+### Packaging for macOS
+
+```bash
+./publish-macos.sh
+open ./publish/Dotsesses.app
+```
+
+Produces a signed `.app` bundle and a `.zip` in `./publish/`. The
+default is ad-hoc signing (no Apple Developer account needed); see
+[SIGNING.md](SIGNING.md) for the path to Developer ID + notarization
+so friends can double-click without Gatekeeper warnings.
+
 ## Project Structure
 
 ```
