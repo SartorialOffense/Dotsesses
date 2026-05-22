@@ -105,13 +105,24 @@ public partial class MainWindowViewModel : ViewModelBase
     private PlotTabContainerViewModel? _plotTabContainerViewModel;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(WindowTitle))]
     private bool _hasUnsavedChanges;
 
     [ObservableProperty]
     private string? _currentSaveFilePath;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(WindowTitle))]
     private string _sourceFileName = "No file loaded";
+
+    /// <summary>
+    /// The full window title — file name plus an unsaved-changes dot
+    /// (matching the Save button's indicator). Lets OS task switchers
+    /// distinguish multiple open analyses at a glance. See ADR-0012.
+    /// </summary>
+    public string WindowTitle => HasUnsavedChanges
+        ? $"Dotsesses - {SourceFileName} ●"
+        : $"Dotsesses - {SourceFileName}";
 
     /// <summary>
     /// Gets the full path to the current source file.
