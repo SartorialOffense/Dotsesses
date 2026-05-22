@@ -4,6 +4,8 @@ using System;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Threading.Tasks;
+using Avalonia.Controls;
+using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
@@ -11,6 +13,7 @@ using Dotsesses.Calculators;
 using Dotsesses.Messages;
 using Dotsesses.Models;
 using Dotsesses.Services;
+using Microsoft.Extensions.DependencyInjection;
 using OxyPlot;
 using OxyPlot.Annotations;
 using OxyPlot.Axes;
@@ -38,6 +41,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly IMessenger _messenger = null!;
     private readonly HoverDelayService _hoverDelayService = null!;
     private readonly StateService _stateService = null!;
+    private readonly WorkspaceFactory? _workspaceFactory;
 
     /// <summary>
     /// Gets a fresh GradeAssigner built from the session's current
@@ -181,7 +185,8 @@ public partial class MainWindowViewModel : ViewModelBase
         ViolinPlotViewModel violinPlotViewModel,
         CorrelationPlotViewModel correlationPlotViewModel,
         HoverDelayService hoverDelayService,
-        StateService stateService)
+        StateService stateService,
+        WorkspaceFactory workspaceFactory)
     {
         Log("MainWindowViewModel: Constructor started");
 
@@ -190,6 +195,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _correlationPlotViewModel = correlationPlotViewModel;
         _hoverDelayService = hoverDelayService;
         _stateService = stateService;
+        _workspaceFactory = workspaceFactory;
 
         // Create the tab container ViewModel
         _plotTabContainerViewModel = new PlotTabContainerViewModel(violinPlotViewModel, correlationPlotViewModel);
@@ -252,7 +258,8 @@ public partial class MainWindowViewModel : ViewModelBase
             null!,
             null!,
             new HoverDelayService(),
-            new StateService());
+            new StateService(),
+            null!);
     }
 
     /// <summary>
@@ -1225,6 +1232,52 @@ public partial class MainWindowViewModel : ViewModelBase
             Log($"Error saving state: {ex.Message}");
             throw;
         }
+    }
+
+    /// <summary>
+    /// Opens another analysis file in its own window. Each invocation
+    /// spawns a fresh DI scope, loads the file into the scope's
+    /// <see cref="MainWindowViewModel"/>, and shows a new
+    /// <see cref="MainWindow"/>. The new window is fully independent —
+    /// drags, hover, comments in one window do not affect any other.
+    /// See ADR-0012.
+    /// </summary>
+    /// <param name="parent">The invoking window — supplies the
+    /// <see cref="IStorageProvider"/> for the file picker.</param>
+    [RelayCommand]
+    private async Task OpenAnotherFile(Window? parent)
+    {
+        if (parent is null || _workspaceFactory is null) return;
+
+        var filePath = await PromptForFile(parent.StorageProvider);
+        if (string.IsNullOrEmpty(filePath)) return;
+
+        var workspace = await _workspaceFactory.CreateForFileAsync(filePath);
+        var newVm = workspace.Services.GetRequiredService<MainWindowViewModel>();
+
+        // Tag holds the workspace alive for the window's lifetime. Slice 3
+        // adds a Closed handler that disposes it; today the scope is reclaimed
+        // when the window is GC'd.
+        var window = new MainWindow { DataContext = newVm, Tag = workspace };
+        window.Show();
+    }
+
+    private static async Task<string?> PromptForFile(IStorageProvider storageProvider)
+    {
+        var result = await storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Open another file",
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("Supported files") { Patterns = new[] { "*.xlsx", "*.xls", "*.dots" } },
+                new FilePickerFileType("Excel files") { Patterns = new[] { "*.xlsx", "*.xls" } },
+                new FilePickerFileType("Dotsesses files") { Patterns = new[] { "*.dots" } },
+                new FilePickerFileType("All files") { Patterns = new[] { "*" } }
+            }
+        });
+
+        return result.Count > 0 ? result[0].Path.LocalPath : null;
     }
 
     /// <summary>

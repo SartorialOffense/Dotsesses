@@ -11,8 +11,9 @@ _Avoid_: Subject, topic.
 
 **Class**: One specific offering of a Course — a particular semester
 with particular Students under a particular instructor. The same Course
-can have many Classes. *(Multi-Class handling is on the roadmap; today
-the app holds one Class at a time.)*
+can have many Classes. *Each loaded Class lives in its own top-level
+window with an independent DI scope; opening another file spawns a
+fresh window that does not share state with any other (see ADR-0012).*
 _Avoid_: Section, cohort, group.
 
 **Student**: A person enrolled in a Class.

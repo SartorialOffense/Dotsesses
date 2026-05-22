@@ -163,6 +163,7 @@ public partial class MainWindow : Window
         DotPlotView.AddHandler(PointerMovedEvent, OnDotPlotPointerMoved, Avalonia.Interactivity.RoutingStrategies.Tunnel | Avalonia.Interactivity.RoutingStrategies.Bubble, handledEventsToo: true);
 
         // Wire up Save, Export, Settings, and Copy button click handlers
+        OpenAnotherFileButton.Click += OnOpenAnotherFileClick;
         SaveButton.Click += OnSaveButtonClick;
         ExportButton.Click += OnExportButtonClick;
         ExportPptxButton.Click += OnExportPptxButtonClick;
@@ -187,6 +188,12 @@ public partial class MainWindow : Window
     private async void OnSaveButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         await SaveWithDialog();
+    }
+
+    private async void OnOpenAnotherFileClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+        await vm.OpenAnotherFileCommand.ExecuteAsync(this);
     }
 
     private void OnSettingsButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)

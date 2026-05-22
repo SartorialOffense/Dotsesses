@@ -84,6 +84,10 @@
                         <!-- Save/Export Buttons -->
                         <Border Grid.Row="0" BorderBrush="#202020" BorderThickness="0,0,0,2" Padding="6,6,10,6">
                             <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button x:Name="OpenAnotherFileButton"
+                                        Classes="app"
+                                        Content="📂"
+                                        ToolTip.Tip="Open another file in a new window"/>
                                 <Button x:Name="SaveButton"
                                         Classes="app"
                                         ToolTip.Tip="Save state to file">
