@@ -47,6 +47,11 @@ public partial class App : Application
         {
             Log("Desktop lifetime detected");
 
+            // Multi-window: app stays alive as long as any window is open.
+            // Default OnMainWindowClose would exit when the first-opened
+            // window closes, killing sibling analyses. See ADR-0012.
+            desktop.ShutdownMode = ShutdownMode.OnLastWindowClose;
+
             // Avoid duplicate validations from both Avalonia and the CommunityToolkit.
             // More info: https://docs.avaloniaui.net/docs/guides/development-guides/data-validation#manage-validationplugins
             DisableAvaloniaDataAnnotationValidation();
@@ -80,6 +85,7 @@ public partial class App : Application
                 };
 
                 desktop.MainWindow = _mainWindow;
+                _mainWindow.Closed += (_, _) => snapshotWorkspace.Dispose();
 
                 _mainWindow.Opened += async (s, e) =>
                 {
@@ -237,6 +243,12 @@ public partial class App : Application
                             {
                                 DataContext = viewModel,
                             };
+
+                            // Capture the workspace in a local so the Closed
+                            // handler keeps it alive and disposes it
+                            // deterministically when the window closes.
+                            var workspaceForClose = _initialWorkspace!;
+                            _mainWindow.Closed += (_, _) => workspaceForClose.Dispose();
 
                             Log("Startup: Showing MainWindow");
                             desktop.MainWindow = _mainWindow;
