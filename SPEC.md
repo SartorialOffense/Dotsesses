@@ -250,6 +250,18 @@ cleanly and silently migrate on first re-save. See ADR-0002.
 
 ## Loading score files
 
+On launch, the splash window prompts for a score file (`.xlsx`/`.xls`)
+or a saved state file (`.dots`). Pick one to open the main window with
+that Class loaded.
+
+Once a window is open, the **📂 Open Another File** button in the
+drill-down toolbar prompts for a second file and opens it in a **new
+top-level window**. Each window is fully independent — drags, hover,
+comment edits, and Settings in one window do not affect any other (see
+ADR-0012). Repeat the action to open as many files as needed; each
+gets its own window. Closing one window leaves siblings untouched.
+*(Lifecycle on the last window closing is covered in slice 3 / #28.)*
+
 Loading an `.xlsx` score file routes through `ScoreReader`. The reader
 tolerates messy spreadsheets — blank rows are skipped, missing cells
 in a score column drop only that one cell, and rows without a parseable
