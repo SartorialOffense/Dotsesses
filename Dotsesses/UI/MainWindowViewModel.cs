@@ -37,7 +37,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly CursorValidation _cursorValidation = null!;
     private readonly IMessenger _messenger = null!;
     private readonly HoverDelayService _hoverDelayService = null!;
-    private readonly StateService _stateService = new();
+    private readonly StateService _stateService = null!;
 
     /// <summary>
     /// Gets a fresh GradeAssigner built from the session's current
@@ -125,6 +125,14 @@ public partial class MainWindowViewModel : ViewModelBase
     public StateService StateService => _stateService;
 
     /// <summary>
+    /// The scoped messenger that belongs to this VM's workspace. View
+    /// code-behind reaches it through <c>DataContext</c> to register
+    /// for messages and to broadcast within the same window's scope.
+    /// See ADR-0012.
+    /// </summary>
+    public IMessenger Messenger => _messenger;
+
+    /// <summary>
     /// Re-renders dotplot annotations from the session's current state.
     /// Invoked whenever the session emits a LastChange notification
     /// (drag commit, enable/disable, reseed, load). Compliance counts
@@ -172,7 +180,8 @@ public partial class MainWindowViewModel : ViewModelBase
         IMessenger messenger,
         ViolinPlotViewModel violinPlotViewModel,
         CorrelationPlotViewModel correlationPlotViewModel,
-        HoverDelayService hoverDelayService)
+        HoverDelayService hoverDelayService,
+        StateService stateService)
     {
         Log("MainWindowViewModel: Constructor started");
 
@@ -180,6 +189,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _violinPlotViewModel = violinPlotViewModel;
         _correlationPlotViewModel = correlationPlotViewModel;
         _hoverDelayService = hoverDelayService;
+        _stateService = stateService;
 
         // Create the tab container ViewModel
         _plotTabContainerViewModel = new PlotTabContainerViewModel(violinPlotViewModel, correlationPlotViewModel);
@@ -238,10 +248,11 @@ public partial class MainWindowViewModel : ViewModelBase
     public static MainWindowViewModel CreateForTesting()
     {
         return new MainWindowViewModel(
-            WeakReferenceMessenger.Default,
+            new WeakReferenceMessenger(),
             null!,
             null!,
-            new HoverDelayService());
+            new HoverDelayService(),
+            new StateService());
     }
 
     /// <summary>
@@ -1478,7 +1489,7 @@ public partial class MainWindowViewModel : ViewModelBase
             if (student != null)
             {
                 var grade = GetGradeForStudent(student);
-                HoveredStudent = new StudentCardViewModel(student, grade, ClassAssessment.SeriesColorMap, () => _hoverDelayService.ClearHover(), BuildDisplayScores(student));
+                HoveredStudent = new StudentCardViewModel(student, grade, ClassAssessment.SeriesColorMap, _messenger, () => _hoverDelayService.ClearHover(), BuildDisplayScores(student));
             }
             else
             {

@@ -4,6 +4,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
+using CommunityToolkit.Mvvm.Messaging;
 using Dotsesses.UI;
 using ShapeCrawler;
 
@@ -36,6 +37,7 @@ public class PowerPointExportService
         Control correlationPlotControl,
         PlotTabContainerViewModel tabViewModel,
         IEnumerable<ComplianceRowViewModel> complianceRows,
+        IMessenger messenger,
         string className = "Grade Analysis")
     {
         // Create presentation with first slide
@@ -45,7 +47,7 @@ public class PowerPointExportService
         {
             // Slide 1: DotPlot (don't restore theme yet - we'll batch renders)
             ClearPlaceholders(pres, 1);
-            await AddPlotSlideAsync(pres, 1, $"{className} - Score Distribution", dotPlotControl, restoreTheme: false);
+            await AddPlotSlideAsync(pres, 1, $"{className} - Score Distribution", dotPlotControl, messenger, restoreTheme: false);
 
             // Slide 2: ViolinPlot - ensure it's visible first
             await Dispatcher.UIThread.InvokeAsync(() =>
@@ -56,7 +58,7 @@ public class PowerPointExportService
 
             pres.Slides.Add(1);
             ClearPlaceholders(pres, 2);
-            await AddPlotSlideAsync(pres, 2, $"{className} - Component Analysis", violinPlotControl, restoreTheme: false);
+            await AddPlotSlideAsync(pres, 2, $"{className} - Component Analysis", violinPlotControl, messenger, restoreTheme: false);
 
             // Slide 3: CorrelationPlot - switch to correlation tab first
             await Dispatcher.UIThread.InvokeAsync(() =>
@@ -68,7 +70,7 @@ public class PowerPointExportService
 
             pres.Slides.Add(1);
             ClearPlaceholders(pres, 3);
-            await AddPlotSlideAsync(pres, 3, $"{className} - Score Correlations", correlationPlotControl, restoreTheme: false);
+            await AddPlotSlideAsync(pres, 3, $"{className} - Score Correlations", correlationPlotControl, messenger, restoreTheme: false);
 
             // Slide 4: Grade Table (no rendering needed)
             pres.Slides.Add(1);
@@ -91,7 +93,7 @@ public class PowerPointExportService
             {
                 tabViewModel.SelectViolinCommand.Execute(null);
             });
-            ImageCopyService.RestoreDarkMode();
+            ImageCopyService.RestoreDarkMode(messenger);
         }
     }
 
@@ -116,6 +118,7 @@ public class PowerPointExportService
         int slideNumber,
         string title,
         Control plotControl,
+        IMessenger messenger,
         bool restoreTheme = true)
     {
         var shapes = pres.Slide(slideNumber).Shapes;
@@ -124,7 +127,7 @@ public class PowerPointExportService
         AddTitle(pres, slideNumber, title);
 
         // Render plot to PNG stream
-        using var imageStream = await ImageCopyService.RenderControlToPngStreamAsync(plotControl, restoreTheme);
+        using var imageStream = await ImageCopyService.RenderControlToPngStreamAsync(plotControl, messenger, restoreTheme);
 
         // Get image dimensions to calculate aspect ratio
         imageStream.Position = 0;

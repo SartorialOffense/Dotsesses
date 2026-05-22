@@ -23,13 +23,14 @@ public static class ImageCopyService
     /// The caller is responsible for disposing the returned stream.
     /// </summary>
     /// <param name="control">The control to render</param>
+    /// <param name="messenger">The scoped messenger of the invoking window — used to broadcast theme switches to that window's controls only. See ADR-0012.</param>
     /// <param name="restoreTheme">If true, restores DarkMode after rendering. Set to false when batching multiple renders.</param>
     /// <returns>A MemoryStream containing the PNG image data</returns>
-    public static async Task<MemoryStream> RenderControlToPngStreamAsync(Control control, bool restoreTheme = true)
+    public static async Task<MemoryStream> RenderControlToPngStreamAsync(Control control, IMessenger messenger, bool restoreTheme = true)
     {
         // Switch to LightMode and wait for re-render
         var renderComplete = new TaskCompletionSource<bool>();
-        WeakReferenceMessenger.Default.Send(new RenderWithThemeMessage(
+        messenger.Send(new RenderWithThemeMessage(
             ThemeName.LightMode,
             () => renderComplete.TrySetResult(true)));
 
@@ -60,7 +61,7 @@ public static class ImageCopyService
         {
             if (restoreTheme)
             {
-                WeakReferenceMessenger.Default.Send(new RenderWithThemeMessage(ThemeName.DarkMode));
+                messenger.Send(new RenderWithThemeMessage(ThemeName.DarkMode));
             }
             throw new InvalidOperationException("Control has zero size and cannot be rendered");
         }
@@ -89,7 +90,7 @@ public static class ImageCopyService
         // Restore theme if requested
         if (restoreTheme)
         {
-            WeakReferenceMessenger.Default.Send(new RenderWithThemeMessage(ThemeName.DarkMode));
+            messenger.Send(new RenderWithThemeMessage(ThemeName.DarkMode));
         }
 
         return stream;
@@ -99,17 +100,17 @@ public static class ImageCopyService
     /// Restores the application to DarkMode theme.
     /// Call this after batching multiple renders with restoreTheme=false.
     /// </summary>
-    public static void RestoreDarkMode()
+    public static void RestoreDarkMode(IMessenger messenger)
     {
-        WeakReferenceMessenger.Default.Send(new RenderWithThemeMessage(ThemeName.DarkMode));
+        messenger.Send(new RenderWithThemeMessage(ThemeName.DarkMode));
     }
 
     /// <summary>
     /// Renders a control to bitmap in LightMode theme and copies to clipboard.
     /// </summary>
-    public static async Task CopyControlToClipboardAsync(Control control, IClipboard clipboard)
+    public static async Task CopyControlToClipboardAsync(Control control, IClipboard clipboard, IMessenger messenger)
     {
-        using var stream = await RenderControlToPngStreamAsync(control);
+        using var stream = await RenderControlToPngStreamAsync(control, messenger);
 
         // Save to temp file and copy to clipboard
         var tempPath = Path.Combine(Path.GetTempPath(), $"dotsesses_copy_{DateTime.Now:HHmmss}.png");

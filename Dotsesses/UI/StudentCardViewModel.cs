@@ -17,6 +17,7 @@ using Dotsesses.Models;
 public partial class StudentCardViewModel : ObservableObject, IDisposable
 {
     private readonly Action? _clearAction;
+    private readonly IMessenger _messenger;
     private CancellationTokenSource? _debounce;
     private bool _disposed;
 
@@ -41,11 +42,12 @@ public partial class StudentCardViewModel : ObservableObject, IDisposable
     /// </summary>
     public IReadOnlyList<Score> DisplayScores { get; }
 
-    public StudentCardViewModel(StudentAssessment assessment, string assignedGrade, Dictionary<string, string> seriesColorMap, Action? clearAction = null, IReadOnlyList<Score>? displayScores = null)
+    public StudentCardViewModel(StudentAssessment assessment, string assignedGrade, Dictionary<string, string> seriesColorMap, IMessenger messenger, Action? clearAction = null, IReadOnlyList<Score>? displayScores = null)
     {
         _assessment = assessment;
         _assignedGrade = assignedGrade;
         SeriesColorMap = seriesColorMap;
+        _messenger = messenger;
         _clearAction = clearAction;
         DisplayScores = displayScores ?? assessment.Scores;
 
@@ -74,7 +76,7 @@ public partial class StudentCardViewModel : ObservableObject, IDisposable
                 // Must send message on UI thread
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
-                    WeakReferenceMessenger.Default.Send(new StudentEditedMessage(Assessment.Id));
+                    _messenger.Send(new StudentEditedMessage(Assessment.Id));
                 });
             }
         }, token);

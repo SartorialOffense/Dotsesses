@@ -57,6 +57,12 @@ public partial class ViolinPlotViewModel : ViewModelBase
     [ObservableProperty]
     private GradingSession? _gradingSession;
 
+    /// <summary>
+    /// The scoped messenger for this VM's workspace. Exposed for the
+    /// View code-behind (ViolinPlotControl) to register/send within the
+    /// same window's scope. See ADR-0012.
+    /// </summary>
+    public IMessenger Messenger => _messenger;
 
     public ViolinPlotViewModel(ViolinPlotService violinService, IMessenger messenger, HoverDelayService hoverDelayService)
     {
