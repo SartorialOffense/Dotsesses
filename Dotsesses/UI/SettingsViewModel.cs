@@ -143,7 +143,7 @@ public sealed class SettingsViewModel : ViewModelBase
         // Reconstruct fresh records in row (= input) order so the callback receives
         // an independent snapshot the caller can persist or feed downstream.
         var snapshot = Rows
-            .Select(r => new ScoreSelection(r.Name, r.Index, r.Display, r.Aggregate, r.Correlation))
+            .Select(r => new ScoreSelection(r.Name, r.Index, r.Type, r.Display, r.Aggregate, r.Correlation))
             .ToList();
         _onApply(snapshot);
 

@@ -60,7 +60,7 @@ public class MainWindowViewModelTests
     {
         return scores
             .Select(s => customize?.Invoke(s) ??
-                new ScoreSelection(s.Name, s.Index, Display: true, Aggregate: true, Correlation: true))
+                new ScoreSelection(s.Name, s.Index, ScoreColumnType.Numeric, Display: true, Aggregate: true, Correlation: true))
             .ToList();
     }
 
@@ -76,6 +76,7 @@ public class MainWindowViewModelTests
         return scores
             .Select(s => new ScoreSelection(
                 s.Name, s.Index,
+                ScoreColumnType.Numeric,
                 Display: true,
                 Aggregate: string.Equals(s.Name, aggregateName, StringComparison.Ordinal)
                     && !string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase),
@@ -88,7 +89,7 @@ public class MainWindowViewModelTests
     {
         var vm = CreateViewModel();
         var newSelections = BuildSelections(vm.ClassAssessment.Assessments.First().Scores, s =>
-            new ScoreSelection(s.Name, s.Index, Display: true,
+            new ScoreSelection(s.Name, s.Index, ScoreColumnType.Numeric, Display: true,
                 Aggregate: !string.Equals(s.Name, "MC", StringComparison.OrdinalIgnoreCase),
                 Correlation: true));
 
@@ -106,7 +107,7 @@ public class MainWindowViewModelTests
         var students = vm.ClassAssessment.Assessments.ToList();
         const string excluded = "MC";
         var newSelections = BuildSelections(students.First().Scores, s =>
-            new ScoreSelection(s.Name, s.Index, Display: true,
+            new ScoreSelection(s.Name, s.Index, ScoreColumnType.Numeric, Display: true,
                 Aggregate: !string.Equals(s.Name, excluded, StringComparison.Ordinal),
                 Correlation: true));
 

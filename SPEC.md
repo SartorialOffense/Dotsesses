@@ -286,7 +286,14 @@ single combined dialog lists each one. The categories it flags:
 - **Skipped rows** — N rows had data but no valid ID in column A.
 - **Sparse column** — values present for only some students.
 - **Constant column** — every student has the same value; the violin
-  for that column renders as a flat midline.
+  for that column renders as a flat midline. Only emitted for numeric
+  columns — an all-`Yes` categorical column is a meaningful pattern,
+  not a flat-violin concern.
+- **Categorical column detected** — a column with any non-numeric,
+  non-empty cell is loaded as a categorical StudentAttribute rather
+  than a numeric Score. It appears in the Drill-down panel's
+  Attributes list but is excluded from the violin plot and correlation
+  matrix.
 
 ## Export
 

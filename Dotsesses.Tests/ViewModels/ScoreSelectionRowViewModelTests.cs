@@ -9,10 +9,11 @@ public class ScoreSelectionRowViewModelTests
     private static ScoreSelection MakeSelection(
         string name = "Q#",
         int? index = 1,
+        ScoreColumnType type = ScoreColumnType.Numeric,
         bool display = true,
         bool aggregate = true,
         bool correlation = true) =>
-        new(name, index, display, aggregate, correlation);
+        new(name, index, type, display, aggregate, correlation);
 
     [Fact]
     public void DisplayName_NoIndex_ReturnsName()

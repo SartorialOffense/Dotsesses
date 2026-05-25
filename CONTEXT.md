@@ -26,7 +26,13 @@ MuppetName.
 `Quiz 1 = 17.5`. May carry a free-text Comment.
 
 **StudentAttribute**: A non-numeric piece of Student data, e.g.
-`Submitted Outline = "Yes"` or `Mid-Term = "✔✔+"`. Categorical.
+`Submitted Outline = "Yes"` or `Mid-Term = "✔✔+"`. Categorical. May
+originate from auto-detection at load time (any non-numeric, non-empty
+cell in a column flips the entire column to a StudentAttribute) or, in
+slice 2, from a user converting a numeric Score column to Categorical
+in the Settings dialog. StudentAttributes appear in the Drill-down
+panel's Attributes list but do not contribute to AggregateScore and do
+not appear in the violin plot or correlation matrix.
 
 **AggregateScore**: The sum of a Student's Scores whose `(Name, Index)`
 is in the active ScoreSelection aggregate set. Used for x-axis position
@@ -52,9 +58,13 @@ size, not absolute counts (see ADR-0006).
 GradeCurve's target ranges. The Compliance panel shows current count vs
 target range per Grade.
 
-**ScoreSelection**: A user-toggleable record per Score column with
-three booleans — Display, Aggregate, Correlation — that determine
-where that Score participates. Persisted on ClassAssessment.
+**ScoreSelection**: A user-toggleable record per column with a Type
+discriminator (`Numeric` / `Categorical`) plus three booleans —
+Display, Aggregate, Correlation — that determine where the column
+participates. The three booleans are meaningful only when
+`Type == Numeric`; for Categorical columns the data lives in
+StudentAttributes and bypasses the plots entirely. Persisted on
+ClassAssessment (see ADR-0013).
 
 **ClassAssessment**: The post-load dataset for one Class — the
 StudentAssessments, the GradeCurve in use, ScoreSelections,

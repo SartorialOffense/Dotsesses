@@ -25,6 +25,14 @@ public partial class ScoreSelectionRowViewModel : ViewModelBase
     public int? Index { get; }
 
     /// <summary>
+    /// Column type carried through from the source <see cref="ScoreSelection"/>. Read-only in
+    /// slice 1 — slice 2 makes this a settable property bound to a <c>Type</c> combobox in the
+    /// Settings dialog and adds guards (locked-on-Total, last-Aggregate, Categorical-to-Numeric
+    /// parse validation).
+    /// </summary>
+    public ScoreColumnType Type { get; }
+
+    /// <summary>
     /// Display name following the canonical project pattern from
     /// MainWindowViewModel: "{Name} {Index}" when Index has a value, else just Name.
     /// </summary>
@@ -75,6 +83,7 @@ public partial class ScoreSelectionRowViewModel : ViewModelBase
 
         Name = selection.Name;
         Index = selection.Index;
+        Type = selection.Type;
         _display = selection.Display;
         _aggregate = selection.Aggregate;
         _correlation = selection.Correlation;
@@ -86,5 +95,5 @@ public partial class ScoreSelectionRowViewModel : ViewModelBase
     /// Used by the parent VM at Apply time.
     /// </summary>
     public ScoreSelection ToScoreSelection() =>
-        new(Name, Index, Display, Aggregate, Correlation);
+        new(Name, Index, Type, Display, Aggregate, Correlation);
 }

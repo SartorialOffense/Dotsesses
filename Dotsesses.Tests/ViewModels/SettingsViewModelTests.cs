@@ -14,10 +14,10 @@ public class SettingsViewModelTests
         // so the last-Aggregate guard does not fire on the first programmatic clear.
         return new List<ScoreSelection>
         {
-            new("Q#", 1, Display: true,  Aggregate: true,  Correlation: true),
-            new("Q#", 2, Display: true,  Aggregate: true,  Correlation: false),
-            new("Mid", null, Display: false, Aggregate: false, Correlation: true),
-            new("Total", null, Display: true, Aggregate: false, Correlation: false),
+            new("Q#", 1, ScoreColumnType.Numeric, Display: true,  Aggregate: true,  Correlation: true),
+            new("Q#", 2, ScoreColumnType.Numeric, Display: true,  Aggregate: true,  Correlation: false),
+            new("Mid", null, ScoreColumnType.Numeric, Display: false, Aggregate: false, Correlation: true),
+            new("Total", null, ScoreColumnType.Numeric, Display: true, Aggregate: false, Correlation: false),
         };
     }
 
@@ -222,8 +222,8 @@ public class SettingsViewModelTests
         // before SetProperty (research §G1), no PropertyChanged fires and IsDirty stays false.
         var input = new List<ScoreSelection>
         {
-            new("A", null, Display: true, Aggregate: true,  Correlation: false),
-            new("B", null, Display: true, Aggregate: false, Correlation: false),
+            new("A", null, ScoreColumnType.Numeric, Display: true, Aggregate: true,  Correlation: false),
+            new("B", null, ScoreColumnType.Numeric, Display: true, Aggregate: false, Correlation: false),
         };
         var (vm, _) = MakeVm(input);
         Assert.False(vm.IsDirty);
@@ -329,9 +329,9 @@ public class SettingsViewModelTests
         // walk the clear sequence and observe the last-Aggregate guard fire.
         var input = new List<ScoreSelection>
         {
-            new("A", null, Display: true, Aggregate: true, Correlation: false),
-            new("B", null, Display: true, Aggregate: true, Correlation: false),
-            new("C", null, Display: true, Aggregate: true, Correlation: false),
+            new("A", null, ScoreColumnType.Numeric, Display: true, Aggregate: true, Correlation: false),
+            new("B", null, ScoreColumnType.Numeric, Display: true, Aggregate: true, Correlation: false),
+            new("C", null, ScoreColumnType.Numeric, Display: true, Aggregate: true, Correlation: false),
         };
         var (vm, _) = MakeVm(input);
 

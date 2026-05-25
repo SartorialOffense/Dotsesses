@@ -1,6 +1,7 @@
 namespace Dotsesses.Services;
 
 using System.Data;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using Dotsesses.Models;
@@ -144,6 +145,40 @@ public class ScoreReader
             }
         }
 
+        // ===== Type-inference pre-scan =====
+        // A column is Categorical if any non-empty cell fails to parse as a double.
+        // The "is this cell empty?" decision MUST match the row loop below so that
+        // detection and population stay consistent.
+        var categoricalColumns = new HashSet<int>();
+        for (int r = 1; r < table.Rows.Count; r++)
+        {
+            var row = table.Rows[r];
+            if (IsBlankRow(row)) continue;
+            foreach (var (columnIndex, _) in scoreColumns)
+            {
+                if (categoricalColumns.Contains(columnIndex)) continue;
+                var cell = row[columnIndex];
+                if (cell == null || cell == DBNull.Value) continue;
+                if (cell is double) continue;
+                var text = cell.ToString();
+                if (string.IsNullOrWhiteSpace(text)) continue;
+                if (double.TryParse(text, NumberStyles.Float | NumberStyles.AllowThousands,
+                                    CultureInfo.InvariantCulture, out _)) continue;
+                categoricalColumns.Add(columnIndex);
+            }
+        }
+
+        // One CategoricalColumnDetected warning per categorical column so the user
+        // sees at-a-glance which columns flipped type at load time.
+        foreach (var (columnIndex, scoreName) in scoreColumns.OrderBy(kvp => kvp.Key))
+        {
+            if (!categoricalColumns.Contains(columnIndex)) continue;
+            warnings.Add(new ReadWarning(
+                ReadWarningKind.CategoricalColumnDetected,
+                $"'{scoreName}' contained non-numeric values; loaded as a categorical Student Attribute. " +
+                "It will appear in the drill-down panel but not in the violin plot or correlation matrix."));
+        }
+
         // ===== Row parsing =====
         var students = new List<StudentAssessment>();
         var idsSeen = new HashSet<int>();
@@ -154,8 +189,12 @@ public class ScoreReader
         // -- the StudentAssessment constructor's default aggregate set is
         // [("Total", null)], so Scores must already contain a Total entry
         // at ctor time for AggregateGrade to be correct on first read.
-        var hasTotalColumn = scoreColumns.Values
-            .Any(n => string.Equals(n, "Total", StringComparison.OrdinalIgnoreCase));
+        // A categorical "Total" column does not satisfy this contract (the
+        // values live in Attributes, not Scores) so it must still trigger
+        // numeric Total synthesis from the remaining numeric columns.
+        var hasTotalColumn = scoreColumns
+            .Where(kvp => !categoricalColumns.Contains(kvp.Key))
+            .Any(kvp => string.Equals(kvp.Value, "Total", StringComparison.OrdinalIgnoreCase));
 
         // Skip row 0 (header). Iterate data rows.
         for (int r = 1; r < table.Rows.Count; r++)
@@ -185,9 +224,21 @@ public class ScoreReader
             }
 
             var scores = new List<Score>();
+            var attributes = new List<StudentAttribute>();
             foreach (var (columnIndex, scoreName) in scoreColumns)
             {
                 var cellValue = row[columnIndex];
+
+                if (categoricalColumns.Contains(columnIndex))
+                {
+                    // Categorical branch: keep the raw string. Blank cells become missing
+                    // (mirrors the numeric branch's "skip on unparseable" semantics).
+                    if (cellValue == null || cellValue == DBNull.Value) continue;
+                    var text = cellValue.ToString()?.Trim();
+                    if (string.IsNullOrEmpty(text)) continue;
+                    attributes.Add(new StudentAttribute(scoreName, null, text));
+                    continue;
+                }
 
                 double scoreValue;
                 if (cellValue is double dVal)
@@ -236,7 +287,7 @@ public class ScoreReader
             students.Add(new StudentAssessment(
                 studentId,
                 scores,
-                new List<StudentAttribute>(),
+                attributes,
                 muppetName: string.Empty));
         }
 
@@ -261,8 +312,25 @@ public class ScoreReader
         }
 
         // ===== Per-column analysis (sparse / constant) =====
-        foreach (var (_, scoreName) in scoreColumns.OrderBy(kvp => kvp.Key))
+        // Categorical columns retain the SparseColumn warning (missing values are still
+        // suspicious) but skip ConstantColumn — "all Yes" is a meaningful categorical
+        // pattern, not the degenerate flat-violin case the warning was designed to
+        // surface.
+        foreach (var (columnIndex, scoreName) in scoreColumns.OrderBy(kvp => kvp.Key))
         {
+            if (categoricalColumns.Contains(columnIndex))
+            {
+                var presentCount = students.Count(s => s.Attributes.Any(a =>
+                    string.Equals(a.Name, scoreName, StringComparison.Ordinal) && a.Index == null));
+                if (presentCount < students.Count)
+                {
+                    warnings.Add(new ReadWarning(
+                        ReadWarningKind.SparseColumn,
+                        $"'{scoreName}' has values for {presentCount} of {students.Count} students."));
+                }
+                continue;
+            }
+
             var values = students
                 .Select(s => s.Scores.FirstOrDefault(sc =>
                     string.Equals(sc.Name, scoreName, StringComparison.Ordinal) && sc.Index == null))

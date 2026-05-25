@@ -60,7 +60,7 @@ public class StateService
 
         var state = new SavedState
         {
-            Version = 2,
+            Version = 3,
             SavedAt = DateTime.UtcNow,
             SourceFile = sourceFile,
             Students = students.Select(s => new SavedStudent
@@ -86,6 +86,7 @@ public class StateService
             {
                 Name = s.Name,
                 Index = s.Index,
+                Type = s.Type,
                 Display = s.Display,
                 Aggregate = s.Aggregate,
                 Correlation = s.Correlation
@@ -159,7 +160,7 @@ public class StateService
     public IReadOnlyList<ScoreSelection> ConvertToScoreSelections(SavedState state)
     {
         return state.ScoreSelections
-            .Select(s => new ScoreSelection(s.Name, s.Index, s.Display, s.Aggregate, s.Correlation))
+            .Select(s => new ScoreSelection(s.Name, s.Index, s.Type, s.Display, s.Aggregate, s.Correlation))
             .ToList();
     }
 

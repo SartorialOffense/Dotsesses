@@ -1400,10 +1400,14 @@ public partial class MainWindowViewModel : ViewModelBase
 
     /// <summary>
     /// Builds the (Name, Index?) aggregate-set tuple list from a selection list.
-    /// Only entries with <see cref="ScoreSelection.Aggregate"/> == true contribute.
+    /// Only Numeric entries with <see cref="ScoreSelection.Aggregate"/> == true contribute —
+    /// Categorical columns have no numeric value to sum, so a stray
+    /// <c>Aggregate=true, Type=Categorical</c> row is filtered out defensively.
     /// </summary>
     private static List<(string Name, int? Index)> BuildAggregateSet(IReadOnlyList<ScoreSelection> selections)
-        => selections.Where(s => s.Aggregate).Select(s => (s.Name, s.Index)).ToList();
+        => selections.Where(s => s.Aggregate && s.Type == ScoreColumnType.Numeric)
+                     .Select(s => (s.Name, s.Index))
+                     .ToList();
 
     /// <summary>
     /// Builds an unordered, equality-comparable set of (Name, Index?) keys for the
@@ -1413,10 +1417,14 @@ public partial class MainWindowViewModel : ViewModelBase
     /// changes (MEM035 / S02 cursor-reset semantics).
     ///
     /// Equality is case-sensitive on the score Name — MEM008 confirms the codebase is
-    /// uniformly case-sensitive on score keys after defaults are seeded.
+    /// uniformly case-sensitive on score keys after defaults are seeded. Categorical
+    /// rows are filtered out so a Numeric→Categorical conversion in slice 2 cleanly
+    /// flips this key set and triggers the ADR-0005 reseed.
     /// </summary>
     private static HashSet<(string Name, int? Index)> BuildAggregateKeySet(IReadOnlyList<ScoreSelection> selections)
-        => selections.Where(s => s.Aggregate).Select(s => (s.Name, s.Index)).ToHashSet();
+        => selections.Where(s => s.Aggregate && s.Type == ScoreColumnType.Numeric)
+                     .Select(s => (s.Name, s.Index))
+                     .ToHashSet();
 
     /// <summary>
     /// If <see cref="ClassAssessment.ScoreSelections"/> is empty (fresh .xlsx load or v1 .dots load
@@ -1431,7 +1439,9 @@ public partial class MainWindowViewModel : ViewModelBase
         if (!ClassAssessment.Assessments.Any()) return;
 
         var firstStudent = ClassAssessment.Assessments.First();
-        ClassAssessment.ScoreSelections = ScoreSelectionDefaults.GenerateDefaults(firstStudent.Scores);
+        ClassAssessment.ScoreSelections = ScoreSelectionDefaults.GenerateDefaults(
+            firstStudent.Scores,
+            firstStudent.Attributes);
 
         var aggregateSet = BuildAggregateSet(ClassAssessment.ScoreSelections);
         foreach (var assessment in ClassAssessment.Assessments)

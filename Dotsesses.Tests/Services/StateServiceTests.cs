@@ -74,7 +74,7 @@ public class StateServiceTests : IDisposable
 
         // Assert
         Assert.NotNull(loadedState);
-        Assert.Equal(2, loadedState.Version);
+        Assert.Equal(3, loadedState.Version);
         Assert.Equal("original_source.xlsx", loadedState.SourceFile);
         Assert.Equal(2, loadedState.Students.Count);
         // Slots are A, B, C (post-#18 fix: catch-all is F, lowest in
@@ -210,12 +210,12 @@ public class StateServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveAsync_WritesVersion2()
+    public async Task SaveAsync_WritesVersion3()
     {
-        var filePath = Path.Combine(_testDirectory, "v2_check.json");
+        var filePath = Path.Combine(_testDirectory, "v3_check.json");
         await _stateService.SaveAsync(filePath, CreateTestStudents(), TestFixtures.SessionForGrading(), Array.Empty<ScoreSelection>());
         var json = await File.ReadAllTextAsync(filePath);
-        Assert.Contains("\"version\": 2", json);
+        Assert.Contains("\"version\": 3", json);
     }
 
     [Fact]
@@ -231,10 +231,55 @@ public class StateServiceTests : IDisposable
         {
             Assert.Equal(originalSelections[i].Name,        converted[i].Name);
             Assert.Equal(originalSelections[i].Index,       converted[i].Index);
+            Assert.Equal(originalSelections[i].Type,        converted[i].Type);
             Assert.Equal(originalSelections[i].Display,     converted[i].Display);
             Assert.Equal(originalSelections[i].Aggregate,   converted[i].Aggregate);
             Assert.Equal(originalSelections[i].Correlation, converted[i].Correlation);
         }
+    }
+
+    [Fact]
+    public async Task RoundTrip_PreservesCategoricalScoreSelectionType()
+    {
+        var filePath = Path.Combine(_testDirectory, "categorical_roundtrip.json");
+        var originalSelections = new List<ScoreSelection>
+        {
+            new("Q", 1, ScoreColumnType.Numeric, Display: true, Aggregate: true, Correlation: true),
+            new("Submitted Outline", null, ScoreColumnType.Categorical, Display: true, Aggregate: false, Correlation: false),
+        };
+        await _stateService.SaveAsync(filePath, CreateTestStudents(), TestFixtures.SessionForGrading(), originalSelections);
+
+        var converted = _stateService.ConvertToScoreSelections(await _stateService.LoadAsync(filePath));
+
+        Assert.Equal(ScoreColumnType.Numeric, converted.First(s => s.Name == "Q").Type);
+        Assert.Equal(ScoreColumnType.Categorical, converted.First(s => s.Name == "Submitted Outline").Type);
+    }
+
+    [Fact]
+    public async Task LoadAsync_V2File_DefaultsScoreSelectionTypeToNumeric()
+    {
+        // Forward-compatible migration per ADR-0002: a v2 file pre-dates the Type
+        // field, so the loader fills in Numeric for every saved selection.
+        var filePath = Path.Combine(_testDirectory, "v2.dots");
+        var v2Content = """
+            {
+              "version": 2,
+              "savedAt": "2024-01-01T00:00:00Z",
+              "students": [],
+              "cursors": [],
+              "scoreSelections": [
+                { "name": "Q", "index": 1, "display": true, "aggregate": true, "correlation": true },
+                { "name": "Total", "index": null, "display": true, "aggregate": false, "correlation": true }
+              ]
+            }
+            """;
+        await File.WriteAllTextAsync(filePath, v2Content);
+
+        var loaded = await _stateService.LoadAsync(filePath);
+        var converted = _stateService.ConvertToScoreSelections(loaded);
+
+        Assert.Equal(2, loaded.Version);
+        Assert.All(converted, s => Assert.Equal(ScoreColumnType.Numeric, s.Type));
     }
 
     [Fact]
@@ -254,9 +299,9 @@ public class StateServiceTests : IDisposable
     {
         return new List<ScoreSelection>
         {
-            new ScoreSelection("Total", null, Display: true,  Aggregate: false, Correlation: true),
-            new ScoreSelection("Q",     1,    Display: true,  Aggregate: true,  Correlation: true),
-            new ScoreSelection("Q",     2,    Display: false, Aggregate: true,  Correlation: false)
+            new ScoreSelection("Total", null, ScoreColumnType.Numeric, Display: true,  Aggregate: false, Correlation: true),
+            new ScoreSelection("Q",     1,    ScoreColumnType.Numeric, Display: true,  Aggregate: true,  Correlation: true),
+            new ScoreSelection("Q",     2,    ScoreColumnType.Numeric, Display: false, Aggregate: true,  Correlation: false)
         };
     }
 

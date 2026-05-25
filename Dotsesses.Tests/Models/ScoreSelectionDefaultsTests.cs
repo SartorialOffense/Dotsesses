@@ -125,4 +125,63 @@ public class ScoreSelectionDefaultsTests
         Assert.Throws<ArgumentNullException>(() =>
             ScoreSelectionDefaults.GenerateDefaults(null!));
     }
+
+    [Fact]
+    public void GenerateDefaults_WithCategoricalAttributes_EmitsCategoricalSelections()
+    {
+        // Arrange
+        var scores = new List<Score>
+        {
+            new("Q#", 1, 10),
+            new("Total", null, 30)
+        };
+        var attributes = new List<StudentAttribute>
+        {
+            new("Submitted Outline", null, "Yes")
+        };
+
+        // Act
+        var result = ScoreSelectionDefaults.GenerateDefaults(scores, attributes);
+
+        // Assert — Numeric rows come first, then Categorical rows.
+        Assert.Equal(3, result.Count);
+
+        var q1 = result.First(s => s.Name == "Q#");
+        Assert.Equal(ScoreColumnType.Numeric, q1.Type);
+        Assert.True(q1.Aggregate);
+
+        var total = result.First(s => s.Name == "Total");
+        Assert.Equal(ScoreColumnType.Numeric, total.Type);
+        Assert.False(total.Aggregate);
+
+        var outline = result.First(s => s.Name == "Submitted Outline");
+        Assert.Equal(ScoreColumnType.Categorical, outline.Type);
+        Assert.True(outline.Display);
+        Assert.False(outline.Aggregate);
+        Assert.False(outline.Correlation);
+    }
+
+    [Fact]
+    public void GenerateDefaults_NoAttributes_BehavesLikeOneArgOverload()
+    {
+        // Arrange — verify the convenience overload (just scores) matches the
+        // explicit empty-attributes call.
+        var scores = new List<Score>
+        {
+            new("Q#", 1, 10),
+            new("Total", null, 30)
+        };
+
+        // Act
+        var fromOverload = ScoreSelectionDefaults.GenerateDefaults(scores);
+        var fromExplicit = ScoreSelectionDefaults.GenerateDefaults(scores, Array.Empty<StudentAttribute>());
+
+        // Assert
+        Assert.Equal(fromExplicit.Count, fromOverload.Count);
+        for (int i = 0; i < fromOverload.Count; i++)
+        {
+            Assert.Equal(fromExplicit[i], fromOverload[i]);
+        }
+        Assert.All(fromOverload, s => Assert.Equal(ScoreColumnType.Numeric, s.Type));
+    }
 }

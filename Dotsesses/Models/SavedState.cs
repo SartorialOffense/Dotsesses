@@ -7,7 +7,7 @@ namespace Dotsesses.Models;
 /// </summary>
 public class SavedState
 {
-    public int Version { get; set; } = 2;
+    public int Version { get; set; } = 3;
     public DateTime SavedAt { get; set; }
     public string? SourceFile { get; set; }
     public List<SavedStudent> Students { get; set; } = new();
@@ -58,12 +58,15 @@ public class SavedCursor
 }
 
 /// <summary>
-/// Persistence DTO mirror of <see cref="ScoreSelection"/>.
+/// Persistence DTO mirror of <see cref="ScoreSelection"/>. The <c>Type</c> field defaults
+/// to <see cref="ScoreColumnType.Numeric"/> so v2 files load cleanly into v3 code per
+/// ADR-0002 (first save-after-load silently rewrites at the current version).
 /// </summary>
 public class SavedScoreSelection
 {
     public string Name { get; set; } = string.Empty;
     public int? Index { get; set; }
+    public ScoreColumnType Type { get; set; } = ScoreColumnType.Numeric;
     public bool Display { get; set; }
     public bool Aggregate { get; set; }
     public bool Correlation { get; set; }

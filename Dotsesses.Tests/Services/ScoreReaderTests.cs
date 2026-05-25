@@ -235,6 +235,178 @@ public class ScoreReaderTests : IDisposable
         Assert.Equal(90, totals[0].Value);
     }
 
+    // ===== Categorical column auto-detection =====
+
+    [Fact]
+    public void Read_AllStringColumn_ClassifiesAsCategorical()
+    {
+        var path = WriteFixture(s =>
+        {
+            s.Cell("A1").Value = "ID";
+            s.Cell("B1").Value = "Submitted Outline";
+            s.Cell("C1").Value = "Total";
+            s.Cell("A2").Value = 1; s.Cell("B2").Value = "Yes"; s.Cell("C2").Value = 80;
+            s.Cell("A3").Value = 2; s.Cell("B3").Value = "No";  s.Cell("C3").Value = 70;
+            s.Cell("A4").Value = 3; s.Cell("B4").Value = "Yes"; s.Cell("C4").Value = 90;
+        });
+
+        var result = new ScoreReader().Read(path);
+
+        Assert.All(result.Students, st => Assert.DoesNotContain(st.Scores,
+            sc => string.Equals(sc.Name, "Submitted Outline", StringComparison.Ordinal)));
+        Assert.All(result.Students, st => Assert.Single(st.Attributes,
+            a => string.Equals(a.Name, "Submitted Outline", StringComparison.Ordinal)));
+        Assert.Equal("Yes", result.Students[0].Attributes.Single().Value);
+        Assert.Equal("No",  result.Students[1].Attributes.Single().Value);
+    }
+
+    [Fact]
+    public void Read_ColumnWithMixedNumericAndString_ClassifiesAsCategorical()
+    {
+        // A single non-numeric cell ("N/A") flips the whole column to categorical.
+        var path = WriteFixture(s =>
+        {
+            s.Cell("A1").Value = "ID";
+            s.Cell("B1").Value = "Midterm";
+            s.Cell("C1").Value = "Total";
+            s.Cell("A2").Value = 1; s.Cell("B2").Value = 80;     s.Cell("C2").Value = 80;
+            s.Cell("A3").Value = 2; s.Cell("B3").Value = "N/A";  s.Cell("C3").Value = 70;
+            s.Cell("A4").Value = 3; s.Cell("B4").Value = 90;     s.Cell("C4").Value = 90;
+        });
+
+        var result = new ScoreReader().Read(path);
+
+        Assert.All(result.Students, st => Assert.DoesNotContain(st.Scores,
+            sc => string.Equals(sc.Name, "Midterm", StringComparison.Ordinal)));
+        Assert.Equal("80",  result.Students[0].Attributes.Single().Value);
+        Assert.Equal("N/A", result.Students[1].Attributes.Single().Value);
+        Assert.Equal("90",  result.Students[2].Attributes.Single().Value);
+    }
+
+    [Fact]
+    public void Read_AllNumericColumn_RemainsScore()
+    {
+        // Regression: pre-existing behavior for clean numeric columns.
+        var path = WriteFixture(s =>
+        {
+            s.Cell("A1").Value = "ID";
+            s.Cell("B1").Value = "Midterm";
+            s.Cell("C1").Value = "Total";
+            s.Cell("A2").Value = 1; s.Cell("B2").Value = 80; s.Cell("C2").Value = 80;
+            s.Cell("A3").Value = 2; s.Cell("B3").Value = 70; s.Cell("C3").Value = 70;
+        });
+
+        var result = new ScoreReader().Read(path);
+
+        Assert.All(result.Students, st => Assert.Empty(st.Attributes));
+        Assert.Contains(result.Students[0].Scores, sc => sc.Name == "Midterm" && sc.Value == 80);
+    }
+
+    [Fact]
+    public void Read_EmptyCellInOtherwiseNumericColumn_StaysNumeric()
+    {
+        // A blank cell is not a non-numeric value — it does not flip the column.
+        var path = WriteFixture(s =>
+        {
+            s.Cell("A1").Value = "ID";
+            s.Cell("B1").Value = "Bonus";
+            s.Cell("C1").Value = "Total";
+            s.Cell("A2").Value = 1; s.Cell("B2").Value = 5; s.Cell("C2").Value = 80;
+            s.Cell("A3").Value = 2;                          s.Cell("C3").Value = 70;
+            s.Cell("A4").Value = 3; s.Cell("B4").Value = 7; s.Cell("C4").Value = 90;
+        });
+
+        var result = new ScoreReader().Read(path);
+
+        Assert.All(result.Students, st => Assert.Empty(st.Attributes));
+        Assert.Contains(result.Students[0].Scores, sc => sc.Name == "Bonus" && sc.Value == 5);
+    }
+
+    [Fact]
+    public void Read_CategoricalColumnNamedTotal_DoesNotPreventTotalSynthesis()
+    {
+        // If the column actually named "Total" is categorical, the loader still
+        // synthesizes a numeric Total from the remaining numeric columns.
+        var path = WriteFixture(s =>
+        {
+            s.Cell("A1").Value = "ID";
+            s.Cell("B1").Value = "Midterm";
+            s.Cell("C1").Value = "Total";
+            s.Cell("A2").Value = 1; s.Cell("B2").Value = 40; s.Cell("C2").Value = "Pass";
+            s.Cell("A3").Value = 2; s.Cell("B3").Value = 30; s.Cell("C3").Value = "Fail";
+        });
+
+        var result = new ScoreReader().Read(path);
+
+        Assert.Contains(result.Warnings, w => w.Kind == ReadWarningKind.NoTotalColumn);
+        // Total ends up in Scores as the synthesized sum (40 and 30 respectively).
+        Assert.Equal(40, result.Students[0].Scores.Single(sc => sc.Name == "Total").Value);
+        Assert.Equal(30, result.Students[1].Scores.Single(sc => sc.Name == "Total").Value);
+        // And "Total" the categorical lives in Attributes.
+        Assert.Equal("Pass", result.Students[0].Attributes.Single(a => a.Name == "Total").Value);
+        Assert.Equal("Fail", result.Students[1].Attributes.Single(a => a.Name == "Total").Value);
+    }
+
+    [Fact]
+    public void Read_CategoricalColumn_DoesNotEmitConstantWarning()
+    {
+        // All students share "Yes" — no ConstantColumn warning for categorical
+        // (that warning exists for flat-violin numeric columns, irrelevant here).
+        var path = WriteFixture(s =>
+        {
+            s.Cell("A1").Value = "ID";
+            s.Cell("B1").Value = "Submitted Outline";
+            s.Cell("C1").Value = "Total";
+            s.Cell("A2").Value = 1; s.Cell("B2").Value = "Yes"; s.Cell("C2").Value = 80;
+            s.Cell("A3").Value = 2; s.Cell("B3").Value = "Yes"; s.Cell("C3").Value = 70;
+            s.Cell("A4").Value = 3; s.Cell("B4").Value = "Yes"; s.Cell("C4").Value = 90;
+        });
+
+        var result = new ScoreReader().Read(path);
+
+        Assert.DoesNotContain(result.Warnings, w =>
+            w.Kind == ReadWarningKind.ConstantColumn && w.Message.Contains("Submitted Outline"));
+    }
+
+    [Fact]
+    public void Read_CategoricalColumn_EmitsSparseWarning_WhenMissing()
+    {
+        // Missing cells in a categorical column still surface as Sparse — the user
+        // should know if their categorical data has holes.
+        var path = WriteFixture(s =>
+        {
+            s.Cell("A1").Value = "ID";
+            s.Cell("B1").Value = "Submitted Outline";
+            s.Cell("C1").Value = "Total";
+            s.Cell("A2").Value = 1; s.Cell("B2").Value = "Yes"; s.Cell("C2").Value = 80;
+            s.Cell("A3").Value = 2;                              s.Cell("C3").Value = 70;
+            s.Cell("A4").Value = 3; s.Cell("B4").Value = "No";  s.Cell("C4").Value = 90;
+        });
+
+        var result = new ScoreReader().Read(path);
+
+        Assert.Contains(result.Warnings, w =>
+            w.Kind == ReadWarningKind.SparseColumn && w.Message.Contains("Submitted Outline"));
+    }
+
+    [Fact]
+    public void Read_CategoricalColumnDetected_EmitsWarning()
+    {
+        var path = WriteFixture(s =>
+        {
+            s.Cell("A1").Value = "ID";
+            s.Cell("B1").Value = "Mid-Term";
+            s.Cell("C1").Value = "Total";
+            s.Cell("A2").Value = 1; s.Cell("B2").Value = "✔✔+"; s.Cell("C2").Value = 80;
+            s.Cell("A3").Value = 2; s.Cell("B3").Value = "✔";   s.Cell("C3").Value = 70;
+        });
+
+        var result = new ScoreReader().Read(path);
+
+        Assert.Contains(result.Warnings, w =>
+            w.Kind == ReadWarningKind.CategoricalColumnDetected && w.Message.Contains("Mid-Term"));
+    }
+
     // ===== Hard errors =====
 
     [Fact]

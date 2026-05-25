@@ -20,6 +20,8 @@ public enum ReadWarningKind
     SparseColumn,
     /// <summary>A score column had the same value for every student (degenerate distribution).</summary>
     ConstantColumn,
+    /// <summary>A column contained non-numeric values and was auto-classified as a categorical Student Attribute.</summary>
+    CategoricalColumnDetected,
 }
 
 /// <summary>
