@@ -29,6 +29,7 @@ namespace Dotsesses.UI;
 public sealed class SettingsViewModel : ViewModelBase
 {
     private readonly Action<IReadOnlyList<ScoreSelection>> _onApply;
+    private readonly Func<string, int?, bool> _canSwitchToNumeric;
     private bool _isDirty;
 
     /// <summary>
@@ -96,12 +97,17 @@ public sealed class SettingsViewModel : ViewModelBase
 
     public SettingsViewModel(
         IReadOnlyList<ScoreSelection> initialSelections,
-        Action<IReadOnlyList<ScoreSelection>> onApply)
+        Action<IReadOnlyList<ScoreSelection>> onApply,
+        Func<string, int?, bool>? canSwitchToNumeric = null)
     {
         ArgumentNullException.ThrowIfNull(initialSelections);
         ArgumentNullException.ThrowIfNull(onApply);
 
         _onApply = onApply;
+        // Default-allow when no validator is supplied keeps the pre-slice-2 constructor
+        // shape working for tests; production callers (MainWindow.axaml.cs) inject a real
+        // predicate that walks ClassAssessment.Assessments[*].Attributes.
+        _canSwitchToNumeric = canSwitchToNumeric ?? ((_, _) => true);
 
         // Build rows in input order. The cross-row last-Aggregate guard is satisfied
         // by closing over Rows here; per T01, a row is allowed to clear only when the
@@ -110,9 +116,11 @@ public sealed class SettingsViewModel : ViewModelBase
         Rows = rows;
         foreach (var sel in initialSelections)
         {
+            var selCaptured = sel;
             rows.Add(new ScoreSelectionRowViewModel(
                 sel,
-                () => Rows.Count(r => r.Aggregate) > 1));
+                canClearAggregate: () => Rows.Count(r => r.Aggregate && r.IsNumeric) > 1,
+                canSwitchToNumeric: () => _canSwitchToNumeric(selCaptured.Name, selCaptured.Index)));
         }
 
         // Subscribe to each row's PropertyChanged. Row VMs only raise events for
@@ -159,8 +167,13 @@ public sealed class SettingsViewModel : ViewModelBase
 
     private void SetAllDisplay(bool value)
     {
+        // Bulk-toggle Display only on Numeric rows. Categorical rows' Display/Aggregate/
+        // Correlation flags are meaningless (they bypass the plots entirely); the Settings
+        // UI greys them out, so honoring "All / None" on them would silently flip values
+        // the user can't see.
         foreach (var row in Rows)
         {
+            if (!row.IsNumeric) continue;
             row.Display = value;
         }
     }
@@ -169,21 +182,19 @@ public sealed class SettingsViewModel : ViewModelBase
     {
         foreach (var row in Rows)
         {
+            if (!row.IsNumeric) continue;
             row.Correlation = value;
         }
     }
 
     private void SetAllAggregate()
     {
-        // Iterate non-locked rows explicitly. The row VM setter naturally rejects
+        // Iterate non-locked Numeric rows explicitly. The row VM setter naturally rejects
         // writes to locked rows, but skipping them here keeps intent clear.
         foreach (var row in Rows)
         {
-            if (row.IsAggregateLocked)
-            {
-                continue;
-            }
-
+            if (row.IsAggregateLocked) continue;
+            if (!row.IsNumeric) continue;
             row.Aggregate = true;
         }
     }

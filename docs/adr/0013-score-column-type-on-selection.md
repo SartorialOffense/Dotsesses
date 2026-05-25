@@ -75,3 +75,65 @@ needed.
 - The drill-down's `Assessment.Attributes` rendering (already in
   `MainWindow.axaml`) is the load-bearing surface for showing
   categorical data — no view change needed in slice 1.
+
+## Slice 2 — user-driven Numeric ↔ Categorical switching
+
+The Settings dialog grows a per-row `Type` combobox alongside the
+existing Display / Aggregate / Correlation checkboxes. On Apply, each
+column whose Type changed has its per-student data moved between
+`StudentAssessment.Scores` and `StudentAssessment.Attributes`:
+
+- **Numeric → Categorical**: `Score.Value` is stringified via
+  `InvariantCulture` `"R"` formatting; `Score.Comment` is preserved into
+  the new `StudentAttribute.Comment` (slice 2 also extends
+  `StudentAttribute` with an optional `Comment` field — ADR-0007 still
+  applies, comments remain per-column-per-student data).
+- **Categorical → Numeric**: `StudentAttribute.Value` is parsed via
+  `InvariantCulture` `double.TryParse`; `StudentAttribute.Comment` is
+  preserved into the new `Score.Comment`.
+
+`ApplyTypeTransitions` runs inside `ApplyScoreSelections` after the
+aggregate-set-change detection and before the new selections are stored,
+so the subsequent `RecalculateAggregate` operates on the post-move
+shape. Because `BuildAggregateKeySet` filters on `Type == Numeric`, a
+Numeric column dropping to Categorical triggers `aggregateSetChanged`
+and the existing ADR-0005 reseed path fires.
+
+### Guards on the Type setter
+
+The row VM rejects three categories of Type writes silently (no
+`SetProperty`, no `IsDirty` flip — matching the existing aggregate
+guards' contract):
+
+- **Locked rows** — `Total` stays `Numeric` (it's either the
+  spreadsheet's pre-summed Total or our synthesized aggregate mirror,
+  numeric by definition).
+- **Last-Aggregate Numeric** — a Numeric → Categorical flip on an
+  `Aggregate=true` row that is the only Numeric row with `Aggregate`
+  enabled is rejected; this would empty the aggregate set as a
+  side-effect of a type switch, parallel to the existing G1 last-
+  Aggregate-clear guard. Re-uses the same `canClearAggregate` closure.
+- **Unparseable Categorical** — a Categorical → Numeric flip is
+  rejected when the parent VM's injected `canSwitchToNumeric`
+  predicate returns false (some `StudentAttribute.Value` strings for
+  the column don't parse as `double`). The Settings dialog injects a
+  predicate that walks `ClassAssessment.Assessments[*].Attributes`.
+
+### Bulk-toggle commands
+
+`DisplayAll/None`, `AggregateAll`, and `CorrelationAll/None` skip
+Categorical rows entirely — the three flags have no effect on
+Categorical columns and bulk-flipping invisible values would surprise
+users. `LastAggregateGuard` counts only Numeric Aggregate rows.
+
+## Considered alternatives for slice 2
+
+- **Drop `Score.Comment` silently on conversion** — smallest diff but
+  surprising data loss; rejected.
+- **Block conversion when any comment exists** — safest but pushy;
+  user would have to clear comments before flipping type.
+- **Confirmation dialog on conversion when comments exist** —
+  acceptable but adds modal friction; chose data preservation instead.
+- **Read-only `Type` discriminator (slice 1 only)** — defers the
+  reverse-direction question forever; categorical-by-accident becomes
+  impossible to undo without reloading the file.

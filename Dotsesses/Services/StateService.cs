@@ -78,7 +78,8 @@ public class StateService
                 {
                     Name = a.Name,
                     Index = a.Index,
-                    Value = a.Value
+                    Value = a.Value,
+                    Comment = a.Comment
                 }).ToList()
             }).ToList(),
             Cursors = savedCursors,
@@ -139,7 +140,7 @@ public class StateService
                 new Score(s.Name, s.Index, s.Value, s.Comment)).ToList();
 
             var attributes = saved.Attributes.Select(a =>
-                new StudentAttribute(a.Name, a.Index, a.Value)).ToList();
+                new StudentAttribute(a.Name, a.Index, a.Value, a.Comment)).ToList();
 
             var student = new StudentAssessment(
                 saved.Id,

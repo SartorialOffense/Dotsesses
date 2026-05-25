@@ -38,13 +38,16 @@ public class SavedScore
 }
 
 /// <summary>
-/// Saved student attribute.
+/// Saved student attribute. The <c>Comment</c> field is null on v2 files (which
+/// pre-date the Numeric↔Categorical switch); v3 files written after slice 2 of
+/// ADR-0013 may carry per-cell comments preserved across a type conversion.
 /// </summary>
 public class SavedAttribute
 {
     public string Name { get; set; } = string.Empty;
     public int? Index { get; set; }
     public string Value { get; set; } = string.Empty;
+    public string? Comment { get; set; }
 }
 
 /// <summary>

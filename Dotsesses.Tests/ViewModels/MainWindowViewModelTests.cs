@@ -509,4 +509,116 @@ public class MainWindowViewModelTests
         Assert.DoesNotContain(vm.HoveredStudent.DisplayScores,
             s => s.Name == excluded.Name && s.Index == excluded.Index);
     }
+
+    // ===== Slice 2 — Type transitions on Apply =====
+
+    private static IReadOnlyList<ScoreSelection> SelectionsWithTypeFlip(
+        IReadOnlyList<ScoreSelection> existing, string flippedName, ScoreColumnType newType)
+    {
+        return existing
+            .Select(s => string.Equals(s.Name, flippedName, StringComparison.Ordinal)
+                ? s with { Type = newType, Aggregate = newType == ScoreColumnType.Numeric ? s.Aggregate : false }
+                : s)
+            .ToList();
+    }
+
+    [Fact]
+    public void ApplyScoreSelections_NumericToCategorical_MovesDataToAttributes()
+    {
+        var vm = CreateViewModel();
+        var firstStudent = vm.ClassAssessment.Assessments.First();
+        var flipName = firstStudent.Scores.First(s =>
+            !string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase)).Name;
+        var originalValue = firstStudent.Scores.First(s => s.Name == flipName).Value;
+
+        var newSelections = SelectionsWithTypeFlip(
+            vm.ClassAssessment.ScoreSelections, flipName, ScoreColumnType.Categorical);
+
+        vm.ApplyScoreSelections(newSelections);
+
+        Assert.DoesNotContain(firstStudent.Scores, s => s.Name == flipName);
+        var attr = firstStudent.Attributes.Single(a => a.Name == flipName);
+        // "R" round-trip format gives invariant-culture text — must parse back to the same value.
+        Assert.Equal(originalValue,
+            double.Parse(attr.Value, System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
+    public void ApplyScoreSelections_NumericToCategorical_PreservesScoreComment()
+    {
+        var vm = CreateViewModel();
+        var firstStudent = vm.ClassAssessment.Assessments.First();
+        var flipName = firstStudent.Scores.First(s =>
+            !string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase)).Name;
+        firstStudent.Scores.First(s => s.Name == flipName).Comment = "preserved";
+
+        var newSelections = SelectionsWithTypeFlip(
+            vm.ClassAssessment.ScoreSelections, flipName, ScoreColumnType.Categorical);
+
+        vm.ApplyScoreSelections(newSelections);
+
+        var attr = firstStudent.Attributes.Single(a => a.Name == flipName);
+        Assert.Equal("preserved", attr.Comment);
+    }
+
+    [Fact]
+    public void ApplyScoreSelections_NumericToCategorical_RemovesFromAggregateSum()
+    {
+        var vm = CreateViewModel();
+        var firstStudent = vm.ClassAssessment.Assessments.First();
+        var flipName = firstStudent.Scores.First(s =>
+            !string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase)).Name;
+        var aggregateBefore = firstStudent.AggregateGrade;
+        var flippedValue = firstStudent.Scores.First(s => s.Name == flipName).Value;
+
+        var newSelections = SelectionsWithTypeFlip(
+            vm.ClassAssessment.ScoreSelections, flipName, ScoreColumnType.Categorical);
+
+        vm.ApplyScoreSelections(newSelections);
+
+        // The flipped column dropped out of the aggregate; the new aggregate is the
+        // old aggregate minus the flipped column's contribution.
+        Assert.Equal(aggregateBefore - (int)flippedValue, firstStudent.AggregateGrade);
+    }
+
+    [Fact]
+    public void ApplyScoreSelections_CategoricalToNumeric_MovesDataToScores()
+    {
+        // Set up: flip a column to Categorical, then flip it back.
+        var vm = CreateViewModel();
+        var firstStudent = vm.ClassAssessment.Assessments.First();
+        var flipName = firstStudent.Scores.First(s =>
+            !string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase)).Name;
+        var originalValue = firstStudent.Scores.First(s => s.Name == flipName).Value;
+
+        vm.ApplyScoreSelections(SelectionsWithTypeFlip(
+            vm.ClassAssessment.ScoreSelections, flipName, ScoreColumnType.Categorical));
+        Assert.DoesNotContain(firstStudent.Scores, s => s.Name == flipName);
+
+        // Now flip back.
+        vm.ApplyScoreSelections(SelectionsWithTypeFlip(
+            vm.ClassAssessment.ScoreSelections, flipName, ScoreColumnType.Numeric));
+
+        var restoredScore = firstStudent.Scores.Single(s => s.Name == flipName);
+        Assert.Equal(originalValue, restoredScore.Value);
+        Assert.DoesNotContain(firstStudent.Attributes, a => a.Name == flipName);
+    }
+
+    [Fact]
+    public void ApplyScoreSelections_CategoricalToNumeric_PreservesAttributeComment()
+    {
+        var vm = CreateViewModel();
+        var firstStudent = vm.ClassAssessment.Assessments.First();
+        var flipName = firstStudent.Scores.First(s =>
+            !string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase)).Name;
+        firstStudent.Scores.First(s => s.Name == flipName).Comment = "round-trip";
+
+        vm.ApplyScoreSelections(SelectionsWithTypeFlip(
+            vm.ClassAssessment.ScoreSelections, flipName, ScoreColumnType.Categorical));
+        vm.ApplyScoreSelections(SelectionsWithTypeFlip(
+            vm.ClassAssessment.ScoreSelections, flipName, ScoreColumnType.Numeric));
+
+        var restored = firstStudent.Scores.Single(s => s.Name == flipName);
+        Assert.Equal("round-trip", restored.Comment);
+    }
 }

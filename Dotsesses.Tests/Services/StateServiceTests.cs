@@ -256,6 +256,30 @@ public class StateServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task RoundTrip_PreservesAttributeComment()
+    {
+        // Slice 2 of ADR-0013: StudentAttribute gained an optional Comment so per-cell
+        // comments survive a Numeric→Categorical conversion. Persist + reload must
+        // round-trip that Comment.
+        var filePath = Path.Combine(_testDirectory, "attribute_comment_roundtrip.json");
+        var students = new List<StudentAssessment>
+        {
+            new(1,
+                new List<Score> { new("Total", null, 80) },
+                new List<StudentAttribute> { new("Outline", null, "Yes", "explanatory note") },
+                "Test"),
+        };
+        await _stateService.SaveAsync(filePath, students, TestFixtures.SessionForGrading(), Array.Empty<ScoreSelection>());
+
+        var loaded = await _stateService.LoadAsync(filePath);
+        var (round, _) = _stateService.ConvertToStudents(loaded);
+
+        var attr = round.Single().Attributes.Single();
+        Assert.Equal("Yes", attr.Value);
+        Assert.Equal("explanatory note", attr.Comment);
+    }
+
+    [Fact]
     public async Task LoadAsync_V2File_DefaultsScoreSelectionTypeToNumeric()
     {
         // Forward-compatible migration per ADR-0002: a v2 file pre-dates the Type

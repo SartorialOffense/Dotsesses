@@ -788,7 +788,32 @@ public partial class MainWindow : Window
 
         var current = vm.ClassAssessment?.ScoreSelections ?? Array.Empty<ScoreSelection>();
         Action<IReadOnlyList<ScoreSelection>> commit = list => vm.ApplyScoreSelections(list);
-        var settingsVm = new SettingsViewModel(current, commit);
+
+        // Categorical→Numeric validator (slice 2 of ADR-0013): the row VM's G4 guard
+        // consults this to refuse a type switch when any stored Attribute value for the
+        // column doesn't parse as a double. Captures the current ClassAssessment so it
+        // sees post-Apply mutations from prior dialog opens.
+        var classAssessment = vm.ClassAssessment;
+        Func<string, int?, bool> canSwitchToNumeric = (name, idx) =>
+        {
+            if (classAssessment == null) return true;
+            foreach (var a in classAssessment.Assessments)
+            {
+                foreach (var attr in a.Attributes)
+                {
+                    if (attr.Name != name || attr.Index != idx) continue;
+                    if (!double.TryParse(attr.Value,
+                            System.Globalization.NumberStyles.Float | System.Globalization.NumberStyles.AllowThousands,
+                            System.Globalization.CultureInfo.InvariantCulture,
+                            out _))
+                    {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        };
+        var settingsVm = new SettingsViewModel(current, commit, canSwitchToNumeric);
         var dlg = new SettingsWindow(settingsVm);
 
         // Wire Closed handler BEFORE assigning the field so a fast close-then-reopen

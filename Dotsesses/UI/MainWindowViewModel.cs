@@ -1427,6 +1427,72 @@ public partial class MainWindowViewModel : ViewModelBase
                      .ToHashSet();
 
     /// <summary>
+    /// For every column whose <see cref="ScoreSelection.Type"/> differs between the old
+    /// and new selection lists, move its per-student data between
+    /// <see cref="StudentAssessment.Scores"/> and <see cref="StudentAssessment.Attributes"/>.
+    /// Comments survive in both directions (<see cref="Score.Comment"/> ↔
+    /// <see cref="StudentAttribute.Comment"/>). Stringification and parsing both use
+    /// <see cref="System.Globalization.CultureInfo.InvariantCulture"/> for round-trippability.
+    /// Slice 2 of ADR-0013.
+    /// </summary>
+    private void ApplyTypeTransitions(
+        IReadOnlyList<ScoreSelection> oldSelections,
+        IReadOnlyList<ScoreSelection> newSelections)
+    {
+        var oldByKey = oldSelections.ToDictionary(s => (s.Name, s.Index));
+        foreach (var fresh in newSelections)
+        {
+            if (!oldByKey.TryGetValue((fresh.Name, fresh.Index), out var prior)) continue;
+            if (prior.Type == fresh.Type) continue;
+
+            if (prior.Type == ScoreColumnType.Numeric &&
+                fresh.Type == ScoreColumnType.Categorical)
+            {
+                MoveScoreToAttribute(fresh.Name, fresh.Index);
+            }
+            else if (prior.Type == ScoreColumnType.Categorical &&
+                     fresh.Type == ScoreColumnType.Numeric)
+            {
+                MoveAttributeToScore(fresh.Name, fresh.Index);
+            }
+        }
+    }
+
+    private void MoveScoreToAttribute(string name, int? index)
+    {
+        foreach (var assessment in ClassAssessment.Assessments)
+        {
+            var score = assessment.Scores.FirstOrDefault(s => s.Name == name && s.Index == index);
+            if (score == null) continue;
+            assessment.Scores.Remove(score);
+            assessment.Attributes.Add(new StudentAttribute(
+                name,
+                index,
+                score.Value.ToString("R", System.Globalization.CultureInfo.InvariantCulture),
+                score.Comment));
+        }
+    }
+
+    private void MoveAttributeToScore(string name, int? index)
+    {
+        foreach (var assessment in ClassAssessment.Assessments)
+        {
+            var attr = assessment.Attributes.FirstOrDefault(a => a.Name == name && a.Index == index);
+            if (attr == null) continue;
+            assessment.Attributes.Remove(attr);
+            // The row VM's G4 guard ensures every value parses; the defensive fallback
+            // silently drops a value that doesn't (unreachable in practice).
+            if (double.TryParse(attr.Value,
+                                System.Globalization.NumberStyles.Float | System.Globalization.NumberStyles.AllowThousands,
+                                System.Globalization.CultureInfo.InvariantCulture,
+                                out var v))
+            {
+                assessment.Scores.Add(new Score(name, index, v, attr.Comment));
+            }
+        }
+    }
+
+    /// <summary>
     /// If <see cref="ClassAssessment.ScoreSelections"/> is empty (fresh .xlsx load or v1 .dots load
     /// that pre-dates the selections feature), populate it via
     /// <see cref="ScoreSelectionDefaults.GenerateDefaults"/> and recompute every student's
@@ -1474,6 +1540,12 @@ public partial class MainWindowViewModel : ViewModelBase
         var oldAggregateKeys = BuildAggregateKeySet(ClassAssessment.ScoreSelections);
         var newAggregateKeys = BuildAggregateKeySet(newSelections);
         var aggregateSetChanged = !oldAggregateKeys.SetEquals(newAggregateKeys);
+
+        // Move per-student data between Scores and Attributes for any column whose
+        // Type changed (slice 2 of ADR-0013). Must run BEFORE ClassAssessment.ScoreSelections
+        // is reassigned and BEFORE RecalculateAggregate, so the subsequent aggregate sum sees
+        // the post-move shape.
+        ApplyTypeTransitions(ClassAssessment.ScoreSelections, newSelections);
 
         ClassAssessment.ScoreSelections = newSelections;
 

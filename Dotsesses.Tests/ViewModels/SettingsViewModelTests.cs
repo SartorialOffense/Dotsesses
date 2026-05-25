@@ -347,4 +347,110 @@ public class SettingsViewModelTests
         vm.Rows[2].Aggregate = false;
         Assert.True(vm.Rows[2].Aggregate);
     }
+
+    // ===== Slice 2 — Type column =====
+
+    private static IReadOnlyList<ScoreSelection> MakeMixedInput()
+    {
+        // Two Numeric Aggregate-on rows, one Categorical (Display=true), one locked Total.
+        return new List<ScoreSelection>
+        {
+            new("Q#", 1, ScoreColumnType.Numeric, Display: true, Aggregate: true, Correlation: true),
+            new("Q#", 2, ScoreColumnType.Numeric, Display: true, Aggregate: true, Correlation: true),
+            new("Submitted Outline", null, ScoreColumnType.Categorical, Display: true, Aggregate: false, Correlation: false),
+            new("Total", null, ScoreColumnType.Numeric, Display: true, Aggregate: false, Correlation: false),
+        };
+    }
+
+    [Fact]
+    public void ExecuteApply_IncludesTypeInSnapshot()
+    {
+        var (vm, captures) = MakeVm(MakeMixedInput());
+
+        vm.ApplyCommand.Execute(null);
+
+        Assert.Single(captures);
+        var snapshot = captures[0];
+        Assert.Equal(ScoreColumnType.Numeric, snapshot.First(s => s.Name == "Q#" && s.Index == 1).Type);
+        Assert.Equal(ScoreColumnType.Categorical, snapshot.First(s => s.Name == "Submitted Outline").Type);
+    }
+
+    [Fact]
+    public void SetAllDisplay_SkipsCategoricalRows()
+    {
+        var (vm, _) = MakeVm(MakeMixedInput());
+
+        vm.DisplayNoneCommand.Execute(null);
+
+        Assert.False(vm.Rows[0].Display); // Numeric
+        Assert.False(vm.Rows[1].Display); // Numeric
+        Assert.True(vm.Rows[2].Display);  // Categorical — untouched
+    }
+
+    [Fact]
+    public void SetAllCorrelation_SkipsCategoricalRows()
+    {
+        var (vm, _) = MakeVm(MakeMixedInput());
+
+        vm.CorrelationAllCommand.Execute(null);
+
+        Assert.True(vm.Rows[0].Correlation);
+        Assert.True(vm.Rows[1].Correlation);
+        Assert.False(vm.Rows[2].Correlation); // Categorical — untouched
+    }
+
+    [Fact]
+    public void SetAllAggregate_SkipsCategoricalRows()
+    {
+        var (vm, _) = MakeVm(MakeMixedInput());
+        // Pre-clear Aggregate on the Numeric rows so we can observe AggregateAll re-enabling them.
+        vm.Rows[0].Aggregate = false;
+
+        vm.AggregateAllCommand.Execute(null);
+
+        Assert.True(vm.Rows[0].Aggregate);
+        Assert.True(vm.Rows[1].Aggregate);
+        Assert.False(vm.Rows[2].Aggregate); // Categorical — untouched
+        Assert.False(vm.Rows[3].Aggregate); // Total locked
+    }
+
+    [Fact]
+    public void LastAggregateGuard_CountsOnlyNumericRows()
+    {
+        // A Categorical row with Aggregate=true (defensive — shouldn't happen in practice)
+        // must not count toward the last-Aggregate guard. With one Numeric Aggregate row
+        // and one Categorical Aggregate row, clearing the Numeric one would empty the set
+        // → must be rejected.
+        var input = new List<ScoreSelection>
+        {
+            new("Num", null, ScoreColumnType.Numeric, Display: true, Aggregate: true, Correlation: false),
+            new("Cat", null, ScoreColumnType.Categorical, Display: true, Aggregate: true, Correlation: false),
+        };
+        var (vm, _) = MakeVm(input);
+
+        vm.Rows[0].Aggregate = false;
+
+        Assert.True(vm.Rows[0].Aggregate);
+    }
+
+    [Fact]
+    public void RowVM_CategoricalToNumeric_HonorsInjectedValidator()
+    {
+        // SettingsViewModel passes the per-row closure that calls back into the
+        // canSwitchToNumeric predicate. Demonstrate end-to-end: a column whose
+        // predicate returns false cannot be flipped Categorical → Numeric.
+        var input = new List<ScoreSelection>
+        {
+            new("Mid-Term", null, ScoreColumnType.Categorical, Display: true, Aggregate: false, Correlation: false),
+            new("Q", null, ScoreColumnType.Numeric, Display: true, Aggregate: true, Correlation: true),
+        };
+        var captures = new List<IReadOnlyList<ScoreSelection>>();
+        var vm = new SettingsViewModel(input,
+            list => captures.Add(list),
+            canSwitchToNumeric: (name, idx) => name != "Mid-Term");
+
+        vm.Rows[0].Type = ScoreColumnType.Numeric;
+
+        Assert.Equal(ScoreColumnType.Categorical, vm.Rows[0].Type);
+    }
 }

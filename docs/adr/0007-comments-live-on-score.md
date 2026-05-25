@@ -25,3 +25,13 @@ to *that* score component on hover.
   user is hovering, not a generic Student comment.
 - `StudentAssessment` has no `Comment` property — drift in any older
   doc referring to one should be corrected.
+
+## Extension — comments on StudentAttribute (ADR-0013 slice 2)
+
+`StudentAttribute` gained an optional `Comment` field so that
+per-cell comments survive a `Numeric ↔ Categorical` type conversion in
+Settings. The contract above is unchanged: comments remain
+*per-column-per-student* data, never a single per-Student field. The
+extension is symmetric — `Score.Comment` and `StudentAttribute.Comment`
+both store the same kind of per-cell note, and they round-trip across
+type conversions.

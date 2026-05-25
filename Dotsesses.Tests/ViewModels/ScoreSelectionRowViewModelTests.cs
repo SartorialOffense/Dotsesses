@@ -187,4 +187,107 @@ public class ScoreSelectionRowViewModelTests
         Assert.True(selection.Aggregate);
         Assert.True(selection.Correlation);
     }
+
+    // ===== Slice 2 — Type guards =====
+
+    [Fact]
+    public void Type_SetToCategorical_FlipsIsNumericFalse()
+    {
+        var selection = MakeSelection("Mid-Term", null, aggregate: false);
+        var vm = new ScoreSelectionRowViewModel(selection, () => true);
+        Assert.True(vm.IsNumeric);
+
+        vm.Type = ScoreColumnType.Categorical;
+
+        Assert.Equal(ScoreColumnType.Categorical, vm.Type);
+        Assert.False(vm.IsNumeric);
+        Assert.False(vm.IsAggregateEditable);
+    }
+
+    [Fact]
+    public void Type_OnTotalRow_AlwaysRejected()
+    {
+        // G2-type: Total stays Numeric — it's either the spreadsheet's pre-summed
+        // Total or our synthesized aggregate mirror, both numeric by definition.
+        var selection = MakeSelection("Total", null, aggregate: false);
+        var vm = new ScoreSelectionRowViewModel(selection, () => true);
+
+        vm.Type = ScoreColumnType.Categorical;
+
+        Assert.Equal(ScoreColumnType.Numeric, vm.Type);
+    }
+
+    [Fact]
+    public void Type_NumericToCategorical_WhenLastAggregate_Rejected()
+    {
+        // G3: converting an Aggregate=true Numeric row would empty the aggregate set
+        // if it's the last Aggregate row. Reject silently.
+        var selection = MakeSelection("Q#", 1, aggregate: true);
+        var vm = new ScoreSelectionRowViewModel(selection, canClearAggregate: () => false);
+        var fires = 0;
+        vm.PropertyChanged += (_, _) => fires++;
+
+        vm.Type = ScoreColumnType.Categorical;
+
+        Assert.Equal(ScoreColumnType.Numeric, vm.Type);
+        Assert.Equal(0, fires);
+    }
+
+    [Fact]
+    public void Type_NumericToCategorical_WhenAggregateFalse_AcceptedEvenIfLast()
+    {
+        // G3 is keyed to Aggregate=true. A non-aggregate Numeric row flipping to
+        // Categorical never empties the aggregate set, so the canClearAggregate
+        // closure is irrelevant — accept regardless.
+        var selection = MakeSelection("Notes", null, aggregate: false);
+        var vm = new ScoreSelectionRowViewModel(selection, canClearAggregate: () => false);
+
+        vm.Type = ScoreColumnType.Categorical;
+
+        Assert.Equal(ScoreColumnType.Categorical, vm.Type);
+    }
+
+    [Fact]
+    public void Type_CategoricalToNumeric_WhenAllParse_Accepted()
+    {
+        var selection = MakeSelection("Numeric strings", null, type: ScoreColumnType.Categorical, aggregate: false);
+        var vm = new ScoreSelectionRowViewModel(
+            selection,
+            canClearAggregate: () => true,
+            canSwitchToNumeric: () => true);
+
+        vm.Type = ScoreColumnType.Numeric;
+
+        Assert.Equal(ScoreColumnType.Numeric, vm.Type);
+    }
+
+    [Fact]
+    public void Type_CategoricalToNumeric_WhenSomeValuesDoNotParse_RejectedSilently()
+    {
+        // G4: validator says no parse → silent rejection, no PropertyChanged fires
+        // (mirrors RejectedAggregateClear_DoesNotFlipIsDirty contract).
+        var selection = MakeSelection("Mid-Term", null, type: ScoreColumnType.Categorical, aggregate: false);
+        var vm = new ScoreSelectionRowViewModel(
+            selection,
+            canClearAggregate: () => true,
+            canSwitchToNumeric: () => false);
+        var fires = 0;
+        vm.PropertyChanged += (_, _) => fires++;
+
+        vm.Type = ScoreColumnType.Numeric;
+
+        Assert.Equal(ScoreColumnType.Categorical, vm.Type);
+        Assert.Equal(0, fires);
+    }
+
+    [Fact]
+    public void ToScoreSelection_RoundTripsType()
+    {
+        var selection = MakeSelection("Mid-Term", null, type: ScoreColumnType.Categorical, aggregate: false);
+        var vm = new ScoreSelectionRowViewModel(selection, () => true);
+
+        var snapshot = vm.ToScoreSelection();
+
+        Assert.Equal(ScoreColumnType.Categorical, snapshot.Type);
+    }
 }

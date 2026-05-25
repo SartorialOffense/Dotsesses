@@ -224,23 +224,46 @@ dotplot and the violin plot. Collapses to a rotated "Size" label.
 Modeless dialog (single-instance, owner = MainWindow) launched from
 the toolbar, the application menu, or `Cmd+,`. Contains a sectioned
 surface designed to grow; the only category today is **Score
-Selection** — a table with one row per Score column and three
-checkbox columns: **Display**, **Aggregate**, **Correlation**, plus
-per-column All/None toggles in the header.
+Selection** — a table with one row per column and four control
+columns: **Type** (Numeric / Categorical combobox), **Display**,
+**Aggregate**, and **Correlation**. The three checkboxes have per-
+column All/None toggles in the header; Type does not (bulk-flipping
+column kinds is almost certainly user error).
+
+When a row's Type is **Categorical**, the three checkboxes disable —
+those flags are meaningless for categorical columns (the data lives in
+StudentAttributes and bypasses the violin / correlation / aggregate
+paths). The bulk All/None commands skip Categorical rows for the same
+reason.
+
+Switching a column's Type on Apply moves its per-student data:
+
+- **Numeric → Categorical**: each `Score.Value` is stringified
+  (invariant-culture round-trip format) into a new
+  `StudentAttribute.Value`; any existing `Score.Comment` is preserved
+  into `StudentAttribute.Comment`. If the column was part of the
+  AggregateScore, the cursors are re-seeded per ADR-0005.
+- **Categorical → Numeric**: each `StudentAttribute.Value` is parsed
+  as a `double`; `Comment` is preserved. Display / Aggregate /
+  Correlation default off until the user re-enables them.
 
 Dialog buttons: **Apply** (commit pending toggles, recompute, dialog
 stays open) and a second button whose label is **Cancel** while there
 are unapplied changes and **Close** when the dialog is in sync. See
-ADR-0003 (recompute timing) and the broader Settings decisions in
-`docs/adr/`.
+ADR-0003 (recompute timing), ADR-0013 (Type discriminator + Apply-time
+conversion), and the broader Settings decisions in `docs/adr/`.
 
 Structural guards on the Score Selection table:
 
 - The "Total" Score (if present in the loaded data) appears as a row
   with its **Aggregate** checkbox locked off — Total is a derived
-  output, not an input.
+  output, not an input. **Total's Type is also locked** to Numeric.
 - The user cannot un-check the last remaining **Aggregate** checkbox —
   AggregateScore must always be defined by at least one Score.
+- The user cannot flip the last Aggregate-on Numeric row to
+  Categorical (parallels the last-Aggregate-clear guard).
+- The Categorical → Numeric Type switch is rejected when not every
+  stored `StudentAttribute.Value` parses as a number.
 
 ## Persistence
 

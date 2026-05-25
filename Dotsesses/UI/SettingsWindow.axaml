@@ -18,14 +18,23 @@
                     <!-- Header row: column titles + per-column All/None bulk-toggle buttons.
                          Column widths must match the row DataTemplate's columns below. -->
                     <Grid Grid.Row="0"
-                          ColumnDefinitions="*,100,100,100"
+                          ColumnDefinitions="*,130,100,100,100"
                           Margin="0,0,0,8">
                         <TextBlock Grid.Column="0"
                                    Text="Score"
                                    FontWeight="SemiBold"
                                    VerticalAlignment="Center"/>
 
-                        <StackPanel Grid.Column="1"
+                        <!-- Type column: no All/None bulk toggle — bulk-flipping type
+                             is almost certainly user error and silently moves data
+                             between Scores / Attributes lists. -->
+                        <TextBlock Grid.Column="1"
+                                   Text="Type"
+                                   FontWeight="SemiBold"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+
+                        <StackPanel Grid.Column="2"
                                     Orientation="Vertical"
                                     HorizontalAlignment="Center">
                             <TextBlock Text="Display"
@@ -47,7 +56,7 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <StackPanel Grid.Column="2"
+                        <StackPanel Grid.Column="3"
                                     Orientation="Vertical"
                                     HorizontalAlignment="Center">
                             <TextBlock Text="Aggregate"
@@ -71,7 +80,7 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <StackPanel Grid.Column="3"
+                        <StackPanel Grid.Column="4"
                                     Orientation="Vertical"
                                     HorizontalAlignment="Center">
                             <TextBlock Text="Correlation"
@@ -94,28 +103,42 @@
                         </StackPanel>
                     </Grid>
 
-                    <!-- Data rows. Per-row checkboxes bind into the row VM directly;
-                         the Aggregate column disables itself for locked (Total) rows
-                         via the IsAggregateLocked-> negated binding. -->
+                    <!-- Data rows. Per-row Type combobox + checkboxes bind into the row VM directly;
+                         the Aggregate column disables itself for locked (Total) rows via the
+                         IsAggregateLocked->negated binding. Display/Aggregate/Correlation
+                         additionally disable when the row is Categorical (those flags don't
+                         apply when the column's data lives in Attributes). -->
                     <ScrollViewer Grid.Row="1">
                         <ItemsControl ItemsSource="{Binding Rows}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ScoreSelectionRowViewModel">
-                                    <Grid ColumnDefinitions="*,100,100,100"
+                                    <Grid ColumnDefinitions="*,130,100,100,100"
                                           Margin="0,2">
                                         <TextBlock Grid.Column="0"
                                                    Text="{Binding DisplayName}"
                                                    VerticalAlignment="Center"/>
-                                        <CheckBox Grid.Column="1"
-                                                  IsChecked="{Binding Display}"
-                                                  HorizontalAlignment="Center"/>
+                                        <ComboBox Grid.Column="1"
+                                                  ItemsSource="{Binding TypeOptions}"
+                                                  SelectedItem="{Binding Type}"
+                                                  IsEnabled="{Binding !IsTypeLocked}"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"
+                                                  MinWidth="120"/>
                                         <CheckBox Grid.Column="2"
-                                                  IsChecked="{Binding Aggregate}"
-                                                  IsEnabled="{Binding !IsAggregateLocked}"
-                                                  HorizontalAlignment="Center"/>
+                                                  IsChecked="{Binding Display}"
+                                                  IsEnabled="{Binding IsNumeric}"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"/>
                                         <CheckBox Grid.Column="3"
+                                                  IsChecked="{Binding Aggregate}"
+                                                  IsEnabled="{Binding IsAggregateEditable}"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"/>
+                                        <CheckBox Grid.Column="4"
                                                   IsChecked="{Binding Correlation}"
-                                                  HorizontalAlignment="Center"/>
+                                                  IsEnabled="{Binding IsNumeric}"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"/>
                                     </Grid>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
