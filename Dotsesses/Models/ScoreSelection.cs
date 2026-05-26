@@ -22,4 +22,5 @@ public enum ScoreColumnType
 /// <param name="Display">Whether this score is shown in the violin plot</param>
 /// <param name="Aggregate">Whether this score contributes to the computed aggregate</param>
 /// <param name="Correlation">Whether this score participates in the correlation matrix</param>
-public record ScoreSelection(string Name, int? Index, ScoreColumnType Type, bool Display, bool Aggregate, bool Correlation);
+/// <param name="Significance">Whether this column participates in the Significance Matrix (Numeric rows / Categorical columns). Unlike the other flags, meaningful for both Types.</param>
+public record ScoreSelection(string Name, int? Index, ScoreColumnType Type, bool Display, bool Aggregate, bool Correlation, bool Significance = true);

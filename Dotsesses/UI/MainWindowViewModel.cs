@@ -102,6 +102,9 @@ public partial class MainWindowViewModel : ViewModelBase
     private CorrelationPlotViewModel? _correlationPlotViewModel;
 
     [ObservableProperty]
+    private SignificancePlotViewModel? _significancePlotViewModel;
+
+    [ObservableProperty]
     private PlotTabContainerViewModel? _plotTabContainerViewModel;
 
     [ObservableProperty]
@@ -195,6 +198,7 @@ public partial class MainWindowViewModel : ViewModelBase
         IMessenger messenger,
         ViolinPlotViewModel violinPlotViewModel,
         CorrelationPlotViewModel correlationPlotViewModel,
+        SignificancePlotViewModel significancePlotViewModel,
         HoverDelayService hoverDelayService,
         StateService stateService,
         WorkspaceFactory workspaceFactory)
@@ -204,12 +208,13 @@ public partial class MainWindowViewModel : ViewModelBase
         _messenger = messenger;
         _violinPlotViewModel = violinPlotViewModel;
         _correlationPlotViewModel = correlationPlotViewModel;
+        _significancePlotViewModel = significancePlotViewModel;
         _hoverDelayService = hoverDelayService;
         _stateService = stateService;
         _workspaceFactory = workspaceFactory;
 
         // Create the tab container ViewModel
-        _plotTabContainerViewModel = new PlotTabContainerViewModel(violinPlotViewModel, correlationPlotViewModel);
+        _plotTabContainerViewModel = new PlotTabContainerViewModel(violinPlotViewModel, correlationPlotViewModel, significancePlotViewModel);
 
         Log("MainWindowViewModel: Creating calculators");
         _cutoffCountCalculator = new CutoffCountCalculator();
@@ -266,6 +271,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         return new MainWindowViewModel(
             new WeakReferenceMessenger(),
+            null!,
             null!,
             null!,
             new HoverDelayService(),
@@ -375,6 +381,56 @@ public partial class MainWindowViewModel : ViewModelBase
     /// <see cref="ClassAssessment.ScoreSelections"/> is empty, every score on the first student passes
     /// through unchanged — this preserves pre-S04 behavior on datasets that have not been seeded.
     /// </summary>
+    /// <summary>
+    /// Builds the (Name, {studentId → subgroup}) series payload for the Significance
+    /// Matrix's categorical axis. Iterates each <see cref="StudentAssessment.Attributes"/>
+    /// list, filters by the supplied selector (typically
+    /// <c>s =&gt; s.Significance &amp;&amp; s.Type == ScoreColumnType.Categorical</c>).
+    /// Student IDs are formatted as "S001" / "S002" / … to match the
+    /// <see cref="BuildSeriesData"/> convention so the two builders can share
+    /// downstream join logic.
+    /// </summary>
+    public static List<(string SeriesName, Dictionary<string, string> Subgroups)> BuildCategoricalSeriesData(
+        ClassAssessment classAssessment,
+        Func<ScoreSelection, bool> selector)
+    {
+        ArgumentNullException.ThrowIfNull(classAssessment);
+        ArgumentNullException.ThrowIfNull(selector);
+
+        var hasSelections = classAssessment.ScoreSelections.Count > 0;
+        var keySet = classAssessment.ScoreSelections
+            .Where(selector)
+            .Select(s => (s.Name, s.Index))
+            .ToHashSet();
+
+        var result = new List<(string SeriesName, Dictionary<string, string> Subgroups)>();
+        if (!classAssessment.Assessments.Any()) return result;
+
+        // Categorical column identity = (Name, Index). Walk Attributes lists from
+        // every student to collect the columns. The first student's Attributes list
+        // is the canonical column order — newer slice-2 conversions append, so
+        // first-student-iteration is consistent with the user's import/conversion
+        // order.
+        var firstStudent = classAssessment.Assessments.First();
+        foreach (var attr in firstStudent.Attributes)
+        {
+            if (hasSelections && !keySet.Contains((attr.Name, attr.Index))) continue;
+            var seriesName = attr.Index.HasValue ? $"{attr.Name} {attr.Index}" : attr.Name;
+            var subgroups = new Dictionary<string, string>();
+            foreach (var assessment in classAssessment.Assessments)
+            {
+                var studentAttr = assessment.Attributes.FirstOrDefault(a =>
+                    a.Name == attr.Name && a.Index == attr.Index);
+                if (studentAttr != null)
+                {
+                    subgroups[$"S{assessment.Id:D3}"] = studentAttr.Value;
+                }
+            }
+            result.Add((seriesName, subgroups));
+        }
+        return result;
+    }
+
     public static List<(string SeriesName, Dictionary<string, double> Scores)> BuildSeriesData(
         ClassAssessment classAssessment,
         Func<ScoreSelection, bool> selector)
@@ -514,6 +570,46 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 Log($"MainWindowViewModel: Correlation plot init failed: {ex}");
                 _messenger.Send(new Messages.PlotInitErrorMessage("Correlation matrix", ex.Message));
+            }
+        });
+    }
+
+    /// <summary>
+    /// Initializes the Significance Matrix plot asynchronously after the UI is loaded
+    /// (mirrors <see cref="InitializeViolinPlotAsync"/> / <see cref="InitializeCorrelationPlotAsync"/>).
+    /// Numeric rows AND Categorical columns are independently filtered by
+    /// <see cref="ScoreSelection.Significance"/>; an empty filter produces an empty matrix
+    /// (see ADR-0014).
+    /// </summary>
+    public void InitializeSignificanceMatrixAsync()
+    {
+        Log("MainWindowViewModel: Starting async Significance Matrix initialization");
+        Task.Run(async () =>
+        {
+            try
+            {
+                if (SignificancePlotViewModel == null)
+                {
+                    Log("MainWindowViewModel: SignificancePlotViewModel is null, skipping");
+                    return;
+                }
+
+                var numericSeries = BuildSeriesData(ClassAssessment,
+                    s => s.Significance && s.Type == ScoreColumnType.Numeric);
+                var categoricalSeries = BuildCategoricalSeriesData(ClassAssessment,
+                    s => s.Significance && s.Type == ScoreColumnType.Categorical);
+
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    SignificancePlotViewModel.UpdateDataAndRegenerate(numericSeries, categoricalSeries, 5.0);
+                });
+
+                Log("MainWindowViewModel: Significance Matrix initialization completed");
+            }
+            catch (Exception ex)
+            {
+                Log($"MainWindowViewModel: Significance Matrix init failed: {ex}");
+                _messenger.Send(new Messages.PlotInitErrorMessage("Significance matrix", ex.Message));
             }
         });
     }
@@ -1589,10 +1685,11 @@ public partial class MainWindowViewModel : ViewModelBase
         // change notification when OnPropertyChanged is invoked explicitly.
         OnPropertyChanged(nameof(DotplotModel));
 
-        // Fire-and-forget: violin/correlation regen runs on a background task internally
-        // (T03 will make these methods filter their seriesData by Display/Correlation).
+        // Fire-and-forget: violin/correlation/significance regen runs on background tasks internally.
+        // Each filters its own slice of ScoreSelections (Display / Correlation / Significance).
         InitializeViolinPlotAsync();
         InitializeCorrelationPlotAsync();
+        InitializeSignificanceMatrixAsync();
 
         HasUnsavedChanges = true;
 

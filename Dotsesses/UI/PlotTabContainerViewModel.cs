@@ -4,7 +4,8 @@ using CommunityToolkit.Mvvm.Input;
 namespace Dotsesses.UI;
 
 /// <summary>
-/// ViewModel for the tabbed container holding violin and correlation plots.
+/// ViewModel for the tabbed container holding the plot views (violin,
+/// correlation, significance).
 /// </summary>
 public partial class PlotTabContainerViewModel : ViewModelBase
 {
@@ -15,17 +16,25 @@ public partial class PlotTabContainerViewModel : ViewModelBase
     private CorrelationPlotViewModel _correlationPlotViewModel;
 
     [ObservableProperty]
+    private SignificancePlotViewModel _significancePlotViewModel;
+
+    [ObservableProperty]
     private bool _isViolinSelected = true;
 
     [ObservableProperty]
     private bool _isCorrelationSelected = false;
 
+    [ObservableProperty]
+    private bool _isSignificanceSelected = false;
+
     public PlotTabContainerViewModel(
         ViolinPlotViewModel violinPlotViewModel,
-        CorrelationPlotViewModel correlationPlotViewModel)
+        CorrelationPlotViewModel correlationPlotViewModel,
+        SignificancePlotViewModel significancePlotViewModel)
     {
         _violinPlotViewModel = violinPlotViewModel;
         _correlationPlotViewModel = correlationPlotViewModel;
+        _significancePlotViewModel = significancePlotViewModel;
     }
 
     [RelayCommand]
@@ -33,6 +42,7 @@ public partial class PlotTabContainerViewModel : ViewModelBase
     {
         IsViolinSelected = true;
         IsCorrelationSelected = false;
+        IsSignificanceSelected = false;
     }
 
     [RelayCommand]
@@ -40,5 +50,14 @@ public partial class PlotTabContainerViewModel : ViewModelBase
     {
         IsViolinSelected = false;
         IsCorrelationSelected = true;
+        IsSignificanceSelected = false;
+    }
+
+    [RelayCommand]
+    private void SelectSignificance()
+    {
+        IsViolinSelected = false;
+        IsCorrelationSelected = false;
+        IsSignificanceSelected = true;
     }
 }

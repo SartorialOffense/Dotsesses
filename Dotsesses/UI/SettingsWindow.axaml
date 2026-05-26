@@ -4,8 +4,8 @@
         x:Class="Dotsesses.UI.SettingsWindow"
         x:DataType="vm:SettingsViewModel"
         Title="Settings"
-        Width="600" Height="500"
-        MinWidth="480" MinHeight="360"
+        Width="720" Height="500"
+        MinWidth="600" MinHeight="360"
         WindowStartupLocation="CenterOwner"
         CanResize="True">
     <Grid RowDefinitions="*,Auto" Margin="20">
@@ -18,7 +18,7 @@
                     <!-- Header row: column titles + per-column All/None bulk-toggle buttons.
                          Column widths must match the row DataTemplate's columns below. -->
                     <Grid Grid.Row="0"
-                          ColumnDefinitions="*,130,100,100,100"
+                          ColumnDefinitions="*,130,100,100,100,100"
                           Margin="0,0,0,8">
                         <TextBlock Grid.Column="0"
                                    Text="Score"
@@ -101,6 +101,28 @@
                                         FontSize="10"/>
                             </StackPanel>
                         </StackPanel>
+
+                        <StackPanel Grid.Column="5"
+                                    Orientation="Vertical"
+                                    HorizontalAlignment="Center">
+                            <TextBlock Text="Significance"
+                                       FontWeight="SemiBold"
+                                       HorizontalAlignment="Center"/>
+                            <!-- Special-case: tiny column-header bulk-toggle buttons, intentionally compact. Inline styling preserved. -->
+                            <StackPanel Orientation="Horizontal"
+                                        Spacing="4"
+                                        HorizontalAlignment="Center"
+                                        Margin="0,4,0,0">
+                                <Button Content="All"
+                                        Command="{Binding SignificanceAllCommand}"
+                                        Padding="6,2"
+                                        FontSize="10"/>
+                                <Button Content="None"
+                                        Command="{Binding SignificanceNoneCommand}"
+                                        Padding="6,2"
+                                        FontSize="10"/>
+                            </StackPanel>
+                        </StackPanel>
                     </Grid>
 
                     <!-- Data rows. Per-row Type combobox + checkboxes bind into the row VM directly;
@@ -112,7 +134,7 @@
                         <ItemsControl ItemsSource="{Binding Rows}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ScoreSelectionRowViewModel">
-                                    <Grid ColumnDefinitions="*,130,100,100,100"
+                                    <Grid ColumnDefinitions="*,130,100,100,100,100"
                                           Margin="0,2">
                                         <TextBlock Grid.Column="0"
                                                    Text="{Binding DisplayName}"
@@ -137,6 +159,10 @@
                                         <CheckBox Grid.Column="4"
                                                   IsChecked="{Binding Correlation}"
                                                   IsEnabled="{Binding IsNumeric}"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"/>
+                                        <CheckBox Grid.Column="5"
+                                                  IsChecked="{Binding Significance}"
                                                   HorizontalAlignment="Center"
                                                   VerticalAlignment="Center"/>
                                     </Grid>

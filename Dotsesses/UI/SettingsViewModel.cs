@@ -95,6 +95,10 @@ public sealed class SettingsViewModel : ViewModelBase
     /// </summary>
     public IRelayCommand AggregateNoneCommand { get; }
 
+    public IRelayCommand SignificanceAllCommand { get; }
+
+    public IRelayCommand SignificanceNoneCommand { get; }
+
     public SettingsViewModel(
         IReadOnlyList<ScoreSelection> initialSelections,
         Action<IReadOnlyList<ScoreSelection>> onApply,
@@ -144,6 +148,9 @@ public sealed class SettingsViewModel : ViewModelBase
         AggregateNoneCommand = new RelayCommand(
             execute: () => { /* no-op; permanently disabled */ },
             canExecute: () => false);
+
+        SignificanceAllCommand = new RelayCommand(() => SetAllSignificance(true));
+        SignificanceNoneCommand = new RelayCommand(() => SetAllSignificance(false));
     }
 
     private void ExecuteApply()
@@ -151,7 +158,7 @@ public sealed class SettingsViewModel : ViewModelBase
         // Reconstruct fresh records in row (= input) order so the callback receives
         // an independent snapshot the caller can persist or feed downstream.
         var snapshot = Rows
-            .Select(r => new ScoreSelection(r.Name, r.Index, r.Type, r.Display, r.Aggregate, r.Correlation))
+            .Select(r => new ScoreSelection(r.Name, r.Index, r.Type, r.Display, r.Aggregate, r.Correlation, r.Significance))
             .ToList();
         _onApply(snapshot);
 
@@ -196,6 +203,17 @@ public sealed class SettingsViewModel : ViewModelBase
             if (row.IsAggregateLocked) continue;
             if (!row.IsNumeric) continue;
             row.Aggregate = true;
+        }
+    }
+
+    private void SetAllSignificance(bool value)
+    {
+        // Significance is the only flag that's meaningful on both Numeric AND Categorical
+        // rows (Numeric → matrix row; Categorical → matrix column). Apply to every row.
+        // No locked-Total or last-row guard — an empty matrix is a fine degenerate state.
+        foreach (var row in Rows)
+        {
+            row.Significance = value;
         }
     }
 }

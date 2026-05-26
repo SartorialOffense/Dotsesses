@@ -604,6 +604,75 @@ public class MainWindowViewModelTests
         Assert.DoesNotContain(firstStudent.Attributes, a => a.Name == flipName);
     }
 
+    // ===== Slice 3 — BuildCategoricalSeriesData / Significance filter =====
+
+    [Fact]
+    public void BuildCategoricalSeriesData_ReadsFromAttributesNotScores()
+    {
+        // Construct a ClassAssessment with one Attribute column and verify the
+        // builder pulls from Attributes (not Scores).
+        var students = new List<StudentAssessment>
+        {
+            new(1,
+                new List<Score> { new("Q", null, 80) },
+                new List<StudentAttribute> { new("Hat", null, "Yes") },
+                "muppet1"),
+            new(2,
+                new List<Score> { new("Q", null, 70) },
+                new List<StudentAttribute> { new("Hat", null, "No") },
+                "muppet2"),
+        };
+        var ca = new ClassAssessment(
+            students,
+            new List<CutoffCountRange>(),
+            new Dictionary<int, MuppetNameInfo>(),
+            new Dictionary<string, string>());
+        ca.ScoreSelections = new List<ScoreSelection>
+        {
+            new("Hat", null, ScoreColumnType.Categorical, Display: true, Aggregate: false, Correlation: false, Significance: true),
+        };
+
+        var result = MainWindowViewModel.BuildCategoricalSeriesData(ca,
+            s => s.Significance && s.Type == ScoreColumnType.Categorical);
+
+        Assert.Single(result);
+        Assert.Equal("Hat", result[0].SeriesName);
+        Assert.Equal("Yes", result[0].Subgroups["S001"]);
+        Assert.Equal("No", result[0].Subgroups["S002"]);
+    }
+
+    [Fact]
+    public void BuildCategoricalSeriesData_OnlyIncludesSignificantCategoricals()
+    {
+        var students = new List<StudentAssessment>
+        {
+            new(1,
+                new List<Score>(),
+                new List<StudentAttribute>
+                {
+                    new("Hat", null, "Yes"),
+                    new("Outline", null, "Yes"),
+                },
+                ""),
+        };
+        var ca = new ClassAssessment(
+            students,
+            new List<CutoffCountRange>(),
+            new Dictionary<int, MuppetNameInfo>(),
+            new Dictionary<string, string>());
+        ca.ScoreSelections = new List<ScoreSelection>
+        {
+            new("Hat", null, ScoreColumnType.Categorical, Display: true, Aggregate: false, Correlation: false, Significance: true),
+            new("Outline", null, ScoreColumnType.Categorical, Display: true, Aggregate: false, Correlation: false, Significance: false),
+        };
+
+        var result = MainWindowViewModel.BuildCategoricalSeriesData(ca,
+            s => s.Significance && s.Type == ScoreColumnType.Categorical);
+
+        Assert.Single(result);
+        Assert.Equal("Hat", result[0].SeriesName);
+    }
+
     [Fact]
     public void ApplyScoreSelections_CategoricalToNumeric_PreservesAttributeComment()
     {

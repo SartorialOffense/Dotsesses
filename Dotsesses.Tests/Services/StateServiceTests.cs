@@ -74,7 +74,7 @@ public class StateServiceTests : IDisposable
 
         // Assert
         Assert.NotNull(loadedState);
-        Assert.Equal(3, loadedState.Version);
+        Assert.Equal(4, loadedState.Version);
         Assert.Equal("original_source.xlsx", loadedState.SourceFile);
         Assert.Equal(2, loadedState.Students.Count);
         // Slots are A, B, C (post-#18 fix: catch-all is F, lowest in
@@ -210,12 +210,12 @@ public class StateServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveAsync_WritesVersion3()
+    public async Task SaveAsync_WritesVersion4()
     {
-        var filePath = Path.Combine(_testDirectory, "v3_check.json");
+        var filePath = Path.Combine(_testDirectory, "v4_check.json");
         await _stateService.SaveAsync(filePath, CreateTestStudents(), TestFixtures.SessionForGrading(), Array.Empty<ScoreSelection>());
         var json = await File.ReadAllTextAsync(filePath);
-        Assert.Contains("\"version\": 3", json);
+        Assert.Contains("\"version\": 4", json);
     }
 
     [Fact]
@@ -277,6 +277,53 @@ public class StateServiceTests : IDisposable
         var attr = round.Single().Attributes.Single();
         Assert.Equal("Yes", attr.Value);
         Assert.Equal("explanatory note", attr.Comment);
+    }
+
+    [Fact]
+    public async Task RoundTrip_PreservesSignificance()
+    {
+        var filePath = Path.Combine(_testDirectory, "significance_roundtrip.json");
+        var originalSelections = new List<ScoreSelection>
+        {
+            new("Q", 1, ScoreColumnType.Numeric, Display: true, Aggregate: true, Correlation: true, Significance: true),
+            new("Cat", null, ScoreColumnType.Categorical, Display: true, Aggregate: false, Correlation: false, Significance: false),
+        };
+        await _stateService.SaveAsync(filePath, CreateTestStudents(), TestFixtures.SessionForGrading(), originalSelections);
+
+        var converted = _stateService.ConvertToScoreSelections(await _stateService.LoadAsync(filePath));
+
+        Assert.True(converted.First(s => s.Name == "Q").Significance);
+        Assert.False(converted.First(s => s.Name == "Cat").Significance);
+    }
+
+    [Fact]
+    public async Task LoadAsync_V3File_DefaultsSignificanceToTrue()
+    {
+        // Slice 3 / ADR-0014: v3 files pre-date the Significance field, so the loader
+        // fills in Significance=true (so the new Significance Matrix isn't blank on
+        // first load of an existing project file).
+        var filePath = Path.Combine(_testDirectory, "v3.dots");
+        // type encoded as the integer enum value (0=Numeric, 1=Categorical) — same
+        // convention as the live SaveAsync output (no string-enum converter is configured).
+        var v3Content = """
+            {
+              "version": 3,
+              "savedAt": "2024-01-01T00:00:00Z",
+              "students": [],
+              "cursors": [],
+              "scoreSelections": [
+                { "name": "Q", "index": 1, "type": 0, "display": true, "aggregate": true, "correlation": true },
+                { "name": "Hat", "index": null, "type": 1, "display": true, "aggregate": false, "correlation": false }
+              ]
+            }
+            """;
+        await File.WriteAllTextAsync(filePath, v3Content);
+
+        var loaded = await _stateService.LoadAsync(filePath);
+        var converted = _stateService.ConvertToScoreSelections(loaded);
+
+        Assert.Equal(3, loaded.Version);
+        Assert.All(converted, s => Assert.True(s.Significance));
     }
 
     [Fact]

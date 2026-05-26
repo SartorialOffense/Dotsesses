@@ -28,6 +28,16 @@
                         Classes.selected="{Binding IsCorrelationSelected}">
                     <TextBlock Text="Correlation" />
                 </Button>
+
+                <!-- Separator -->
+                <Border Width="1" Height="16" Background="#333333" Margin="8,0" VerticalAlignment="Center" />
+
+                <!-- Significance Tab -->
+                <Button Command="{Binding SelectSignificanceCommand}"
+                        Classes="tab-button"
+                        Classes.selected="{Binding IsSignificanceSelected}">
+                    <TextBlock Text="Significance" />
+                </Button>
             </StackPanel>
         </Border>
 
@@ -40,6 +50,10 @@
             <!-- Correlation Plot -->
             <vm:CorrelationPlotControl DataContext="{Binding CorrelationPlotViewModel}"
                                        IsVisible="{Binding $parent[UserControl].((vm:PlotTabContainerViewModel)DataContext).IsCorrelationSelected}" />
+
+            <!-- Significance Matrix -->
+            <vm:SignificancePlotControl DataContext="{Binding SignificancePlotViewModel}"
+                                        IsVisible="{Binding $parent[UserControl].((vm:PlotTabContainerViewModel)DataContext).IsSignificanceSelected}" />
         </Grid>
     </Grid>
 

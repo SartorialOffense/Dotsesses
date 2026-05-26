@@ -162,6 +162,27 @@ public class ScoreSelectionDefaultsTests
     }
 
     [Fact]
+    public void GenerateDefaults_SetsSignificanceTrue_OnAllRows()
+    {
+        // Arrange — one Numeric, one Categorical, one Total. All three should
+        // get Significance=true so the Significance Matrix populates on first load.
+        var scores = new List<Score>
+        {
+            new("Q#", 1, 10),
+            new("Total", null, 30)
+        };
+        var attributes = new List<StudentAttribute>
+        {
+            new("Submitted Outline", null, "Yes")
+        };
+
+        var result = ScoreSelectionDefaults.GenerateDefaults(scores, attributes);
+
+        Assert.All(result, s => Assert.True(s.Significance,
+            $"Significance should default true for {s.Name}"));
+    }
+
+    [Fact]
     public void GenerateDefaults_NoAttributes_BehavesLikeOneArgOverload()
     {
         // Arrange — verify the convenience overload (just scores) matches the

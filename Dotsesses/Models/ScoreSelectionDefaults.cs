@@ -37,7 +37,8 @@ public static class ScoreSelectionDefaults
                 Type: ScoreColumnType.Numeric,
                 Display: true,
                 Aggregate: !isTotalColumn,
-                Correlation: true));
+                Correlation: true,
+                Significance: true));
         }
 
         foreach (var attribute in attributes)
@@ -48,7 +49,8 @@ public static class ScoreSelectionDefaults
                 Type: ScoreColumnType.Categorical,
                 Display: true,
                 Aggregate: false,
-                Correlation: false));
+                Correlation: false,
+                Significance: true));
         }
 
         return result;

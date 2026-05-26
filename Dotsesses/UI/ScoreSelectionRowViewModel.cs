@@ -67,6 +67,16 @@ public partial class ScoreSelectionRowViewModel : ViewModelBase
     private bool _correlation;
 
     /// <summary>
+    /// Whether the column participates in the Significance Matrix plot. Unlike the other
+    /// flags, meaningful for both <see cref="ScoreColumnType.Numeric"/> (the column becomes
+    /// a matrix row) and <see cref="ScoreColumnType.Categorical"/> (the column becomes a
+    /// matrix column). No locked-Total or last-row guard — an empty matrix is a fine
+    /// degenerate state.
+    /// </summary>
+    [ObservableProperty]
+    private bool _significance;
+
+    /// <summary>
     /// Aggregate flag for this score. Hand-rolled (not [ObservableProperty]) so the
     /// guards can reject the change without raising PropertyChanged.
     /// </summary>
@@ -173,6 +183,7 @@ public partial class ScoreSelectionRowViewModel : ViewModelBase
         _display = selection.Display;
         _aggregate = selection.Aggregate;
         _correlation = selection.Correlation;
+        _significance = selection.Significance;
         _canClearAggregate = canClearAggregate;
         // Default-allow when no validator is supplied (e.g. row VM unit tests that don't
         // exercise the type-switch path). Production callers always pass a real closure.
@@ -184,5 +195,5 @@ public partial class ScoreSelectionRowViewModel : ViewModelBase
     /// Used by the parent VM at Apply time.
     /// </summary>
     public ScoreSelection ToScoreSelection() =>
-        new(Name, Index, Type, Display, Aggregate, Correlation);
+        new(Name, Index, Type, Display, Aggregate, Correlation, Significance);
 }

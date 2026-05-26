@@ -434,6 +434,57 @@ public class SettingsViewModelTests
     }
 
     [Fact]
+    public void SignificanceAllCommand_SetsAllRowsTrue_OnNumericAndCategorical()
+    {
+        // Slice 3: Significance is meaningful on BOTH Numeric and Categorical rows
+        // (Numeric → matrix row; Categorical → matrix column). Bulk-toggle must
+        // apply to all of them, unlike Display/Aggregate/Correlation which skip
+        // Categorical rows.
+        var input = new List<ScoreSelection>
+        {
+            new("Q#", 1, ScoreColumnType.Numeric,     Display: true, Aggregate: true,  Correlation: true,  Significance: false),
+            new("Cat", null, ScoreColumnType.Categorical, Display: true, Aggregate: false, Correlation: false, Significance: false),
+            new("Total", null, ScoreColumnType.Numeric, Display: true, Aggregate: false, Correlation: false, Significance: false),
+        };
+        var (vm, _) = MakeVm(input);
+
+        vm.SignificanceAllCommand.Execute(null);
+
+        Assert.All(vm.Rows, r => Assert.True(r.Significance));
+    }
+
+    [Fact]
+    public void SignificanceNoneCommand_SetsAllRowsFalse()
+    {
+        var input = new List<ScoreSelection>
+        {
+            new("Q#", 1, ScoreColumnType.Numeric, Display: true, Aggregate: true,  Correlation: true,  Significance: true),
+            new("Cat", null, ScoreColumnType.Categorical, Display: true, Aggregate: false, Correlation: false, Significance: true),
+        };
+        var (vm, _) = MakeVm(input);
+
+        vm.SignificanceNoneCommand.Execute(null);
+
+        Assert.All(vm.Rows, r => Assert.False(r.Significance));
+    }
+
+    [Fact]
+    public void ExecuteApply_IncludesSignificanceInSnapshot()
+    {
+        var input = new List<ScoreSelection>
+        {
+            new("Q", null, ScoreColumnType.Numeric, Display: true, Aggregate: true, Correlation: true, Significance: false),
+        };
+        var (vm, captures) = MakeVm(input);
+
+        vm.Rows[0].Significance = true;
+        vm.ApplyCommand.Execute(null);
+
+        Assert.Single(captures);
+        Assert.True(captures[0][0].Significance);
+    }
+
+    [Fact]
     public void RowVM_CategoricalToNumeric_HonorsInjectedValidator()
     {
         // SettingsViewModel passes the per-row closure that calls back into the

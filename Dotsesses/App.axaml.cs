@@ -344,6 +344,7 @@ public partial class App : Application
         // Stateless Python-interop renderers — shared across all workspaces.
         services.AddSingleton<ViolinPlotService>();
         services.AddSingleton<CorrelationPlotService>();
+        services.AddSingleton<SignificancePlotService>();
 
         // Scoped: one per workspace.
         services.AddScoped<HoverDelayService>();
@@ -362,6 +363,7 @@ public partial class App : Application
         services.AddScoped<MainWindowViewModel>();
         services.AddScoped<ViolinPlotViewModel>();
         services.AddScoped<CorrelationPlotViewModel>();
+        services.AddScoped<SignificancePlotViewModel>();
 
         Log("ConfigureServices: Completed");
     }

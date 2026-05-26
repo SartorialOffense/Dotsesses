@@ -7,7 +7,7 @@ namespace Dotsesses.Models;
 /// </summary>
 public class SavedState
 {
-    public int Version { get; set; } = 3;
+    public int Version { get; set; } = 4;
     public DateTime SavedAt { get; set; }
     public string? SourceFile { get; set; }
     public List<SavedStudent> Students { get; set; } = new();
@@ -73,4 +73,10 @@ public class SavedScoreSelection
     public bool Display { get; set; }
     public bool Aggregate { get; set; }
     public bool Correlation { get; set; }
+    /// <summary>
+    /// Whether the column participates in the Significance Matrix plot.
+    /// Defaults to <c>true</c> so v3 files migrate cleanly per ADR-0002
+    /// (Significance Matrix is a new plot — old files should show it by default).
+    /// </summary>
+    public bool Significance { get; set; } = true;
 }

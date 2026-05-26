@@ -31,8 +31,24 @@ originate from auto-detection at load time (any non-numeric, non-empty
 cell in a column flips the entire column to a StudentAttribute) or, in
 slice 2, from a user converting a numeric Score column to Categorical
 in the Settings dialog. StudentAttributes appear in the Drill-down
-panel's Attributes list but do not contribute to AggregateScore and do
-not appear in the violin plot or correlation matrix.
+panel's Attributes list and as the *columns* of the
+**Significance Matrix**, but do not contribute to AggregateScore and
+do not appear in the violin plot or correlation matrix.
+
+**Subgroup**: The set of Students sharing a particular
+**StudentAttribute** value — e.g. the Students who answered `"Yes"` to
+*Submitted Outline* form one Subgroup. Each cell of the
+**Significance Matrix** plots one dot per Subgroup of the cell's
+categorical column, positioned at (subgroup label, mean of the cell's
+continuous column within that subgroup) with a ±SEM error bar.
+
+**Significance Matrix**: A matrix of small scatter cells — one row per
+Numeric column with `Significance=true`, one column per
+StudentAttribute (Categorical) column with `Significance=true`. Each
+cell answers: "does subgroup membership in this categorical column
+materially shift the average of this numeric column?" v3 of the plot
+is descriptive (mean + SEM dots); a future inferential layer will add
+per-cell p-values. See ADR-0014.
 
 **AggregateScore**: The sum of a Student's Scores whose `(Name, Index)`
 is in the active ScoreSelection aggregate set. Used for x-axis position
@@ -59,12 +75,15 @@ GradeCurve's target ranges. The Compliance panel shows current count vs
 target range per Grade.
 
 **ScoreSelection**: A user-toggleable record per column with a Type
-discriminator (`Numeric` / `Categorical`) plus three booleans —
-Display, Aggregate, Correlation — that determine where the column
-participates. The three booleans are meaningful only when
-`Type == Numeric`; for Categorical columns the data lives in
-StudentAttributes and bypasses the plots entirely. Persisted on
-ClassAssessment (see ADR-0013).
+discriminator (`Numeric` / `Categorical`) plus four booleans —
+Display, Aggregate, Correlation, Significance — that determine where
+the column participates. Display / Aggregate / Correlation are
+meaningful only when `Type == Numeric`; for Categorical columns the
+data lives in StudentAttributes and bypasses the violin / correlation /
+aggregate paths. Significance is meaningful for *both* Types — Numeric
+columns become Significance Matrix rows, Categorical columns become
+Significance Matrix columns. Persisted on ClassAssessment (see
+ADR-0013, ADR-0014).
 
 **ClassAssessment**: The post-load dataset for one Class — the
 StudentAssessments, the GradeCurve in use, ScoreSelections,

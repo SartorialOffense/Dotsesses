@@ -290,4 +290,28 @@ public class ScoreSelectionRowViewModelTests
 
         Assert.Equal(ScoreColumnType.Categorical, snapshot.Type);
     }
+
+    // ===== Slice 3 — Significance flag =====
+
+    [Fact]
+    public void Significance_DefaultsTrue_FromMakeSelection()
+    {
+        // MakeSelection uses ScoreSelection's default Significance=true (positional default).
+        var selection = MakeSelection("Q", 1);
+        var vm = new ScoreSelectionRowViewModel(selection, () => true);
+
+        Assert.True(vm.Significance);
+    }
+
+    [Fact]
+    public void Significance_TogglesAndRoundTrips()
+    {
+        var selection = MakeSelection("Hat", null);
+        var vm = new ScoreSelectionRowViewModel(selection, () => true);
+
+        vm.Significance = false;
+        var snapshot = vm.ToScoreSelection();
+
+        Assert.False(snapshot.Significance);
+    }
 }

@@ -1,0 +1,150 @@
+using System;
+using System.Collections.Generic;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Messaging;
+using Dotsesses.Models;
+using Dotsesses.Services;
+
+namespace Dotsesses.UI;
+
+/// <summary>
+/// ViewModel for the Significance Matrix plot — a matrix of small scatter
+/// cells with one row per Numeric column and one column per Categorical
+/// column. Each cell plots one dot per Subgroup of the column's categorical
+/// column at (subgroup index, mean of numeric value) with a ±SEM error bar.
+///
+/// Unlike <see cref="CorrelationPlotViewModel"/>, this VM has **no cross-view
+/// sync**: the dots represent subgroups (aggregates), not individual
+/// students, so hovering a dot here doesn't highlight anything in the
+/// dotplot/violin, and vice versa. The tooltip on each dot exposes the
+/// subgroup name, mean, SEM, and N — that's the entire interaction model
+/// in slice 3. Future slice 4 will add a per-cell p-value annotation
+/// (see ADR-0014).
+/// </summary>
+public partial class SignificancePlotViewModel : ViewModelBase
+{
+    private readonly SignificancePlotService _service;
+    private readonly IMessenger _messenger;
+    private List<SignificanceDataPoint> _dataPoints = new();
+    private double _svgWidth;
+    private double _svgHeight;
+    private double _displayWidth;
+    private double _displayHeight;
+    private List<(string Name, Dictionary<string, double> Values)> _numericSeries = new();
+    private List<(string Name, Dictionary<string, string> Subgroups)> _categoricalSeries = new();
+    private double _dotSize = 5.0;
+
+    [ObservableProperty]
+    private string? _svgContent;
+
+    /// <summary>
+    /// Scoped messenger for this VM's workspace (see ADR-0012). Exposed for
+    /// the View code-behind even though Significance has no cross-view sync —
+    /// keeping the symmetric shape lets future features (e.g. theme-render
+    /// broadcast) reach this control without a refactor.
+    /// </summary>
+    public IMessenger Messenger => _messenger;
+
+    public SignificancePlotViewModel(
+        SignificancePlotService service,
+        IMessenger messenger)
+    {
+        _service = service;
+        _messenger = messenger;
+    }
+
+    public void GeneratePlot(
+        (double Width, double Height) displaySize,
+        List<(string Name, Dictionary<string, double> Values)> numericSeries,
+        List<(string Name, Dictionary<string, string> Subgroups)> categoricalSeries,
+        double dotSize = 5.0,
+        ThemeName theme = ThemeName.DarkMode)
+    {
+        _numericSeries = numericSeries;
+        _categoricalSeries = categoricalSeries;
+        _dotSize = dotSize;
+        _displayWidth = displaySize.Width;
+        _displayHeight = displaySize.Height;
+
+        const double DPI = 100.0;
+        double widthInches = displaySize.Width / DPI;
+        double heightInches = displaySize.Height / DPI;
+
+        var (svgContent, dataPoints) = _service.GeneratePlot(
+            (widthInches, heightInches),
+            numericSeries,
+            categoricalSeries,
+            dotSize,
+            theme);
+
+        SvgContent = svgContent;
+        _dataPoints = dataPoints;
+        ExtractSvgDimensions(svgContent);
+    }
+
+    public void RegeneratePlot(double displayWidth, double displayHeight, ThemeName theme = ThemeName.DarkMode)
+    {
+        if (_numericSeries.Count == 0 && _categoricalSeries.Count == 0)
+        {
+            return;
+        }
+        GeneratePlot((displayWidth, displayHeight), _numericSeries, _categoricalSeries, _dotSize, theme);
+    }
+
+    public void UpdateDataAndRegenerate(
+        List<(string Name, Dictionary<string, double> Values)> numericSeries,
+        List<(string Name, Dictionary<string, string> Subgroups)> categoricalSeries,
+        double dotSize)
+    {
+        _numericSeries = numericSeries;
+        _categoricalSeries = categoricalSeries;
+        _dotSize = dotSize;
+
+        var displayWidth = _displayWidth > 0 ? _displayWidth : 800;
+        var displayHeight = _displayHeight > 0 ? _displayHeight : 600;
+        GeneratePlot((displayWidth, displayHeight), _numericSeries, _categoricalSeries, _dotSize);
+    }
+
+    public List<SignificanceDataPoint> GetAllPoints() => _dataPoints;
+
+    public (double X, double Y) SvgToDisplayWithSize(double svgX, double svgY, double displayWidth, double displayHeight)
+    {
+        if (_svgWidth == 0 || _svgHeight == 0) return (0, 0);
+        double scaleX = displayWidth / _svgWidth;
+        double scaleY = displayHeight / _svgHeight;
+        return (svgX * scaleX, svgY * scaleY);
+    }
+
+    private void ExtractSvgDimensions(string svgContent)
+    {
+        var viewBoxMatch = System.Text.RegularExpressions.Regex.Match(
+            svgContent,
+            @"viewBox=""[\d\.\-\s]+\s+([\d\.]+)\s+([\d\.]+)""");
+
+        if (viewBoxMatch.Success)
+        {
+            _svgWidth = double.Parse(viewBoxMatch.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+            _svgHeight = double.Parse(viewBoxMatch.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
+        }
+        else
+        {
+            const double DPI = 100.0;
+            _svgWidth = _displayWidth / DPI * 72;
+            _svgHeight = _displayHeight / DPI * 72;
+        }
+    }
+
+    /// <summary>
+    /// Builds the per-dot tooltip text. N=1 collapses to mean only (SEM undefined).
+    /// </summary>
+    public static string BuildTooltip(SignificanceDataPoint p)
+    {
+        if (p.N <= 1)
+        {
+            return $"{p.CategoricalColumn} = {p.Subgroup}   (N = {p.N})\n" +
+                   $"{p.NumericColumn}: {p.Mean:0.##}";
+        }
+        return $"{p.CategoricalColumn} = {p.Subgroup}   (N = {p.N})\n" +
+               $"{p.NumericColumn}: mean {p.Mean:0.##} ± {p.Sem:0.##} (SEM)";
+    }
+}

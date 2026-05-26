@@ -178,6 +178,9 @@ public partial class MainWindow : Window
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] MainWindow: Triggering async correlation plot initialization");
             vm.InitializeCorrelationPlotAsync();
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] MainWindow: Triggering async significance matrix initialization");
+            vm.InitializeSignificanceMatrixAsync();
         }
         else
         {
