@@ -46,9 +46,23 @@ continuous column within that subgroup) with a ±SEM error bar.
 Numeric column with `Significance=true`, one column per
 StudentAttribute (Categorical) column with `Significance=true`. Each
 cell answers: "does subgroup membership in this categorical column
-materially shift the average of this numeric column?" v3 of the plot
-is descriptive (mean + SEM dots); a future inferential layer will add
-per-cell p-values. See ADR-0014.
+materially shift the average of this numeric column?" The descriptive
+layer plots mean + SEM dots per Subgroup; the inferential layer
+(slice 4) overlays each cell's **Significance Test** p-value and stars.
+The matrix is an *exploratory screening* view — p-values are raw
+(uncorrected for the many cells tested). See ADR-0014.
+
+**Significance Test**: The per-cell omnibus test the Significance Matrix
+runs over a cell's Subgroups to produce its p-value. One **Test Family**
+is chosen for the whole matrix (a top-of-plot selector, persisted with the
+workspace): *parametric* = Welch's ANOVA (unequal-variance-safe; reduces
+to Welch's t for 2 Subgroups), *non-parametric* = Kruskal–Wallis
+(rank-based; reduces to Mann–Whitney for 2 Subgroups). The same family
+covers categorical columns with 2 or 2+ values — no per-cell branching.
+Subgroups with N<2 are dropped from the test; a cell with fewer than 2
+remaining Subgroups is untestable (shows an em-dash). Significance tiers
+follow the universal convention: `*` p<.05, `**` p<.01, `***`
+p<.001.
 
 **AggregateScore**: The sum of a Student's Scores whose `(Name, Index)`
 is in the active ScoreSelection aggregate set. Used for x-axis position

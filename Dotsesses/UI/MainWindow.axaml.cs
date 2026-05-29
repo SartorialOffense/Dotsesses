@@ -128,8 +128,9 @@ public partial class MainWindow : Window
 
     private void OnGlobalPointerMoved(object? sender, PointerEventArgs e)
     {
-        // Get service if not already cached
-        _hoverDelayService ??= App.Services?.GetService<HoverDelayService>();
+        // Window-scoped instance (cached in OnDataContextChanged); fall back to
+        // resolving from the VM if a pointer event somehow precedes it.
+        _hoverDelayService ??= (DataContext as MainWindowViewModel)?.HoverDelayService;
 
         if (_hoverDelayService != null)
         {
@@ -228,8 +229,9 @@ public partial class MainWindow : Window
     {
         if (DataContext is not MainWindowViewModel vm) return;
 
-        // Initialize hover delay service if needed
-        _hoverDelayService ??= App.Services?.GetService<HoverDelayService>();
+        // Window-scoped instance (cached in OnDataContextChanged); fall back to
+        // resolving from the VM so export gating acts on the plots' instance.
+        _hoverDelayService ??= vm.HoverDelayService;
 
         // Check if a student is currently selected
         if (vm.HoveredStudentId.HasValue)
@@ -343,6 +345,21 @@ public partial class MainWindow : Window
                 return;
             }
 
+            // Get the SignificancePlotControl instance
+            var significancePlotControl = this.FindControl<SignificancePlotControl>("SignificancePlotControl")
+                                          ?? this.GetVisualDescendants().OfType<SignificancePlotControl>().FirstOrDefault();
+
+            if (significancePlotControl == null)
+            {
+                var errorBox = MessageBoxManager.GetMessageBoxStandard(
+                    "Export Error",
+                    "Could not find SignificancePlot control.",
+                    ButtonEnum.Ok,
+                    MsBoxIcon.Error);
+                await errorBox.ShowWindowDialogAsync(this);
+                return;
+            }
+
             // Get the PlotTabContainerViewModel for tab switching
             if (vm.PlotTabContainerViewModel == null)
             {
@@ -365,6 +382,7 @@ public partial class MainWindow : Window
                 DotPlotBorder,
                 violinPlotControl,
                 correlationPlotControl,
+                significancePlotControl,
                 vm.PlotTabContainerViewModel,
                 vm.ComplianceGrid?.Rows ?? Enumerable.Empty<Dotsesses.UI.ComplianceRowViewModel>(),
                 vm.Messenger,
@@ -544,8 +562,9 @@ public partial class MainWindow : Window
 
     private void OnDotPlotPointerMoved(object? sender, PointerEventArgs e)
     {
-        // Get service if not already cached
-        _hoverDelayService ??= App.Services?.GetService<HoverDelayService>();
+        // Window-scoped instance (cached in OnDataContextChanged); fall back to
+        // resolving from the VM if a pointer event somehow precedes it.
+        _hoverDelayService ??= (DataContext as MainWindowViewModel)?.HoverDelayService;
 
         if (_hoverDelayService != null)
         {
@@ -558,6 +577,14 @@ public partial class MainWindow : Window
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
         if (DataContext is not MainWindowViewModel vm) return;
+
+        // Use the window's scoped HoverDelayService — the same instance the
+        // plot VMs hold — so export gating (IsExporting) and ClearHover act on
+        // the hover state the plots actually consult. Resolving from
+        // App.Services would hand back the root-scope orphan instead, leaving
+        // hover live during export (and breaking velocity tracking). See
+        // ADR-0012 (per-window scope).
+        _hoverDelayService = vm.HoverDelayService;
 
         vm.PropertyChanged += OnViewModelPropertyChanged;
 

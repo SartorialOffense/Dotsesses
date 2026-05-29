@@ -38,6 +38,14 @@ public partial class SignificancePlotViewModel : ViewModelBase
     private string? _svgContent;
 
     /// <summary>
+    /// The omnibus test family applied per cell (see ADR-0014 slice 4).
+    /// Bound to the top-of-plot radio; the control regenerates on change.
+    /// Persisted with the workspace (SavedState v5).
+    /// </summary>
+    [ObservableProperty]
+    private SignificanceTestFamily _testFamily = SignificanceTestFamily.Parametric;
+
+    /// <summary>
     /// Scoped messenger for this VM's workspace (see ADR-0012). Exposed for
     /// the View code-behind even though Significance has no cross-view sync —
     /// keeping the symmetric shape lets future features (e.g. theme-render
@@ -75,7 +83,8 @@ public partial class SignificancePlotViewModel : ViewModelBase
             numericSeries,
             categoricalSeries,
             dotSize,
-            theme);
+            theme,
+            TestFamily);
 
         SvgContent = svgContent;
         _dataPoints = dataPoints;
@@ -135,16 +144,38 @@ public partial class SignificancePlotViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Builds the per-dot tooltip text. N=1 collapses to mean only (SEM undefined).
+    /// Builds the per-dot tooltip text. N=1 collapses to mean only (SEM
+    /// undefined). The cell's omnibus test result is appended (slice 4): the
+    /// p-value + test name, or a note that the cell/subgroup couldn't be
+    /// tested. The p-value is a cell property, so every dot in the cell shows
+    /// the same value.
     /// </summary>
     public static string BuildTooltip(SignificanceDataPoint p)
     {
-        if (p.N <= 1)
+        var head = p.N <= 1
+            ? $"{p.CategoricalColumn} = {p.Subgroup}   (N = {p.N})\n" +
+              $"{p.NumericColumn}: {p.Mean:0.##}"
+            : $"{p.CategoricalColumn} = {p.Subgroup}   (N = {p.N})\n" +
+              $"{p.NumericColumn}: mean {p.Mean:0.##} ± {p.Sem:0.##} (SEM)";
+
+        var testName = p.TestFamily == SignificanceTestFamily.Nonparametric
+            ? "Kruskal–Wallis"
+            : "Welch ANOVA";
+
+        string statLine;
+        if (p.Excluded)
         {
-            return $"{p.CategoricalColumn} = {p.Subgroup}   (N = {p.N})\n" +
-                   $"{p.NumericColumn}: {p.Mean:0.##}";
+            statLine = $"excluded from test: N < 2";
         }
-        return $"{p.CategoricalColumn} = {p.Subgroup}   (N = {p.N})\n" +
-               $"{p.NumericColumn}: mean {p.Mean:0.##} ± {p.Sem:0.##} (SEM)";
+        else if (p.PValue is null)
+        {
+            statLine = $"{testName}: not testable (< 2 groups with N ≥ 2)";
+        }
+        else
+        {
+            statLine = $"{testName}: p = {p.PValue.Value:0.###}";
+        }
+
+        return head + "\n" + statLine;
     }
 }

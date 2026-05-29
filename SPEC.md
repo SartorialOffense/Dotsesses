@@ -224,6 +224,28 @@ the average of this numeric column?*
   ```
 
   N=1 collapses to `Q1: 78.3 (N = 1)` (no ± since SEM is undefined).
+  The tooltip also carries the cell's test result line (see below) —
+  e.g. `Welch ANOVA: p = 0.003`, `Kruskal–Wallis: not testable
+  (< 2 groups with N ≥ 2)`, or `excluded from test: N < 2` on a dot
+  whose subgroup was dropped.
+- **Significance annotation** (top-right corner of each cell): the cell's
+  omnibus p-value plus tiered stars — `*` p<.05, `**` p<.01,
+  `***` p<.001. Significant cells render **bold** in a strong color;
+  non-significant cells render their p faint/grey with no star; cells that
+  can't be tested show an em-dash (`—`). Cells with no dots get no
+  annotation. p-values are **raw / uncorrected** — the matrix is an
+  exploratory screening view, not a confirmatory multiple-comparison
+  procedure.
+- **Test family selector** (top-right combo box): switches every cell between
+  *Parametric* (Welch's ANOVA — reduces to Welch's t for 2 subgroups) and
+  *Non-parametric* (Kruskal–Wallis — reduces to Mann–Whitney for 2). One
+  family is applied matrix-wide; the choice is **persisted** with the
+  workspace (SavedState v5; v4 files open as Parametric). The same family
+  handles categorical columns with 2 or 2+ values — no group-count
+  branching. Default: Parametric.
+- **Small-N test policy**: subgroups with N<2 are dropped from the test
+  (their dots still render); the cell is tested only if ≥2 valid subgroups
+  remain, otherwise the annotation is `—`.
 - **No cross-view sync** — the dots represent subgroups, not students,
   so hovering a matrix dot does not highlight anything in the dotplot
   or violin, and vice versa.
@@ -235,8 +257,9 @@ the average of this numeric column?*
   has Significance=false, the tab renders the empty-state hint
   "No Significant rows or columns to plot."
 
-A future revision will overlay a per-cell inferential test (Welch's
-ANOVA or Kruskal–Wallis) — see ADR-0014.
+A future revision may add an **effect-size** measure (η²/ε²) alongside the
+p-value so cells convey *magnitude*, not just detectability — see
+ADR-0015.
 
 ## Curve Compliance
 
@@ -374,7 +397,13 @@ single combined dialog lists each one. The categories it flags:
 
 - **Excel** export with columns for Student Id, AggregateScore, individual
   Scores, StudentAttributes, and assigned letter Grade.
-- **PowerPoint** export of the current plots.
+- **PowerPoint** export — one slide each for the dotplot, violin plot,
+  correlation matrix, and significance matrix, plus a grade-breakdown
+  table. Plots render in the light theme (dark text on white) while the
+  bright `CYCLING_PALETTE` dot colors are preserved. The significance
+  slide carries a footer documenting the per-cell test used (Welch's
+  ANOVA / Kruskal–Wallis), the star tiers, and that the p-values are raw
+  (exploratory).
 - **Copy plot** to clipboard for individual plots.
 
 ## Snapshot mode (for automated UI verification)

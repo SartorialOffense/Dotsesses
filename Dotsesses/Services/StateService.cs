@@ -35,7 +35,8 @@ public class StateService
         IEnumerable<StudentAssessment> students,
         GradingSession gradingSession,
         IEnumerable<ScoreSelection> selections,
-        string? sourceFile = null)
+        string? sourceFile = null,
+        SignificanceTestFamily significanceTestFamily = SignificanceTestFamily.Parametric)
     {
         ArgumentNullException.ThrowIfNull(gradingSession);
 
@@ -60,9 +61,10 @@ public class StateService
 
         var state = new SavedState
         {
-            Version = 4,
+            Version = 5,
             SavedAt = DateTime.UtcNow,
             SourceFile = sourceFile,
+            SignificanceTestFamily = significanceTestFamily,
             Students = students.Select(s => new SavedStudent
             {
                 Id = s.Id,

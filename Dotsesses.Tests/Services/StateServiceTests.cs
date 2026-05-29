@@ -74,7 +74,7 @@ public class StateServiceTests : IDisposable
 
         // Assert
         Assert.NotNull(loadedState);
-        Assert.Equal(4, loadedState.Version);
+        Assert.Equal(5, loadedState.Version);
         Assert.Equal("original_source.xlsx", loadedState.SourceFile);
         Assert.Equal(2, loadedState.Students.Count);
         // Slots are A, B, C (post-#18 fix: catch-all is F, lowest in
@@ -210,12 +210,51 @@ public class StateServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveAsync_WritesVersion4()
+    public async Task SaveAsync_WritesVersion5()
     {
-        var filePath = Path.Combine(_testDirectory, "v4_check.json");
+        var filePath = Path.Combine(_testDirectory, "v5_check.json");
         await _stateService.SaveAsync(filePath, CreateTestStudents(), TestFixtures.SessionForGrading(), Array.Empty<ScoreSelection>());
         var json = await File.ReadAllTextAsync(filePath);
-        Assert.Contains("\"version\": 4", json);
+        Assert.Contains("\"version\": 5", json);
+    }
+
+    [Fact]
+    public async Task SaveAsync_RoundTripsSignificanceTestFamily()
+    {
+        var filePath = Path.Combine(_testDirectory, "test_family.json");
+        await _stateService.SaveAsync(
+            filePath, CreateTestStudents(), TestFixtures.SessionForGrading(),
+            Array.Empty<ScoreSelection>(), sourceFile: null,
+            significanceTestFamily: SignificanceTestFamily.Nonparametric);
+
+        var loaded = await _stateService.LoadAsync(filePath);
+
+        Assert.Equal(SignificanceTestFamily.Nonparametric, loaded.SignificanceTestFamily);
+    }
+
+    [Fact]
+    public async Task LoadAsync_V4Json_DefaultsSignificanceTestFamilyToParametric()
+    {
+        // A v4 file predates the inferential layer and has no
+        // significanceTestFamily field — it must silently migrate to the
+        // Parametric default (ADR-0002 / ADR-0014).
+        var filePath = Path.Combine(_testDirectory, "v4_legacy.json");
+        var v4Content = """
+            {
+              "version": 4,
+              "savedAt": "2024-01-01T00:00:00Z",
+              "sourceFile": "legacy.xlsx",
+              "students": [],
+              "cursors": [],
+              "scoreSelections": []
+            }
+            """;
+        await File.WriteAllTextAsync(filePath, v4Content);
+
+        var loaded = await _stateService.LoadAsync(filePath);
+
+        Assert.Equal(4, loaded.Version);
+        Assert.Equal(SignificanceTestFamily.Parametric, loaded.SignificanceTestFamily);
     }
 
     [Fact]
