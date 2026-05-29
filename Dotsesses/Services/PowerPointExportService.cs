@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Messaging;
+using Dotsesses.Models;
 using Dotsesses.UI;
 using ShapeCrawler;
 
@@ -26,15 +27,18 @@ public class PowerPointExportService
     private const int ContentY = 50;
     private const int ContentWidth = 860;  // SlideWidth - 2*MarginX
     private const int MaxContentHeight = 460; // SlideHeight - ContentY - margin
+    private const int FooterHeight = 28; // bottom caption band (points)
 
     /// <summary>
-    /// Exports a complete presentation with DotPlot, ViolinPlot, CorrelationPlot, and grade table.
+    /// Exports a complete presentation with DotPlot, ViolinPlot, CorrelationPlot,
+    /// SignificanceMatrix, and grade table.
     /// </summary>
     public async Task ExportAsync(
         string outputPath,
         Control dotPlotControl,
         Control violinPlotControl,
         Control correlationPlotControl,
+        Control significancePlotControl,
         PlotTabContainerViewModel tabViewModel,
         IEnumerable<ComplianceRowViewModel> complianceRows,
         IMessenger messenger,
@@ -72,10 +76,29 @@ public class PowerPointExportService
             ClearPlaceholders(pres, 3);
             await AddPlotSlideAsync(pres, 3, $"{className} - Score Correlations", correlationPlotControl, messenger, restoreTheme: false);
 
-            // Slide 4: Grade Table (no rendering needed)
+            // Slide 4: SignificanceMatrix - switch to significance tab first
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                tabViewModel.SelectSignificanceCommand.Execute(null);
+            });
+            // Allow layout + Python plot regeneration in light theme
+            await Task.Delay(500);
+
+            // Capture the active test family so the slide footer documents
+            // exactly which metric produced the cell p-values and stars.
+            var testFamily = await Dispatcher.UIThread.InvokeAsync(() =>
+                (significancePlotControl.DataContext as SignificancePlotViewModel)?.TestFamily
+                    ?? SignificanceTestFamily.Parametric);
+
             pres.Slides.Add(1);
             ClearPlaceholders(pres, 4);
-            AddGradeTableSlide(pres, 4, $"{className} - Grade Breakdown", complianceRows);
+            await AddPlotSlideAsync(pres, 4, $"{className} - Subgroup Significance", significancePlotControl, messenger, restoreTheme: false,
+                footer: BuildSignificanceFooter(testFamily));
+
+            // Slide 5: Grade Table (no rendering needed)
+            pres.Slides.Add(1);
+            ClearPlaceholders(pres, 5);
+            AddGradeTableSlide(pres, 5, $"{className} - Grade Breakdown", complianceRows);
 
             // Delete existing file if it exists (ShapeCrawler doesn't overwrite cleanly)
             if (File.Exists(outputPath))
@@ -119,7 +142,8 @@ public class PowerPointExportService
         string title,
         Control plotControl,
         IMessenger messenger,
-        bool restoreTheme = true)
+        bool restoreTheme = true,
+        string? footer = null)
     {
         var shapes = pres.Slide(slideNumber).Shapes;
 
@@ -139,20 +163,25 @@ public class PowerPointExportService
         // Reset stream position for ShapeCrawler
         imageStream.Position = 0;
 
+        // Reserve vertical space at the bottom for a footer when present, so
+        // the plot image is centered above it rather than overlapping it.
+        var footerReserve = footer != null ? FooterHeight : 0;
+        var maxContentHeight = MaxContentHeight - footerReserve;
+
         // Calculate dimensions: full width, height scaled to maintain aspect ratio
         var targetWidth = ContentWidth;
         var targetHeight = (int)(targetWidth * aspectRatio);
 
         // If height exceeds max, scale down from height instead
-        if (targetHeight > MaxContentHeight)
+        if (targetHeight > maxContentHeight)
         {
-            targetHeight = MaxContentHeight;
+            targetHeight = maxContentHeight;
             targetWidth = (int)(targetHeight / aspectRatio);
         }
 
         // Calculate centered position (horizontally centered, vertically centered in content area)
         var x = (SlideWidth - targetWidth) / 2;
-        var contentAreaHeight = SlideHeight - ContentY;
+        var contentAreaHeight = SlideHeight - ContentY - footerReserve;
         var y = ContentY + (contentAreaHeight - targetHeight) / 2;
 
         // Add plot image
@@ -164,6 +193,58 @@ public class PowerPointExportService
         picture.Y = y;
         picture.Width = targetWidth;
         picture.Height = targetHeight;
+
+        if (footer != null)
+        {
+            AddFooter(pres, slideNumber, footer);
+        }
+    }
+
+    /// <summary>
+    /// Adds a small, full-width caption text box pinned to the bottom of the
+    /// slide — used to document the metric behind a plot (e.g. the
+    /// Significance Matrix's per-cell test and star legend).
+    /// </summary>
+    private void AddFooter(Presentation pres, int slideNumber, string footer)
+    {
+        var shapes = pres.Slide(slideNumber).Shapes;
+        shapes.AddShape(
+            x: MarginX,
+            y: SlideHeight - FooterHeight,
+            width: ContentWidth,
+            height: FooterHeight - 4,
+            Geometry.Rectangle,
+            footer);
+
+        var footerShape = shapes.Last();
+        footerShape.Fill?.SetNoFill();
+        footerShape.Outline?.SetNoOutline();
+        footerShape.SetFontColor("555555");
+
+        var textBox = footerShape.TextBox;
+        if (textBox != null && textBox.Paragraphs.Count > 0)
+        {
+            var paragraph = textBox.Paragraphs[0];
+            if (paragraph.Portions.Count > 0)
+            {
+                var portion = paragraph.Portions[0];
+                portion.Font.Size = 10;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Builds the Significance Matrix slide footer describing the per-cell
+    /// omnibus test that produced the cell p-values and stars, the star tiers,
+    /// and that the p-values are raw (exploratory). See ADR-0015.
+    /// </summary>
+    private static string BuildSignificanceFooter(SignificanceTestFamily testFamily)
+    {
+        var testName = testFamily == SignificanceTestFamily.Nonparametric
+            ? "Kruskal–Wallis (non-parametric)"
+            : "Welch's ANOVA (parametric)";
+        return $"Per-cell test: {testName}.  Stars: * p<.05   ** p<.01   *** p<.001.  " +
+               "Raw, uncorrected p-values — exploratory screening.";
     }
 
     /// <summary>

@@ -7,12 +7,21 @@ namespace Dotsesses.Models;
 /// </summary>
 public class SavedState
 {
-    public int Version { get; set; } = 4;
+    public int Version { get; set; } = 5;
     public DateTime SavedAt { get; set; }
     public string? SourceFile { get; set; }
     public List<SavedStudent> Students { get; set; } = new();
     public List<SavedCursor> Cursors { get; set; } = new();
     public List<SavedScoreSelection> ScoreSelections { get; set; } = new();
+
+    /// <summary>
+    /// The Significance Matrix's per-cell omnibus test family (ADR-0014
+    /// slice 4). Defaults to <see cref="SignificanceTestFamily.Parametric"/>
+    /// so v4 files (which lack this field) silently migrate to the parametric
+    /// default on load, per the ADR-0002 first-save-rewrites pattern.
+    /// </summary>
+    public SignificanceTestFamily SignificanceTestFamily { get; set; }
+        = SignificanceTestFamily.Parametric;
 }
 
 /// <summary>

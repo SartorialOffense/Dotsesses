@@ -1329,7 +1329,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 ClassAssessment.Assessments,
                 GradingSession,
                 ClassAssessment.ScoreSelections,
-                _currentSourceFile);
+                _currentSourceFile,
+                SignificancePlotViewModel?.TestFamily ?? SignificanceTestFamily.Parametric);
 
             CurrentSaveFilePath = filePath;
             HasUnsavedChanges = false;
@@ -1409,6 +1410,14 @@ public partial class MainWindowViewModel : ViewModelBase
         try
         {
             var state = await _stateService.LoadAsync(filePath);
+
+            // Restore the Significance Matrix test family before the matrix is
+            // (re)initialized below, so the first render uses the saved family.
+            // v4 files default to Parametric via SavedState's field default.
+            if (SignificancePlotViewModel != null)
+            {
+                SignificancePlotViewModel.TestFamily = state.SignificanceTestFamily;
+            }
 
             // Convert saved students back to domain models
             var (students, muppetMap) = _stateService.ConvertToStudents(state);

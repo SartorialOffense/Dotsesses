@@ -5,8 +5,10 @@ namespace Dotsesses.Models;
 /// <c>Subgroup</c> of a Categorical column averaged against a Numeric column
 /// (see CONTEXT.md). Unlike <see cref="CorrelationDataPoint"/>, the dot does
 /// not represent an individual student — it summarises the subgroup's
-/// students. The point shape leaves room for a future per-cell <c>PValue</c>
-/// field when slice 4 layers in the inferential test (see ADR-0014).
+/// students. Slice 4 (ADR-0014) layers in the inferential test: every dot
+/// in a cell carries that cell's omnibus <see cref="PValue"/> (null when the
+/// cell is untestable) and a flag for whether its subgroup was
+/// <see cref="Excluded"/> from the test for being too small (N&lt;2).
 /// </summary>
 public record SignificanceDataPoint(
     int CellRow,
@@ -19,4 +21,7 @@ public record SignificanceDataPoint(
     double Mean,
     double Sem,
     int N,
-    string Color);
+    string Color,
+    double? PValue = null,
+    SignificanceTestFamily TestFamily = SignificanceTestFamily.Parametric,
+    bool Excluded = false);

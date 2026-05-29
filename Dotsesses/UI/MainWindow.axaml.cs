@@ -343,6 +343,21 @@ public partial class MainWindow : Window
                 return;
             }
 
+            // Get the SignificancePlotControl instance
+            var significancePlotControl = this.FindControl<SignificancePlotControl>("SignificancePlotControl")
+                                          ?? this.GetVisualDescendants().OfType<SignificancePlotControl>().FirstOrDefault();
+
+            if (significancePlotControl == null)
+            {
+                var errorBox = MessageBoxManager.GetMessageBoxStandard(
+                    "Export Error",
+                    "Could not find SignificancePlot control.",
+                    ButtonEnum.Ok,
+                    MsBoxIcon.Error);
+                await errorBox.ShowWindowDialogAsync(this);
+                return;
+            }
+
             // Get the PlotTabContainerViewModel for tab switching
             if (vm.PlotTabContainerViewModel == null)
             {
@@ -365,6 +380,7 @@ public partial class MainWindow : Window
                 DotPlotBorder,
                 violinPlotControl,
                 correlationPlotControl,
+                significancePlotControl,
                 vm.PlotTabContainerViewModel,
                 vm.ComplianceGrid?.Rows ?? Enumerable.Empty<Dotsesses.UI.ComplianceRowViewModel>(),
                 vm.Messenger,

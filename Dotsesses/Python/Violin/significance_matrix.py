@@ -21,10 +21,24 @@ Small-N handling:
 - N=1 → render dot, no error bar.
 - N≥2 → render dot + SEM error bar.
 
+Inferential layer (ADR-0014, "slice 4"): each cell runs ONE omnibus test
+over its subgroups and prints the resulting p-value + tiered significance
+stars in the cell corner. The `test_family` argument switches all cells
+between two robust families:
+- 'parametric'    → Welch's ANOVA (unequal-variance-safe; reduces to
+                    Welch's t for 2 groups).
+- 'nonparametric' → Kruskal–Wallis (rank-based; reduces to Mann–Whitney
+                    for 2 groups).
+Subgroups with N<2 are dropped from the test (no within-group variance);
+the cell is testable only if ≥2 valid groups remain, otherwise it shows
+an em-dash. p-values are RAW (uncorrected) — the matrix is an exploratory
+screening view, not a confirmatory multiple-comparison procedure.
+
 Returns: (timing_dict, svg_string, point_data_list). Each point dict has
-{cell_row, cell_col, x, y, cat_col, num_col, subgroup, mean, sem, n, color}.
-The shape leaves room for a future `p_value` field per cell when slice 4
-adds the inferential test (see ADR-0014).
+{cell_row, cell_col, x, y, cat_col, num_col, subgroup, mean, sem, n, color,
+p_value, test_family, excluded}. `p_value` is the cell's omnibus p (NaN
+when the cell is untestable) and is repeated on every dot in the cell;
+`excluded` flags a dot whose subgroup was dropped from the test (N<2).
 """
 import math
 import time
@@ -35,6 +49,7 @@ import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy import stats as _stats
 
 
 def apply_theme(theme: str = 'dark'):
@@ -71,12 +86,113 @@ def get_subgroup_color(idx: int) -> str:
     return CYCLING_PALETTE[idx % len(CYCLING_PALETTE)]
 
 
+def _welch_anova_pvalue(groups: List[List[float]]) -> Optional[float]:
+    """
+    Welch's ANOVA p-value (unequal-variance one-way ANOVA, Welch 1951).
+
+    scipy has no built-in Welch ANOVA (`f_oneway` assumes equal variance),
+    so we compute the closed form directly. For exactly 2 groups this equals
+    the two-sided Welch's t-test p-value (F = t²). Returns None when the test
+    is undefined — fewer than 2 groups, or any included group has zero
+    within-group variance (all-tied values make the Welch weight infinite).
+    """
+    k = len(groups)
+    if k < 2:
+        return None
+    ns = [len(g) for g in groups]
+    means = [float(np.mean(g)) for g in groups]
+    variances = [float(np.var(g, ddof=1)) for g in groups]
+    if any(v <= 0.0 for v in variances):
+        return None
+
+    weights = [n / v for n, v in zip(ns, variances)]
+    w_total = sum(weights)
+    grand_mean = sum(w * m for w, m in zip(weights, means)) / w_total
+
+    numer = sum(w * (m - grand_mean) ** 2 for w, m in zip(weights, means)) / (k - 1)
+    # Σ (1 - w_i/W)² / (n_i - 1)
+    tail = sum((1.0 - w / w_total) ** 2 / (n - 1) for w, n in zip(weights, ns))
+    denom = 1.0 + (2.0 * (k - 2) / (k ** 2 - 1)) * tail
+    f_stat = numer / denom
+
+    df1 = k - 1
+    df2 = 1.0 / ((3.0 / (k ** 2 - 1)) * tail)
+    return float(_stats.f.sf(f_stat, df1, df2))
+
+
+def _kruskal_pvalue(groups: List[List[float]]) -> Optional[float]:
+    """
+    Kruskal–Wallis H-test p-value. For 2 groups this reduces to the
+    Mann–Whitney U test. Returns None when undefined (fewer than 2 groups,
+    or scipy rejects the input, e.g. every value identical across groups).
+    """
+    if len(groups) < 2:
+        return None
+    try:
+        _, p = _stats.kruskal(*groups)
+    except ValueError:
+        return None
+    return None if (p is None or math.isnan(p)) else float(p)
+
+
+def compute_cell_pvalue(
+    subgroup_to_values: Dict[str, List[float]],
+    test_family: str,
+) -> Tuple[Optional[float], set]:
+    """
+    Run the per-cell omnibus test over a cell's subgroups.
+
+    Subgroups with N<2 are dropped (no within-group variance to test); the
+    cell is testable only if ≥2 valid groups remain. Returns
+    (p_value_or_None, excluded_subgroup_labels).
+    """
+    valid_groups: List[List[float]] = []
+    excluded: set = set()
+    for sg, values in subgroup_to_values.items():
+        if len(values) >= 2:
+            valid_groups.append(values)
+        elif len(values) >= 1:
+            excluded.add(sg)
+
+    if len(valid_groups) < 2:
+        return (None, excluded)
+
+    if test_family == 'nonparametric':
+        return (_kruskal_pvalue(valid_groups), excluded)
+    return (_welch_anova_pvalue(valid_groups), excluded)
+
+
+def _format_pvalue_annotation(p: Optional[float]) -> Tuple[str, bool]:
+    """
+    Build the in-cell annotation label and whether it is significant.
+
+    Tiers follow the universal convention: * p<.05, ** p<.01, *** p<.001.
+    Untestable cells (p is None) render an em-dash. Returns (label, is_sig).
+    """
+    if p is None:
+        return ('—', False)
+    if p < 0.001:
+        stars = '***'
+        p_text = 'p<.001'
+    else:
+        if p < 0.01:
+            stars = '**'
+        elif p < 0.05:
+            stars = '*'
+        else:
+            stars = ''
+        p_text = 'p=' + f'{p:.3f}'.lstrip('0')  # e.g. 'p=.003'
+    label = (p_text + ' ' + stars).strip()
+    return (label, bool(stars))
+
+
 def create_significance_matrix(
     fig_size: Tuple[float, float],
     numeric_series: List[Tuple[str, Dict[str, float]]],
     categorical_series: List[Tuple[str, Dict[str, str]]],
     theme: str = 'dark',
     dot_size: float = 5.0,
+    test_family: str = 'parametric',
 ) -> Tuple[Dict[str, int], str, List[Dict]]:
     """
     Build the significance matrix.
@@ -88,6 +204,9 @@ def create_significance_matrix(
     categorical_series : list of (column_name, {student_id_str: subgroup_string})
     theme : 'dark' or 'light'
     dot_size : marker radius in points (squared internally for scatter size)
+    test_family : 'parametric' (Welch's ANOVA) or 'nonparametric'
+        (Kruskal–Wallis) — the omnibus test run per cell for the in-cell
+        p-value annotation.
 
     Returns
     -------
@@ -121,6 +240,9 @@ def create_significance_matrix(
     # ----- Subgroup stats per cell -----
     # cell_stats[(i, j)] = list of (subgroup_label, mean, sem, n) in alpha order
     cell_stats: Dict[Tuple[int, int], List[Tuple[str, float, float, int]]] = {}
+    # cell_pvalues[(i, j)] = (p_value_or_None, excluded_subgroup_labels) from
+    # the per-cell omnibus test (see compute_cell_pvalue / ADR-0014 slice 4).
+    cell_pvalues: Dict[Tuple[int, int], Tuple[Optional[float], set]] = {}
     # Also collect per categorical column the canonical subgroup → color-index
     # map so the same subgroup gets the same color across all rows in a column.
     column_subgroup_index: Dict[int, Dict[str, int]] = {}
@@ -155,6 +277,7 @@ def create_significance_matrix(
                     sem = float('nan')  # undefined for N=1
                 row_stats.append((sg, mean_val, sem, n))
             cell_stats[(i, j)] = row_stats
+            cell_pvalues[(i, j)] = compute_cell_pvalue(subgroup_to_values, test_family)
 
     # ----- Per-row y-limits: [min(m-SEM), max(m+SEM)] +/- 5% padding -----
     row_ylims: Dict[int, Tuple[float, float]] = {}
@@ -190,6 +313,11 @@ def create_significance_matrix(
                              sharex='col',
                              gridspec_kw={'hspace': 0})
     label_color = '#555555' if theme == 'light' else '#B4B4B4'
+    # Significance annotation colors: strong/dark for significant cells (drawn
+    # bold), faint grey for non-significant / untestable cells.
+    sig_text_color = '#111111' if theme == 'light' else '#FFFFFF'
+    faint_text_color = '#999999'
+    anno_bbox_color = '#FFFFFF' if theme == 'light' else '#202020'
 
     # Track which (i, j) cells actually got a scatter call so we can map
     # SVG PathCollection groups back to them in order.
@@ -249,6 +377,25 @@ def create_significance_matrix(
             ax.scatter(xs, ys, s=dot_size ** 2, c=colors,
                        edgecolors='none', alpha=0.9, zorder=3)
             scatter_cells.append((i, j))
+
+            # In-cell significance annotation (top-right corner). Significant
+            # cells render bold + tiered stars in a strong color; non-sig /
+            # untestable cells render faint. Skipped entirely for cells with no
+            # dots at all (nothing was tested and nothing is shown).
+            p_val, _excluded = cell_pvalues.get((i, j), (None, set()))
+            if stats:
+                anno_label, anno_sig = _format_pvalue_annotation(p_val)
+                ax.text(
+                    0.97, 0.95, anno_label,
+                    transform=ax.transAxes,
+                    ha='right', va='top',
+                    fontsize=6.5,
+                    fontweight='bold' if anno_sig else 'normal',
+                    color=sig_text_color if anno_sig else faint_text_color,
+                    zorder=5,
+                    bbox=dict(facecolor=anno_bbox_color, alpha=0.55,
+                              edgecolor='none', pad=1.0),
+                )
 
             # Cell axes
             y_lo, y_hi = row_ylims[i]
@@ -327,6 +474,7 @@ def create_significance_matrix(
         num_name, _ = numeric_series[i]
         sg_to_idx = column_subgroup_index[j]
 
+        cell_p, cell_excluded = cell_pvalues.get((i, j), (None, set()))
         if len(svg_points) == len(stats):
             for k, (sg, mean_val, sem, n) in enumerate(stats):
                 color_idx = sg_to_idx.get(sg, 0)
@@ -342,6 +490,12 @@ def create_significance_matrix(
                     'sem': float(sem) if not math.isnan(sem) else float('nan'),
                     'n': int(n),
                     'color': get_subgroup_color(color_idx),
+                    # Cell-level omnibus p, repeated on every dot in the cell
+                    # (NaN when untestable); `excluded` flags a dot dropped
+                    # from the test for N<2. See ADR-0014 slice 4.
+                    'p_value': float(cell_p) if cell_p is not None else float('nan'),
+                    'test_family': test_family,
+                    'excluded': bool(sg in cell_excluded),
                 })
 
         # Remove the rendered <use> elements from the SVG; the dots will be

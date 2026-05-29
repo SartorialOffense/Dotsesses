@@ -89,6 +89,7 @@ public partial class SignificancePlotControl : UserControl
             }
 
             vm.PropertyChanged += OnViewModelPropertyChanged;
+            SyncTestFamilySelection(vm);
             if (!string.IsNullOrEmpty(vm.SvgContent))
             {
                 UpdateSvgDisplay(vm.SvgContent);
@@ -96,10 +97,51 @@ public partial class SignificancePlotControl : UserControl
         }
     }
 
+    /// <summary>
+    /// Reflects the VM's <see cref="SignificancePlotViewModel.TestFamily"/>
+    /// onto the combo box. Setting SelectedIndex re-enters
+    /// <see cref="OnTestFamilyChanged"/>, but that handler no-ops when the
+    /// chosen family already matches the VM, so this won't loop or regenerate.
+    /// </summary>
+    private void SyncTestFamilySelection(SignificancePlotViewModel vm)
+    {
+        TestFamilyCombo.SelectedIndex =
+            vm.TestFamily == SignificanceTestFamily.Nonparametric ? 1 : 0;
+    }
+
+    /// <summary>
+    /// User picked a test family. Updates the VM and regenerates the plot in
+    /// the current theme. No-ops when the selection already matches the VM
+    /// (e.g. when the combo is being synced from the VM on load).
+    /// </summary>
+    private void OnTestFamilyChanged(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is not SignificancePlotViewModel vm) return;
+
+        var family = TestFamilyCombo.SelectedIndex == 1
+            ? SignificanceTestFamily.Nonparametric
+            : SignificanceTestFamily.Parametric;
+        if (vm.TestFamily == family) return;
+
+        vm.TestFamily = family;
+
+        var b = SignificancePlotArea.Bounds;
+        if (b.Width > 0 && b.Height > 0 && !string.IsNullOrEmpty(vm.SvgContent))
+        {
+            vm.RegeneratePlot(b.Width, b.Height, _currentTheme);
+        }
+    }
+
     private void OnRenderWithThemeMessage(object recipient, RenderWithThemeMessage message)
     {
         _currentTheme = message.Theme;
         Background = ThemeColors.BackgroundBrush(_currentTheme);
+
+        // Hide the test-family combo while rendering for export / clipboard
+        // (the only path that switches to LightMode) so the interactive chrome
+        // doesn't bleed into the captured image; restore it on the DarkMode
+        // switch that follows.
+        TestFamilyCombo.IsVisible = message.Theme == ThemeName.DarkMode;
 
         Dispatcher.UIThread.Post(() =>
         {
@@ -125,6 +167,12 @@ public partial class SignificancePlotControl : UserControl
         if (e.PropertyName == nameof(SignificancePlotViewModel.SvgContent))
         {
             UpdateSvgDisplay(vm.SvgContent);
+        }
+        else if (e.PropertyName == nameof(SignificancePlotViewModel.TestFamily))
+        {
+            // Keep the combo in step when the family is restored from a loaded
+            // workspace (SavedState v5).
+            SyncTestFamilySelection(vm);
         }
     }
 
