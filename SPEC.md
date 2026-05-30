@@ -205,6 +205,10 @@ column with **Significance**=true, one column per StudentAttribute
 *does subgroup membership in this categorical column materially shift
 the average of this numeric column?*
 
+A plain-language guide for instructors — what the p-value means, the two
+test families, when to prefer each, and citations for papers — lives at
+[`docs/significance-guide.md`](docs/significance-guide.md).
+
 - Each cell plots one dot per **Subgroup** of its categorical column.
   Dot x-position: subgroup label (alphabetical ascending). Dot
   y-position: mean of the cell's numeric column within that subgroup.

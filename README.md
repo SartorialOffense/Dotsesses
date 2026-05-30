@@ -67,6 +67,7 @@ The name is a playful take on incorrect pluralization of "dot," reflecting the a
 - **Drill-Down Cards**: Click students to display detailed score breakdowns in formatted cards
 - **Student Comments**: Visual indicators (square vs circle markers) for students with comments
 - **Violin Plot Integration**: Python-generated violin plots with swarm overlays for distribution analysis
+- **Significance Matrix**: Per-cell significance tests (Welch's ANOVA / Kruskal–Wallis) comparing subgroup averages. See the instructor-facing [Significance Matrix guide](docs/significance-guide.md) for what the p-value means, the two test families, and citations for papers.
 - **Dynamic Sizing**: Adjustable dot size via slider control
 
 ### Grade Management
