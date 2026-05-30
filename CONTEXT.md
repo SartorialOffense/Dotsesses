@@ -28,8 +28,10 @@ MuppetName.
 **StudentAttribute**: A non-numeric piece of Student data, e.g.
 `Submitted Outline = "Yes"` or `Mid-Term = "✔✔+"`. Categorical. May
 originate from auto-detection at load time (any non-numeric, non-empty
-cell in a column flips the entire column to a StudentAttribute) or, in
-slice 2, from a user converting a numeric Score column to Categorical
+cell *in a Student data row* — a row with a numeric Id — flips the
+entire column to a StudentAttribute; trailer rows such as summary
+statistics or a repeated header row are ignored for this decision) or,
+in slice 2, from a user converting a numeric Score column to Categorical
 in the Settings dialog. StudentAttributes appear in the Drill-down
 panel's Attributes list and as the *columns* of the
 **Significance Matrix**, but do not contribute to AggregateScore and

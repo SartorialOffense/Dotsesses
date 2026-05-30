@@ -407,6 +407,61 @@ public class ScoreReaderTests : IDisposable
             w.Kind == ReadWarningKind.CategoricalColumnDetected && w.Message.Contains("Mid-Term"));
     }
 
+    [Fact]
+    public void Read_TrailerRowsWithoutNumericId_DoNotFlipNumericColumns()
+    {
+        // Real spreadsheets carry trailer rows below the roster: summary stats
+        // ("AVG") and a repeated header row whose cells hold the column names as
+        // text ("Midterm"). Those rows have no numeric Id, so the row loop
+        // discards them — and type detection must ignore them too. Otherwise the
+        // literal "Midterm" in the repeated-header row flips the Midterm column
+        // to Categorical even though every actual student's Midterm is numeric.
+        var path = WriteFixture(s =>
+        {
+            s.Cell("A1").Value = "ID";
+            s.Cell("B1").Value = "Midterm";
+            s.Cell("C1").Value = "Total";
+            s.Cell("A2").Value = 1; s.Cell("B2").Value = 80; s.Cell("C2").Value = 80;
+            s.Cell("A3").Value = 2; s.Cell("B3").Value = 70; s.Cell("C3").Value = 70;
+            // Trailer rows (no numeric Id):
+            s.Cell("A5").Value = "AVG";     s.Cell("B5").Value = 75; s.Cell("C5").Value = 75;
+            s.Cell("A6").Value = "Midterm"; s.Cell("B6").Value = "Midterm"; s.Cell("C6").Value = "Total";
+        });
+
+        var result = new ScoreReader().Read(path);
+
+        // Two real students; Midterm stayed numeric (in Scores, not Attributes).
+        Assert.Equal(2, result.Students.Count);
+        Assert.All(result.Students, st => Assert.Empty(st.Attributes));
+        Assert.Contains(result.Students[0].Scores, sc => sc.Name == "Midterm" && sc.Value == 80);
+        Assert.DoesNotContain(result.Warnings, w =>
+            w.Kind == ReadWarningKind.CategoricalColumnDetected);
+    }
+
+    [Fact]
+    public void Read_TrailerRows_DoNotMaskGenuinelyCategoricalColumns()
+    {
+        // The valid-Id gate must not over-correct: a column that is non-numeric
+        // in a real student row is still Categorical, trailer rows notwithstanding.
+        var path = WriteFixture(s =>
+        {
+            s.Cell("A1").Value = "ID";
+            s.Cell("B1").Value = "Submitted Outline";
+            s.Cell("C1").Value = "Total";
+            s.Cell("A2").Value = 1; s.Cell("B2").Value = "Yes"; s.Cell("C2").Value = 80;
+            s.Cell("A3").Value = 2; s.Cell("B3").Value = "No";  s.Cell("C3").Value = 70;
+            s.Cell("A5").Value = "AVG"; s.Cell("C5").Value = 75; // trailer
+        });
+
+        var result = new ScoreReader().Read(path);
+
+        Assert.Equal(2, result.Students.Count);
+        Assert.All(result.Students, st => Assert.Single(st.Attributes,
+            a => a.Name == "Submitted Outline"));
+        Assert.Contains(result.Warnings, w =>
+            w.Kind == ReadWarningKind.CategoricalColumnDetected && w.Message.Contains("Submitted Outline"));
+    }
+
     // ===== Hard errors =====
 
     [Fact]
