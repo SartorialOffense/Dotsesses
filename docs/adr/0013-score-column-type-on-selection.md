@@ -16,6 +16,16 @@ column to Categorical. Categorical columns produce a new
 `ReadWarningKind.CategoricalColumnDetected` warning so the user sees
 which columns were auto-classified.
 
+The type-inference pre-scan considers only **Student data rows** — rows
+whose first cell holds a numeric Id — using the same `TryReadStudentId`
+gate as the row-parsing loop. Trailer rows that real gradebooks carry
+below the roster (summary statistics like `AVG`/`Stdev`, repeated header
+rows whose cells echo the column names, max-points rows) lack a numeric
+Id and are skipped by both. Without this, the literal `"Q1"` in a
+repeated-header row would flip the `Q1` column to Categorical even
+though every actual student's `Q1` is numeric. Detection and population
+must apply the identical row-eligibility rule.
+
 Slice 2 (a follow-up branch) makes `Type` user-toggleable via a
 combobox column in the Settings dialog, with `Numeric ↔ Categorical`
 both supported. `Categorical → Numeric` is gated on every value

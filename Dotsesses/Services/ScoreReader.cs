@@ -146,14 +146,18 @@ public class ScoreReader
         }
 
         // ===== Type-inference pre-scan =====
-        // A column is Categorical if any non-empty cell fails to parse as a double.
-        // The "is this cell empty?" decision MUST match the row loop below so that
-        // detection and population stay consistent.
+        // A column is Categorical if any non-empty cell IN A STUDENT DATA ROW
+        // fails to parse as a double. The row-eligibility decision (blank rows
+        // AND rows without a numeric Id) MUST match the row loop below so that
+        // detection and population stay consistent — otherwise non-numeric text
+        // in a trailer row (e.g. a repeated header row's "Q1") flips a column to
+        // Categorical even though the row loop discards that row.
         var categoricalColumns = new HashSet<int>();
         for (int r = 1; r < table.Rows.Count; r++)
         {
             var row = table.Rows[r];
             if (IsBlankRow(row)) continue;
+            if (!TryReadStudentId(row[0], out _)) continue;
             foreach (var (columnIndex, _) in scoreColumns)
             {
                 if (categoricalColumns.Contains(columnIndex)) continue;
@@ -206,13 +210,7 @@ public class ScoreReader
                 continue;
             }
 
-            var idValue = row[0];
-            int studentId;
-            if (idValue is double d)
-            {
-                studentId = (int)d;
-            }
-            else if (!int.TryParse(idValue?.ToString(), out studentId))
+            if (!TryReadStudentId(row[0], out int studentId))
             {
                 skippedRows++;
                 continue;
@@ -397,5 +395,25 @@ public class ScoreReader
             }
         }
         return true;
+    }
+
+    /// <summary>
+    /// A row is a Student data row only if its first cell holds a valid integer
+    /// Id. Shared by the type-inference pre-scan and the row-parsing loop so the
+    /// two agree on which rows count: trailer rows that real spreadsheets carry
+    /// below the roster — summary statistics ("AVG", "Stdev"), repeated header
+    /// rows, max-points rows — all lack a numeric Id and must be ignored by
+    /// BOTH. (Previously only the parser skipped them, so non-numeric text in a
+    /// repeated header row like "Q1" wrongly flipped the Q1 column to
+    /// Categorical.)
+    /// </summary>
+    private static bool TryReadStudentId(object? idValue, out int studentId)
+    {
+        if (idValue is double d)
+        {
+            studentId = (int)d;
+            return true;
+        }
+        return int.TryParse(idValue?.ToString(), out studentId);
     }
 }
