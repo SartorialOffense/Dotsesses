@@ -176,7 +176,13 @@ with swarm overlay.
 - One series per Score whose **Display** ScoreSelection flag is on.
 - Hollow square for any Score with a Comment; filled circle otherwise.
 - Hover: highlights the same Student in every series and in the
-  dotplot. Tooltip shows Score value and that Score's Comment.
+  dotplot. Tooltip shows Score value and that Score's Comment. Each
+  hovered Student gets one tooltip per series; these normally float
+  beside their dots, but when **more than 10** score series are shown
+  they crowd the dots, so they relocate to the very top of the plot
+  (each still horizontally aligned to its series column). Odd-indexed
+  series are staggered down by one tooltip height into a second row so
+  neighbouring tooltips stay legible.
 - Resize debounce: 300 ms before regenerating the Python plot.
 - Click / double-click / right-click — same comment-editor behavior as
   the dotplot.

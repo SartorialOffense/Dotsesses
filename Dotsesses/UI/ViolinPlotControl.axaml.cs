@@ -451,8 +451,17 @@ public partial class ViolinPlotControl : UserControl
             var displayWidth = plotBounds.Width > 0 ? plotBounds.Width : 800;
             var displayHeight = plotBounds.Height > 0 ? plotBounds.Height : 400;
 
-            foreach (var point in studentPoints)
+            // With many score series the per-dot tooltips crowd the plot, so
+            // pin them to a single row at the very top (still aligned to each
+            // series' column) once the displayed-series count exceeds the
+            // threshold. See SPEC "Distribution plot".
+            bool pinTooltipsToTop =
+                vm.GetAllPoints().Select(p => p.Series).Distinct().Count() > MaxSeriesForInlineTooltips;
+
+            for (int seriesIndex = 0; seriesIndex < studentPoints.Count; seriesIndex++)
             {
+                var point = studentPoints[seriesIndex];
+
                 // Find the shape for this student using actual display coordinates
                 var (displayX, displayY) = vm.SvgToDisplayWithSize(point.X, point.Y, displayWidth, displayHeight);
 
@@ -480,15 +489,13 @@ public partial class ViolinPlotControl : UserControl
                 }
 
                 // Create tooltip
-                CreateTooltip(point, displayX, displayY);
+                CreateTooltip(point, displayX, displayY, pinTooltipsToTop, seriesIndex);
 
                 // Create comment at top or bottom based on series index, centered on series X position
                 // Use live comment from ClassAssessment instead of cached point.Comment
                 var liveComment = vm.GetLiveComment(point.StudentId, point.Series);
                 if (!string.IsNullOrEmpty(liveComment))
                 {
-                    // Find series index to determine top vs bottom positioning
-                    var seriesIndex = studentPoints.IndexOf(point);
                     CreateSeriesComment(point, liveComment, displayX, displayHeight, seriesIndex);
                 }
             }
@@ -576,7 +583,17 @@ public partial class ViolinPlotControl : UserControl
         CommentsOverlay.Children.Add(commentBorder);
     }
 
-    private void CreateTooltip(ViolinDataPoint point, double displayX, double displayY)
+    // Above this many displayed score series, hover tooltips move from beside
+    // each dot to a single row pinned at the top of the plot (they crowd the
+    // dots otherwise).
+    private const int MaxSeriesForInlineTooltips = 10;
+    private const double TooltipTopMargin = 4;
+    private const double TooltipRowGap = 2;
+    // Odd-row tooltips drop a full tooltip height plus 25% so the two rows
+    // read with a clear gap rather than sitting flush.
+    private const double SecondRowHeightFactor = 1.25;
+
+    private void CreateTooltip(ViolinDataPoint point, double displayX, double displayY, bool pinToTop, int seriesIndex)
     {
         var tooltipBorder = new Border
         {
@@ -626,6 +643,7 @@ public partial class ViolinPlotControl : UserControl
         // Measure tooltip to determine positioning
         tooltipBorder.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         double tooltipWidth = tooltipBorder.DesiredSize.Width;
+        double tooltipHeight = tooltipBorder.DesiredSize.Height;
 
         // Get canvas width
         double canvasWidth = TooltipsOverlay.Bounds.Width;
@@ -636,7 +654,17 @@ public partial class ViolinPlotControl : UserControl
             : displayX + 20;
 
         Canvas.SetLeft(tooltipBorder, leftPos);
-        Canvas.SetTop(tooltipBorder, displayY - 10);
+        // Many-series mode: pin to the top of the plot (still horizontally
+        // aligned to the series column) instead of floating beside the dot.
+        // Stagger odd series into a second row — offset down by a full tooltip
+        // height — so neighbouring top-row tooltips don't overlap horizontally.
+        double topPos = displayY - 10;
+        if (pinToTop)
+        {
+            double secondRowOffset = (seriesIndex % 2 == 1) ? tooltipHeight * SecondRowHeightFactor + TooltipRowGap : 0;
+            topPos = TooltipTopMargin + secondRowOffset;
+        }
+        Canvas.SetTop(tooltipBorder, topPos);
 
         TooltipsOverlay.Children.Add(tooltipBorder);
     }
