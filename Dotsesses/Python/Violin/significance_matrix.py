@@ -11,7 +11,8 @@ using CYCLING_PALETTE (the same palette violin/correlation use). The index
 resets per categorical matrix-column, so "Yes" in `Hat` and "Yes" in
 `Submitted Outline` may be different colors.
 
-Subgroup ordering within a column: alphabetical ascending.
+Subgroup ordering within a column: caller-supplied via `ordered_subgroups`
+(ADR-0017) — suffixed labels by their ~N rank, then unsuffixed alphabetical.
 
 Y-axis scale: shared per row using [min(mean - SEM), max(mean + SEM)] across
 all cells in the row, padded by 5%.
@@ -221,6 +222,7 @@ def create_significance_matrix(
     fig_size: Tuple[float, float],
     numeric_series: List[Tuple[str, Dict[str, float]]],
     categorical_series: List[Tuple[str, Dict[str, str]]],
+    ordered_subgroups: List[List[str]],
     theme: str = 'dark',
     dot_size: float = 5.0,
     test_family: str = 'parametric',
@@ -233,6 +235,11 @@ def create_significance_matrix(
     fig_size : (width_inches, height_inches)
     numeric_series : list of (column_name, {student_id_str: numeric_value})
     categorical_series : list of (column_name, {student_id_str: subgroup_string})
+    ordered_subgroups : list aligned with categorical_series; entry j is the
+        caller-supplied canonical left-to-right order of column j's subgroup
+        labels (ADR-0017 — ownership of ordering lives in C#). Any present
+        label not listed is appended in alphabetical order as a fallback; an
+        empty entry falls back to fully alphabetical for that column.
     theme : 'dark' or 'light'
     dot_size : marker radius in points (squared internally for scatter size)
     test_family : 'parametric' (Welch's ANOVA) or 'nonparametric'
@@ -269,7 +276,8 @@ def create_significance_matrix(
         return ({'TOTAL': int((time.perf_counter() - t_start) * 1000)}, svg_output, [])
 
     # ----- Subgroup stats per cell -----
-    # cell_stats[(i, j)] = list of (subgroup_label, mean, sem, n) in alpha order
+    # cell_stats[(i, j)] = list of (subgroup_label, mean, sem, n) in canonical
+    # (caller-supplied) subgroup order — ADR-0017.
     cell_stats: Dict[Tuple[int, int], List[Tuple[str, float, float, int]]] = {}
     # cell_pvalues[(i, j)] = (p_value_or_None, excluded_subgroup_labels) from
     # the per-cell omnibus test (see compute_cell_pvalue / ADR-0014 slice 4).
@@ -279,11 +287,16 @@ def create_significance_matrix(
     column_subgroup_index: Dict[int, Dict[str, int]] = {}
 
     for j, (cat_name, cat_data) in enumerate(categorical_series):
-        # Canonical ordering for this column — alphabetical ascending across
-        # ALL distinct subgroup values seen in the data (even ones that
-        # collapse to N=0 in some cells, so they keep their color).
-        distinct = sorted(set(cat_data.values()))
-        column_subgroup_index[j] = {sg: idx for idx, sg in enumerate(distinct)}
+        # Canonical ordering for this column comes from the caller (ADR-0017):
+        # ordered_subgroups[j] lists the labels in left-to-right order across
+        # ALL distinct subgroup values (even ones that collapse to N=0 in some
+        # cells, so they keep their color). Present-but-unlisted labels are
+        # appended alphabetically; a missing/empty entry falls back to alpha.
+        present = set(cat_data.values())
+        provided = ordered_subgroups[j] if j < len(ordered_subgroups) else []
+        ordered = [sg for sg in provided if sg in present]
+        ordered += sorted(present - set(ordered))
+        column_subgroup_index[j] = {sg: idx for idx, sg in enumerate(ordered)}
 
     t_data_prep = time.perf_counter()
 
@@ -296,7 +309,11 @@ def create_significance_matrix(
                 subgroup_to_values.setdefault(cat_data[sid], []).append(num_data[sid])
 
             row_stats = []
-            for sg in sorted(subgroup_to_values.keys()):
+            # Walk subgroups in the column's canonical order (ADR-0017) rather
+            # than alphabetically, so dot/SVG point order matches the x layout.
+            col_idx = column_subgroup_index[j]
+            for sg in sorted(subgroup_to_values.keys(),
+                             key=lambda s: col_idx.get(s, len(col_idx))):
                 values = subgroup_to_values[sg]
                 n = len(values)
                 if n == 0:
@@ -370,8 +387,8 @@ def create_significance_matrix(
 
             for (sg, mean_val, sem, n) in stats:
                 color_idx = sg_to_idx.get(sg, 0)
-                # Use column-canonical alphabetical index so identical
-                # subgroup positions across all rows keep the same x slot.
+                # Use the column-canonical index (ADR-0017 caller order) so
+                # identical subgroups keep the same x slot/color across rows.
                 x_pos = color_idx
                 xs.append(x_pos)
                 ys.append(mean_val)
@@ -432,10 +449,11 @@ def create_significance_matrix(
             y_lo, y_hi = row_ylims[i]
             ax.set_ylim(y_lo, y_hi)
 
-            # X ticks: the full subgroup list for this column (alpha order).
-            # Labels AND tick marks only on the bottom row — upper rows hide
-            # both so the cells sit flush vertically (hspace=0 above).
-            distinct_sgs = sorted(sg_to_idx.keys())
+            # X ticks: the full subgroup list for this column in canonical
+            # (caller-supplied) order — ADR-0017. Labels AND tick marks only on
+            # the bottom row — upper rows hide both so the cells sit flush
+            # vertically (hspace=0 above).
+            distinct_sgs = [sg for sg, _ in sorted(sg_to_idx.items(), key=lambda kv: kv[1])]
             ax.set_xticks(list(range(len(distinct_sgs))))
             if i == n_rows - 1:
                 ax.set_xticklabels(distinct_sgs, fontsize=7, rotation=30, ha='right')

@@ -35,13 +35,26 @@ public class SignificancePlotService
         List<(string Name, Dictionary<string, string> Subgroups)> categoricalSeries,
         double dotSize = 5.0,
         ThemeName theme = ThemeName.DarkMode,
-        SignificanceTestFamily testFamily = SignificanceTestFamily.Parametric)
+        SignificanceTestFamily testFamily = SignificanceTestFamily.Parametric,
+        List<(string Name, List<string> Order)>? subgroupOrders = null)
     {
         var pyNumeric = numericSeries
             .Select(s => (s.Name, (IReadOnlyDictionary<string, double>)s.Values.AsReadOnly()))
             .ToList();
         var pyCategorical = categoricalSeries
             .Select(s => (s.Name, (IReadOnlyDictionary<string, string>)s.Subgroups.AsReadOnly()))
+            .ToList();
+
+        // Canonical subgroup order per categorical column (ADR-0017). Built in
+        // C#; Python consumes it verbatim. Look up by series name and emit a
+        // list aligned with pyCategorical so column j matches order j; a column
+        // with no supplied order gets an empty list (Python falls back to alpha).
+        var orderByName = (subgroupOrders ?? new())
+            .GroupBy(o => o.Name)
+            .ToDictionary(g => g.Key, g => g.First().Order);
+        var pyOrdered = categoricalSeries
+            .Select(s => (IReadOnlyList<string>)(
+                orderByName.TryGetValue(s.Name, out var o) ? o : new List<string>()))
             .ToList();
 
         var themeStr = theme == ThemeName.LightMode ? "light" : "dark";
@@ -53,6 +66,7 @@ public class SignificancePlotService
             (figSize.Width, figSize.Height),
             pyNumeric,
             pyCategorical,
+            pyOrdered,
             themeStr,
             dotSize,
             testFamilyStr);

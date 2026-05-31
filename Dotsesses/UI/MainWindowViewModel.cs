@@ -442,6 +442,49 @@ public partial class MainWindowViewModel : ViewModelBase
         return result;
     }
 
+    /// <summary>
+    /// Builds the canonical subgroup order per categorical/ordinal column for the
+    /// Significance Matrix (ADR-0017): suffixed labels by their <c>~N</c> rank,
+    /// then unsuffixed alphabetical. Aligned by series name with
+    /// <see cref="BuildCategoricalSeriesData"/> (same selector, same iteration),
+    /// so the renderer can match column j's order to column j's data.
+    /// </summary>
+    public static List<(string SeriesName, List<string> OrderedSubgroups)> BuildSubgroupOrders(
+        ClassAssessment classAssessment,
+        Func<ScoreSelection, bool> selector)
+    {
+        ArgumentNullException.ThrowIfNull(classAssessment);
+        ArgumentNullException.ThrowIfNull(selector);
+
+        var hasSelections = classAssessment.ScoreSelections.Count > 0;
+        var keySet = classAssessment.ScoreSelections
+            .Where(selector)
+            .Select(s => (s.Name, s.Index))
+            .ToHashSet();
+
+        var result = new List<(string SeriesName, List<string> OrderedSubgroups)>();
+        if (!classAssessment.Assessments.Any()) return result;
+
+        var firstStudent = classAssessment.Assessments.First();
+        foreach (var attr in firstStudent.Attributes)
+        {
+            if (hasSelections && !keySet.Contains((attr.Name, attr.Index))) continue;
+            var seriesName = attr.Index.HasValue ? $"{attr.Name} {attr.Index}" : attr.Name;
+            var observations = new List<(string Label, int? SortOrder)>();
+            foreach (var assessment in classAssessment.Assessments)
+            {
+                var studentAttr = assessment.Attributes.FirstOrDefault(a =>
+                    a.Name == attr.Name && a.Index == attr.Index);
+                if (studentAttr != null)
+                {
+                    observations.Add((studentAttr.Value, studentAttr.SortOrder));
+                }
+            }
+            result.Add((seriesName, Calculators.SubgroupOrderCalculator.Order(observations)));
+        }
+        return result;
+    }
+
     public static List<(string SeriesName, Dictionary<string, double> Scores)> BuildSeriesData(
         ClassAssessment classAssessment,
         Func<ScoreSelection, bool> selector)
@@ -607,12 +650,16 @@ public partial class MainWindowViewModel : ViewModelBase
 
                 var numericSeries = BuildSeriesData(ClassAssessment,
                     s => s.Significance && s.Type == ScoreColumnType.Numeric);
-                var categoricalSeries = BuildCategoricalSeriesData(ClassAssessment,
-                    s => s.Significance && s.Type == ScoreColumnType.Categorical);
+                // Ordinal columns join the matrix as categorical columns
+                // (ADR-0017) — their labels are Subgroups; SortOrder drives order.
+                bool isSigCategorical(ScoreSelection s) => s.Significance &&
+                    (s.Type == ScoreColumnType.Categorical || s.Type == ScoreColumnType.Ordinal);
+                var categoricalSeries = BuildCategoricalSeriesData(ClassAssessment, isSigCategorical);
+                var subgroupOrders = BuildSubgroupOrders(ClassAssessment, isSigCategorical);
 
                 await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                 {
-                    SignificancePlotViewModel.UpdateDataAndRegenerate(numericSeries, categoricalSeries, 5.0);
+                    SignificancePlotViewModel.UpdateDataAndRegenerate(numericSeries, categoricalSeries, 5.0, subgroupOrders);
                 });
 
                 Log("MainWindowViewModel: Significance Matrix initialization completed");
@@ -1741,8 +1788,12 @@ public partial class MainWindowViewModel : ViewModelBase
         if (ClassAssessment == null || _significancePlotService == null) return;
 
         var numericSeries = BuildSeriesData(ClassAssessment, s => s.Type == ScoreColumnType.Numeric);
+        // Ordinal columns are Significance Matrix columns too (ADR-0017), so
+        // they count as optimization targets. Ordering isn't needed here —
+        // ComputeCellPValues (the only consumer below) is order-independent.
         var categoricalSeries = BuildCategoricalSeriesData(
-            ClassAssessment, s => s.Significance && s.Type == ScoreColumnType.Categorical);
+            ClassAssessment, s => s.Significance &&
+                (s.Type == ScoreColumnType.Categorical || s.Type == ScoreColumnType.Ordinal));
         if (categoricalSeries.Count == 0) return; // nothing displayed to optimize against
 
         var testFamily = SignificancePlotViewModel?.TestFamily ?? SignificanceTestFamily.Parametric;

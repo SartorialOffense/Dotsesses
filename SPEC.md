@@ -215,10 +215,11 @@ this in Settings.
 
 Third tab in the bottom-right surface, after Distribution and
 Correlation. A matrix of small scatter cells — one row per Numeric
-column with **Significance**=true, one column per StudentAttribute
-(Categorical) column with **Significance**=true. Each cell answers:
-*does subgroup membership in this categorical column materially shift
-the average of this numeric column?*
+column with **Significance**=true, one column per Categorical *or*
+Ordinal column with **Significance**=true (an Ordinal column — one whose
+every value carries a `~N` suffix — acts as a matrix column, never a
+row; see ADR-0017). Each cell answers: *does subgroup membership in this
+categorical column materially shift the average of this numeric column?*
 
 **Default selection** (fresh load, see ADR-0016): using Welch's ANOVA
 p-values, a categorical column qualifies when its smallest p across the
@@ -233,10 +234,12 @@ test families, when to prefer each, and citations for papers — lives at
 [`docs/significance-guide.md`](docs/significance-guide.md).
 
 - Each cell plots one dot per **Subgroup** of its categorical column.
-  Dot x-position: subgroup label (alphabetical ascending). Dot
-  y-position: mean of the cell's numeric column within that subgroup.
-  Vertical line: ±SEM error bar (N ≥ 2 only; N=1 dots render with no
-  whisker).
+  Dot x-position: subgroup label, ordered by **SortOrder** — values with
+  a `~N` suffix come first in `N` order, then unsuffixed values
+  alphabetically (a column with no suffixes stays fully alphabetical;
+  see ADR-0017). Dot y-position: mean of the cell's numeric column within
+  that subgroup. Vertical line: ±SEM error bar (N ≥ 2 only; N=1 dots
+  render with no whisker).
 - Coloring: per-subgroup, from the same `CYCLING_PALETTE` as the
   violin plot, indexed positionally within each categorical column
   (the index resets per column, so "Yes" in *Hat* and "Yes" in
@@ -336,11 +339,10 @@ data lives in StudentAttributes and bypasses the violin / correlation /
 aggregate paths). The Display / Aggregate / Correlation bulk All/None
 commands skip Categorical rows for the same reason.
 
-**Significance is special**: it is meaningful for *both* Numeric and
-Categorical rows. A Numeric column with Significance=true becomes a
-row in the Significance Matrix; a Categorical column with
-Significance=true becomes a column in the Significance Matrix. The
-Significance bulk All/None commands therefore apply to every row,
+**Significance is special**: it is meaningful for *all* Types. A Numeric
+column with Significance=true becomes a row in the Significance Matrix; a
+Categorical *or* Ordinal column with Significance=true becomes a column.
+The Significance bulk All/None commands therefore apply to every row,
 regardless of Type. There is no locked-Total or last-row guard — an
 empty Significance Matrix is a fine degenerate state (the tab shows
 an empty-state hint).

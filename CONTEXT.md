@@ -72,11 +72,17 @@ manual type override.
 *Submitted Outline* form one Subgroup. Each cell of the
 **Significance Matrix** plots one dot per Subgroup of the cell's
 categorical column, positioned at (subgroup label, mean of the cell's
-continuous column within that subgroup) with a ±SEM error bar.
+continuous column within that subgroup) with a ±SEM error bar. Subgroups
+are ordered left-to-right by their **SortOrder** (suffixed labels by
+`~N` rank, then unsuffixed alphabetically) rather than purely
+alphabetically; this ordering is computed in C# and the Python renderer
+consumes it verbatim (see ADR-0017).
 
 **Significance Matrix**: A matrix of small scatter cells — one row per
-Numeric column with `Significance=true`, one column per
-StudentAttribute (Categorical) column with `Significance=true`. Each
+Numeric column with `Significance=true`, one column per **Categorical**
+*or* **Ordinal** column with `Significance=true` (an Ordinal column acts
+as a Significance Matrix column, never a row — see **Ordinal**,
+ADR-0017). Each
 cell answers: "does subgroup membership in this categorical column
 materially shift the average of this numeric column?" The descriptive
 layer plots mean + SEM dots per Subgroup; the inferential layer

@@ -32,6 +32,7 @@ public partial class SignificancePlotViewModel : ViewModelBase
     private double _displayHeight;
     private List<(string Name, Dictionary<string, double> Values)> _numericSeries = new();
     private List<(string Name, Dictionary<string, string> Subgroups)> _categoricalSeries = new();
+    private List<(string Name, List<string> Order)> _subgroupOrders = new();
     private double _dotSize = 5.0;
 
     [ObservableProperty]
@@ -77,10 +78,12 @@ public partial class SignificancePlotViewModel : ViewModelBase
         List<(string Name, Dictionary<string, double> Values)> numericSeries,
         List<(string Name, Dictionary<string, string> Subgroups)> categoricalSeries,
         double dotSize = 5.0,
-        ThemeName theme = ThemeName.DarkMode)
+        ThemeName theme = ThemeName.DarkMode,
+        List<(string Name, List<string> Order)>? subgroupOrders = null)
     {
         _numericSeries = numericSeries;
         _categoricalSeries = categoricalSeries;
+        _subgroupOrders = subgroupOrders ?? new();
         _dotSize = dotSize;
         _displayWidth = displaySize.Width;
         _displayHeight = displaySize.Height;
@@ -95,7 +98,8 @@ public partial class SignificancePlotViewModel : ViewModelBase
             categoricalSeries,
             dotSize,
             theme,
-            TestFamily);
+            TestFamily,
+            _subgroupOrders);
 
         SvgContent = svgContent;
         _dataPoints = dataPoints;
@@ -108,21 +112,23 @@ public partial class SignificancePlotViewModel : ViewModelBase
         {
             return;
         }
-        GeneratePlot((displayWidth, displayHeight), _numericSeries, _categoricalSeries, _dotSize, theme);
+        GeneratePlot((displayWidth, displayHeight), _numericSeries, _categoricalSeries, _dotSize, theme, _subgroupOrders);
     }
 
     public void UpdateDataAndRegenerate(
         List<(string Name, Dictionary<string, double> Values)> numericSeries,
         List<(string Name, Dictionary<string, string> Subgroups)> categoricalSeries,
-        double dotSize)
+        double dotSize,
+        List<(string Name, List<string> Order)>? subgroupOrders = null)
     {
         _numericSeries = numericSeries;
         _categoricalSeries = categoricalSeries;
+        _subgroupOrders = subgroupOrders ?? new();
         _dotSize = dotSize;
 
         var displayWidth = _displayWidth > 0 ? _displayWidth : 800;
         var displayHeight = _displayHeight > 0 ? _displayHeight : 600;
-        GeneratePlot((displayWidth, displayHeight), _numericSeries, _categoricalSeries, _dotSize);
+        GeneratePlot((displayWidth, displayHeight), _numericSeries, _categoricalSeries, _dotSize, ThemeName.DarkMode, _subgroupOrders);
     }
 
     public List<SignificanceDataPoint> GetAllPoints() => _dataPoints;
