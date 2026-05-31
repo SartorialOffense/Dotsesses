@@ -141,3 +141,17 @@ enforces `[min−1, max+5]` (issue #9 / Q3, asymmetric per
 maintainer preference). Rejected moves are silently dropped, so
 the cursor visually parks at its last valid position when the
 mouse pushes past the boundary.
+
+---
+
+### TD008 — Significance-star tier thresholds were inline in one module *(closed)*
+
+**Resolved by ADR-0018 slice 0 (2026-05-31).** The `.05/.01/.001`
+star tiers lived inline in `significance_matrix.py`'s
+`_format_pvalue_annotation`. ADR-0018 makes both stats tabs star
+identically from raw p, so the thresholds moved to a single
+`significance_stars(p)` helper in `Dotsesses/Python/Violin/stats_common.py`
+before the Correlation tab grew its own copy. `_format_pvalue_annotation`
+now delegates to it; the correlation path (slice 3) will reuse the same
+helper. Exercised through C# via CSnakes (`StatsCommon().SignificanceStars`)
+in `SignificanceStarsTests`.

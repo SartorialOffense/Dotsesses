@@ -52,6 +52,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats as _stats
 
+from stats_common import significance_stars
+
 
 def apply_theme(theme: str = 'dark'):
     """Apply matplotlib theme based on theme name."""
@@ -203,16 +205,10 @@ def _format_pvalue_annotation(p: Optional[float]) -> Tuple[str, bool]:
     """
     if p is None:
         return ('—', False)
+    stars = significance_stars(p)  # shared tier thresholds (ADR-0018)
     if p < 0.001:
-        stars = '***'
         p_text = 'p<.001'
     else:
-        if p < 0.01:
-            stars = '**'
-        elif p < 0.05:
-            stars = '*'
-        else:
-            stars = ''
         p_text = 'p=' + f'{p:.3f}'.lstrip('0')  # e.g. 'p=.003'
     label = (p_text + ' ' + stars).strip()
     return (label, bool(stars))

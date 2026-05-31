@@ -56,6 +56,9 @@
         <AdditionalFiles Include="Python/Violin/significance_matrix.py">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </AdditionalFiles>
+        <AdditionalFiles Include="Python/Violin/stats_common.py">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </AdditionalFiles>
         <None Include="Python/Violin/pyproject.toml">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
