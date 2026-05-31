@@ -127,6 +127,38 @@ def get_r_squared_color(r_squared: float, theme: str = 'dark') -> str:
             return f'#{r:02x}{g:02x}{b:02x}'
 
 
+def _rest_score_debias(
+    x_data: Dict[str, float],
+    y_data: Dict[str, float],
+    x_is_total: bool,
+    y_is_total: bool,
+    x_is_component: bool,
+    y_is_component: bool,
+) -> Tuple[Dict[str, float], Dict[str, float], bool]:
+    """
+    Apply the corrected item-total (rest-score) de-bias to a Total × aggregate-
+    component cell (ADR-0018 slice 2).
+
+    Correlating a component X against a Total that *contains* X correlates X
+    partly with itself, inflating r. The classical-test-theory fix is to
+    correlate X against the rest score Total − X (per common student). We
+    correct ONLY when exactly one axis is Total and the other is an aggregate
+    component; every other cell (component-vs-component, Total-vs-non-component,
+    ordinal, etc.) is returned unchanged.
+
+    Returns (eff_x_data, eff_y_data, corrected).
+    """
+    if x_is_total and y_is_component:
+        common = set(x_data) & set(y_data)
+        rest = {sid: x_data[sid] - y_data[sid] for sid in common}
+        return (rest, y_data, True)
+    if y_is_total and x_is_component:
+        common = set(x_data) & set(y_data)
+        rest = {sid: y_data[sid] - x_data[sid] for sid in common}
+        return (x_data, rest, True)
+    return (x_data, y_data, False)
+
+
 def create_correlation_matrix(
     fig_size: Tuple[float, float],
     series: List[Tuple[str, Dict[str, float]]],
@@ -170,6 +202,15 @@ def create_correlation_matrix(
     if n == 0:
         return ({'TOTAL': 0}, '', [])
 
+    # Normalize the per-series metadata lists to length n so positional indexing
+    # is safe even if a caller under-supplies (defensive — C# sends aligned
+    # lists of length n).
+    is_total = [bool(is_total[k]) if k < len(is_total) else False for k in range(n)]
+    is_aggregate_component = [
+        bool(is_aggregate_component[k]) if k < len(is_aggregate_component) else False
+        for k in range(n)
+    ]
+
     # Create figure with subplots - corner plot (lower triangle only)
     fig, axes = plt.subplots(n, n, figsize=fig_size)
 
@@ -190,26 +231,44 @@ def create_correlation_matrix(
     for _, scores in series:
         all_ids.update(scores.keys())
 
-    # Pre-calculate r² for all lower-triangle cells (for coloring)
+    # Per lower-triangle cell, compute the EFFECTIVE data both axes correlate
+    # over. For a Total × aggregate-component cell this is the rest-score
+    # de-bias (Total − X); every other cell is unchanged (ADR-0018 slice 2).
+    # `blank` flags a corrected cell whose rest score is degenerate — a single-
+    # component Total makes Total − X ≡ 0 (zero variance → r undefined), so the
+    # cell is rendered empty. All downstream passes (r², scatter, regression,
+    # point extraction) read this one dict so they never disagree.
+    cell_data: Dict[Tuple[int, int], Tuple[Dict[str, float], Dict[str, float], bool, bool]] = {}
     r_squared_matrix = {}
     for i in range(n):
         _, y_data = series[i]
         for j in range(i):  # Only lower triangle
             _, x_data = series[j]
-            common_ids = set(x_data.keys()) & set(y_data.keys())
+            eff_x, eff_y, corrected = _rest_score_debias(
+                x_data, y_data,
+                is_total[j], is_total[i],
+                is_aggregate_component[j], is_aggregate_component[i])
+
+            common_ids = set(eff_x.keys()) & set(eff_y.keys())
+            blank = False
+            r_sq = 0.0
             if len(common_ids) > 1:
-                x_vals = [x_data[sid] for sid in common_ids]
-                y_vals = [y_data[sid] for sid in common_ids]
-                try:
-                    r = np.corrcoef(x_vals, y_vals)[0, 1]
-                    if not np.isnan(r):
-                        r_squared_matrix[(i, j)] = r ** 2
-                    else:
-                        r_squared_matrix[(i, j)] = 0.0
-                except Exception:
-                    r_squared_matrix[(i, j)] = 0.0
-            else:
-                r_squared_matrix[(i, j)] = 0.0
+                x_vals = [eff_x[sid] for sid in common_ids]
+                y_vals = [eff_y[sid] for sid in common_ids]
+                if corrected and (np.std(x_vals) == 0 or np.std(y_vals) == 0):
+                    # Degenerate rest score (single-component Total). Blank it.
+                    blank = True
+                else:
+                    try:
+                        r = np.corrcoef(x_vals, y_vals)[0, 1]
+                        r_sq = r ** 2 if not np.isnan(r) else 0.0
+                    except Exception:
+                        r_sq = 0.0
+            elif corrected and len(common_ids) < 2:
+                blank = True
+
+            cell_data[(i, j)] = (eff_x, eff_y, corrected, blank)
+            r_squared_matrix[(i, j)] = r_sq
 
     # Process each cell
     for i in range(n):
@@ -247,17 +306,21 @@ def create_correlation_matrix(
                        ha='center', va='center', fontsize=9, fontweight='bold',
                        color=x_series_color, alpha=0.7)
             else:
-                # Lower triangle: scatter plot - color by r²
-                # Get common student IDs
-                common_ids = sorted(set(x_data.keys()) & set(y_data.keys()))
+                # Lower triangle: scatter plot - color by r². Use the cell's
+                # EFFECTIVE data (rest-score de-biased when corrected) so the
+                # dots, fitted line, and r annotation are all consistent
+                # (ADR-0018 slice 2).
+                eff_x, eff_y, corrected, blank = cell_data.get(
+                    (i, j), (x_data, y_data, False, False))
+                common_ids = sorted(set(eff_x.keys()) & set(eff_y.keys()))
 
                 # Get r²-based color for this cell
                 r_sq = r_squared_matrix.get((i, j), 0.0)
                 cell_color = get_r_squared_color(r_sq, theme)
 
-                if len(common_ids) > 0:
-                    x_vals = [x_data[sid] for sid in common_ids]
-                    y_vals = [y_data[sid] for sid in common_ids]
+                if not blank and len(common_ids) > 0:
+                    x_vals = [eff_x[sid] for sid in common_ids]
+                    y_vals = [eff_y[sid] for sid in common_ids]
 
                     # Draw scatter with r²-based color
                     scatter = ax.scatter(x_vals, y_vals, s=dot_size**2,
@@ -353,10 +416,16 @@ def create_correlation_matrix(
                 # Skip upper triangle and diagonal (no scatter points)
                 continue
 
-            # This is a lower triangle scatter plot
-            common_ids = sorted(set(x_data.keys()) & set(y_data.keys()))
+            # Lower triangle. Use the cell's EFFECTIVE (rest-score de-biased)
+            # data so the stored x_value/y_value and the SVG point matching line
+            # up with what was actually scattered (ADR-0018 slice 2). Blanked
+            # cells drew no scatter, so they produced no PathCollection — skip
+            # them here too or the collection indices desync.
+            eff_x, eff_y, corrected, blank = cell_data.get(
+                (i, j), (x_data, y_data, False, False))
+            common_ids = sorted(set(eff_x.keys()) & set(eff_y.keys()))
 
-            if len(common_ids) == 0:
+            if blank or len(common_ids) == 0:
                 continue
 
             # Get r²-based color for this cell (same as used for matplotlib scatter)
@@ -379,8 +448,8 @@ def create_correlation_matrix(
 
                 # Match SVG points to data points by sorting
                 # SVG points should be in the same order as data
-                x_vals = [x_data[sid] for sid in common_ids]
-                y_vals = [y_data[sid] for sid in common_ids]
+                x_vals = [eff_x[sid] for sid in common_ids]
+                y_vals = [eff_y[sid] for sid in common_ids]
 
                 # Calculate expected positions and match
                 if len(svg_points) == len(common_ids):
@@ -393,8 +462,8 @@ def create_correlation_matrix(
                             'id': sid,
                             'x_series': x_name,
                             'y_series': y_name,
-                            'x_value': x_data[sid],
-                            'y_value': y_data[sid],
+                            'x_value': eff_x[sid],
+                            'y_value': eff_y[sid],
                             'color': cell_color  # Color by r² value
                         })
 
@@ -408,9 +477,10 @@ def create_correlation_matrix(
                                 break
             else:
                 # No SVG points found, calculate positions manually
-                # This happens if SVG extraction fails
-                x_vals = [x_data[sid] for sid in common_ids]
-                y_vals = [y_data[sid] for sid in common_ids]
+                # This happens if SVG extraction fails. Effective data again
+                # (ADR-0018 slice 2) so manual positions match the de-biased axis.
+                x_vals = [eff_x[sid] for sid in common_ids]
+                y_vals = [eff_y[sid] for sid in common_ids]
 
                 # Estimate cell bounds
                 cell_left = j * cell_width + cell_width * 0.1
@@ -437,8 +507,8 @@ def create_correlation_matrix(
                         'id': sid,
                         'x_series': x_name,
                         'y_series': y_name,
-                        'x_value': x_data[sid],
-                        'y_value': y_data[sid],
+                        'x_value': eff_x[sid],
+                        'y_value': eff_y[sid],
                         'color': cell_color  # Color by r² value
                     })
 

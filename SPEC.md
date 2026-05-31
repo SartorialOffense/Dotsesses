@@ -204,6 +204,18 @@ every pair of Scores whose **Correlation** ScoreSelection flag is on.
 No synthetic AggregateScore series is added to the matrix — correlating
 an aggregate against its own components would be misleading.
 
+**Rest-score de-bias** (ADR-0018): a cell relating an aggregate component
+against the **Total** column is de-biased automatically — the component is
+correlated against the rest score `Total − component` instead of the full
+Total (which contains the component and would inflate the correlation). The
+de-bias is applied transparently: the dots, fitted line, r, and r² color
+all reflect the corrected values, with no special cell marker. Because the
+cell is unmarked, the corrected fact is disclosed here in the spec (and, once
+the per-cell tooltip lands, in the tooltip's `corrected` field). A
+single-component Total makes the rest score identically zero, so that one
+cell renders blank. Component-vs-component and Total-vs-non-component cells
+are unaffected.
+
 **Default selection** (fresh load, see ADR-0016): the columns appearing
 in the **4 highest-r² pairs** among non-Total numerics, plus the **Total**
 column. (Total is excluded from the pair ranking — it tracks its

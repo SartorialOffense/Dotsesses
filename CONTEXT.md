@@ -107,6 +107,26 @@ is in the active ScoreSelection aggregate set. Used for x-axis position
 in the dotplot. Cached on StudentAssessment.
 _Avoid_: AggregateGrade (legacy code-side name; see `TECH_DEBT.md` TD001).
 
+**Rest score / corrected item-total correlation**: When the correlation
+matrix relates an aggregate component (a Numeric Score summed into Total)
+against Total itself, Total *contains* the component, so a naive
+correlation correlates the component partly with itself and inflates `r`.
+The classical-test-theory fix is to correlate the component against the
+**rest score** — `Total − component`, per Student — yielding the
+**corrected item-total correlation**. Applied only to Total ×
+aggregate-component cells; a single-component Total makes the rest score
+identically zero (undefined correlation), so that cell is blanked. See
+ADR-0018.
+
+**Effect size / variance explained**: The headline both exploratory-stats
+tabs lead with — the fraction of variation in the Score a variable
+explains, on a 0–1 scale. The correlation matrix reports **r²** (or **ρ²**
+for Spearman); the Significance Matrix reports **η²** (Welch ANOVA path) /
+**ε²** (Kruskal–Wallis path). The p-value and per-cell N are supporting
+detail, not the headline, and p is always **raw** (no multiple-comparison
+correction) — the matrices are exploratory *screening* views, treated as
+leads, not confirmation. See ADR-0018.
+
 **Grade**: A letter grade (A, A-, B+, …, F) plus its Order. The thing
 assigned to a Student based on where their AggregateScore falls
 relative to the GradeCutoffs.
