@@ -155,3 +155,22 @@ before the Correlation tab grew its own copy. `_format_pvalue_annotation`
 now delegates to it; the correlation path (slice 3) will reuse the same
 helper. Exercised through C# via CSnakes (`StatsCommon().SignificanceStars`)
 in `SignificanceStarsTests`.
+
+---
+
+### TD009 — Instructor significance guide predates the effect-size headline
+
+**Why it's debt:** `docs/significance-guide.md` (linked from `SPEC.md`)
+explains the Significance Matrix to instructors in terms of the p-value
+and the two test families. ADR-0018 made the **effect size** (η²/ε²,
+"variance explained") the headline and demoted raw p to support, and
+added the same effect-size frame (r²) to the Correlation tab. The guide
+no longer matches what the UI leads with, so a non-statistician reading
+it will over-index on p.
+
+**Trigger:** next time the guide is touched, or when an instructor asks
+what the η²/ε² number means. Cheap to fold in.
+
+**Touches:** `docs/significance-guide.md` — add an effect-size section
+(what η²/ε²/r² mean, the 0–1 "variance explained" reading, why it leads
+over p at class N); cross-reference ADR-0018.
