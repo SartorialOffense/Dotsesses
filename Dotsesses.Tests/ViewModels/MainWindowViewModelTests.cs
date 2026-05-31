@@ -150,32 +150,41 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
-    public void LoadFromExcelFile_SeedsDefaultSelections()
+    public void LoadFromExcelFile_SeedsDataDrivenDefaultSelections()
     {
         // Arrange / Act — CreateViewModel calls LoadFromExcelFile via the T01 factory.
+        // (CreateForTesting has no Python service, so the Significance refinement
+        //  is skipped; this asserts the pure Display/Correlation/Aggregate rules.
+        //  ADR-0016.)
         var vm = CreateViewModel();
 
-        // Assert
-        var firstStudentScores = vm.ClassAssessment.Assessments.First().Scores;
         var selections = vm.ClassAssessment.ScoreSelections;
-
+        var firstStudentScores = vm.ClassAssessment.Assessments.First().Scores;
         Assert.Equal(firstStudentScores.Count, selections.Count);
 
-        foreach (var sel in selections)
-        {
-            Assert.True(sel.Display, $"Display should default true for {sel.Name}");
-            Assert.True(sel.Correlation, $"Correlation should default true for {sel.Name}");
+        var numeric = selections.Where(s => s.Type == ScoreColumnType.Numeric).ToList();
+        var total = numeric.SingleOrDefault(s =>
+            string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase) && s.Index == null);
+        Assert.NotNull(total);
 
-            var isTotal = string.Equals(sel.Name, "Total", StringComparison.OrdinalIgnoreCase);
-            if (isTotal)
-            {
-                Assert.False(sel.Aggregate, "The 'Total' column must default to Aggregate=false.");
-            }
-            else
-            {
-                Assert.True(sel.Aggregate, $"Non-Total score {sel.Name} should default to Aggregate=true.");
-            }
-        }
+        // Distribution: Total + the first 10 non-Total numerics in column order.
+        var expectedDisplay = new HashSet<(string, int?)> { (total!.Name, total.Index) };
+        foreach (var s in numeric.Where(s => s != total).Take(10))
+            expectedDisplay.Add((s.Name, s.Index));
+        foreach (var sel in selections)
+            Assert.Equal(expectedDisplay.Contains((sel.Name, sel.Index)), sel.Display);
+
+        // Correlation: Total always in; pared to the top-4-pair union (≤ 9 columns).
+        Assert.True(total.Correlation, "Total must always be selected for Correlation.");
+        Assert.All(selections.Where(s => s.Correlation),
+            s => Assert.Equal(ScoreColumnType.Numeric, s.Type));
+        Assert.True(selections.Count(s => s.Correlation) <= 9,
+            "Correlation default is at most Total + the 4 top-r² pairs (≤ 9 columns).");
+
+        // Aggregate is unchanged by the data-driven selection.
+        Assert.False(total.Aggregate, "The 'Total' column must default to Aggregate=false.");
+        Assert.All(numeric.Where(s => s != total),
+            s => Assert.True(s.Aggregate, $"Non-Total score {s.Name} should default to Aggregate=true."));
     }
 
     [Fact]

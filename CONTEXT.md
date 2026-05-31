@@ -99,7 +99,10 @@ data lives in StudentAttributes and bypasses the violin / correlation /
 aggregate paths. Significance is meaningful for *both* Types — Numeric
 columns become Significance Matrix rows, Categorical columns become
 Significance Matrix columns. Persisted on ClassAssessment (see
-ADR-0013, ADR-0014).
+ADR-0013, ADR-0014). At fresh load the flags are seeded **data-driven**
+per plot rather than all-on — Total + 10 leftmost for Display, the
+top-r² pairs + Total for Correlation, and qualifying categoricals with
+their strongest numerics for Significance (see ADR-0016).
 
 **ClassAssessment**: The post-load dataset for one Class — the
 StudentAssessments, the GradeCurve in use, ScoreSelections,

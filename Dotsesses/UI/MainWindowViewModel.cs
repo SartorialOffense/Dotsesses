@@ -42,6 +42,9 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly HoverDelayService _hoverDelayService = null!;
     private readonly StateService _stateService = null!;
     private readonly WorkspaceFactory? _workspaceFactory;
+    // Used at load to compute data-driven default Significance selection
+    // (ADR-0016). Null in the test factory, which skips that refinement.
+    private readonly SignificancePlotService? _significancePlotService;
 
     /// <summary>
     /// Gets a fresh GradeAssigner built from the session's current
@@ -201,7 +204,8 @@ public partial class MainWindowViewModel : ViewModelBase
         SignificancePlotViewModel significancePlotViewModel,
         HoverDelayService hoverDelayService,
         StateService stateService,
-        WorkspaceFactory workspaceFactory)
+        WorkspaceFactory workspaceFactory,
+        SignificancePlotService significancePlotService)
     {
         Log("MainWindowViewModel: Constructor started");
 
@@ -212,6 +216,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _hoverDelayService = hoverDelayService;
         _stateService = stateService;
         _workspaceFactory = workspaceFactory;
+        _significancePlotService = significancePlotService;
 
         // Create the tab container ViewModel
         _plotTabContainerViewModel = new PlotTabContainerViewModel(violinPlotViewModel, correlationPlotViewModel, significancePlotViewModel);
@@ -276,6 +281,7 @@ public partial class MainWindowViewModel : ViewModelBase
             null!,
             new HoverDelayService(),
             new StateService(),
+            null!,
             null!);
     }
 
@@ -1610,15 +1616,80 @@ public partial class MainWindowViewModel : ViewModelBase
         if (!ClassAssessment.Assessments.Any()) return;
 
         var firstStudent = ClassAssessment.Assessments.First();
-        ClassAssessment.ScoreSelections = ScoreSelectionDefaults.GenerateDefaults(
+        var baseDefaults = ScoreSelectionDefaults.GenerateDefaults(
             firstStudent.Scores,
             firstStudent.Attributes);
+
+        ClassAssessment.ScoreSelections = ApplyDataDrivenSelection(baseDefaults);
 
         var aggregateSet = BuildAggregateSet(ClassAssessment.ScoreSelections);
         foreach (var assessment in ClassAssessment.Assessments)
         {
             assessment.RecalculateAggregate(aggregateSet);
         }
+    }
+
+    /// <summary>
+    /// Pares the all-on base defaults down to a sensible per-plot subset
+    /// (ADR-0016): Distribution = Total + 10 leftmost numerics; Correlation =
+    /// the top-r² non-Total pairs + Total; Significance = categoricals with a
+    /// numeric at p≤0.2 plus their top-3 numerics. Only Display / Correlation /
+    /// Significance are rewritten; Type and Aggregate are preserved. The
+    /// Significance refinement is skipped (base flags kept) when the Python
+    /// service is unavailable (test factory).
+    /// </summary>
+    private IReadOnlyList<ScoreSelection> ApplyDataDrivenSelection(
+        IReadOnlyList<ScoreSelection> baseDefaults)
+    {
+        // Series name == the join key the plots/calculator use.
+        static string SeriesName(ScoreSelection s) =>
+            s.Index.HasValue ? $"{s.Name} {s.Index}" : s.Name;
+
+        var numericSel = baseDefaults.Where(s => s.Type == ScoreColumnType.Numeric).ToList();
+        var numericSeries = BuildSeriesData(ClassAssessment!, s => s.Type == ScoreColumnType.Numeric);
+        var categoricalSeries = BuildCategoricalSeriesData(ClassAssessment!, s => s.Type == ScoreColumnType.Categorical);
+
+        var orderedNumericNames = numericSeries.Select(s => s.SeriesName).ToList();
+        var totalName = numericSel
+            .Where(s => string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase) && s.Index == null)
+            .Select(SeriesName)
+            .FirstOrDefault();
+
+        var displayNames = PlotSelectionCalculator.SelectDistribution(orderedNumericNames, totalName);
+
+        var correlationInput = numericSeries
+            .Select(s => (s.SeriesName, (IReadOnlyDictionary<string, double>)s.Scores))
+            .ToList();
+        var correlationNames = PlotSelectionCalculator.SelectCorrelation(correlationInput, totalName);
+
+        // Significance needs per-cell p-values (Python). Skip the refinement
+        // when the service is absent — leave the base Significance flags.
+        HashSet<string>? significanceNames = null;
+        if (_significancePlotService != null && categoricalSeries.Count > 0)
+        {
+            var pvalues = _significancePlotService.ComputeCellPValues(
+                numericSeries.Select(s => (s.SeriesName, s.Scores)).ToList(),
+                categoricalSeries.Select(s => (s.SeriesName, s.Subgroups)).ToList(),
+                SignificanceTestFamily.Parametric);
+            significanceNames = PlotSelectionCalculator.SelectSignificance(
+                orderedNumericNames,
+                categoricalSeries.Select(s => s.SeriesName).ToList(),
+                (num, cat) => pvalues.TryGetValue((num, cat), out var p) ? p : null);
+        }
+
+        return baseDefaults.Select(s =>
+        {
+            var name = SeriesName(s);
+            bool isNumeric = s.Type == ScoreColumnType.Numeric;
+            return s with
+            {
+                Display = isNumeric ? displayNames.Contains(name) : s.Display,
+                Correlation = isNumeric && correlationNames.Contains(name),
+                Significance = significanceNames != null
+                    ? significanceNames.Contains(name)
+                    : s.Significance,
+            };
+        }).ToList();
     }
 
     /// <summary>

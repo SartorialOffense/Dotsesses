@@ -86,4 +86,44 @@ public class SignificancePlotService
 
         return (svgContent, dataPoints);
     }
+
+    /// <summary>
+    /// Computes the per-cell omnibus p-value for every (numeric, categorical)
+    /// pair in a single Python call — no plot rendering. Used at load time to
+    /// drive the data-driven default Significance selection (see ADR-0016).
+    /// Returns a map keyed by (numericSeriesName, categoricalSeriesName); a
+    /// null value means the cell was untestable.
+    /// </summary>
+    public Dictionary<(string Num, string Cat), double?> ComputeCellPValues(
+        List<(string Name, Dictionary<string, double> Values)> numericSeries,
+        List<(string Name, Dictionary<string, string> Subgroups)> categoricalSeries,
+        SignificanceTestFamily testFamily = SignificanceTestFamily.Parametric)
+    {
+        var result = new Dictionary<(string Num, string Cat), double?>();
+        if (numericSeries.Count == 0 || categoricalSeries.Count == 0)
+        {
+            return result;
+        }
+
+        var pyNumeric = numericSeries
+            .Select(s => (s.Name, (IReadOnlyDictionary<string, double>)s.Values.AsReadOnly()))
+            .ToList();
+        var pyCategorical = categoricalSeries
+            .Select(s => (s.Name, (IReadOnlyDictionary<string, string>)s.Subgroups.AsReadOnly()))
+            .ToList();
+
+        var testFamilyStr = testFamily == SignificanceTestFamily.Nonparametric
+            ? "nonparametric"
+            : "parametric";
+
+        var rows = _module.ComputeSignificancePvalues(pyNumeric, pyCategorical, testFamilyStr);
+        foreach (var rowObj in rows)
+        {
+            var d = rowObj.As<IReadOnlyDictionary<string, PyObject>>();
+            var p = d["p"].As<double>();
+            result[(d["num"].As<string>(), d["cat"].As<string>())] =
+                double.IsNaN(p) ? null : p;
+        }
+        return result;
+    }
 }

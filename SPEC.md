@@ -174,6 +174,9 @@ with swarm overlay.
   to the C# side and rendered with an Avalonia shape overlay for
   hit-testing and hover effects.
 - One series per Score whose **Display** ScoreSelection flag is on.
+  **Default selection** (fresh load, see ADR-0016): the **Total** column
+  plus the first **10** non-Total numeric columns in left-to-right order
+  (≤ 11 series). Adjustable in Settings.
 - Hollow square for any Score with a Comment; filled circle otherwise.
 - Hover: highlights the same Student in every series and in the
   dotplot. Tooltip shows Score value and that Score's Comment. Each
@@ -198,9 +201,15 @@ with swarm overlay.
 
 Sibling tab in the bottom-right surface. Pearson correlation between
 every pair of Scores whose **Correlation** ScoreSelection flag is on.
-The user-defined AggregateScore deliberately does **not** appear in
-the matrix — correlating an aggregate against its own components would
-be misleading.
+No synthetic AggregateScore series is added to the matrix — correlating
+an aggregate against its own components would be misleading.
+
+**Default selection** (fresh load, see ADR-0016): the columns appearing
+in the **4 highest-r² pairs** among non-Total numerics, plus the **Total**
+column. (Total is excluded from the pair ranking — it tracks its
+components and would otherwise win every slot — but is included so the
+matrix opens with the overall-score column present.) The user can change
+this in Settings.
 
 ## Significance matrix
 
@@ -210,6 +219,12 @@ column with **Significance**=true, one column per StudentAttribute
 (Categorical) column with **Significance**=true. Each cell answers:
 *does subgroup membership in this categorical column materially shift
 the average of this numeric column?*
+
+**Default selection** (fresh load, see ADR-0016): using Welch's ANOVA
+p-values, a categorical column qualifies when its smallest p across the
+numerics is **≤ 0.2**; each qualifier brings in its **3 numerics with the
+smallest p**. The matrix opens on the union of qualifying categoricals and
+those numerics (empty matrix if none qualify). Adjustable in Settings.
 
 A plain-language guide for instructors — what the p-value means, the two
 test families, when to prefer each, and citations for papers — lives at
