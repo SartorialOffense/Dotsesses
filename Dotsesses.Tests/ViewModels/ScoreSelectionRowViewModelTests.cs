@@ -314,4 +314,43 @@ public class ScoreSelectionRowViewModelTests
 
         Assert.False(snapshot.Significance);
     }
+
+    // ===== Ordinal type is auto-detected, never user-editable (ADR-0017) =====
+
+    [Fact]
+    public void Type_OrdinalRow_IsTypeLocked()
+    {
+        var selection = MakeSelection("Mid-Term", null, type: ScoreColumnType.Ordinal, aggregate: false);
+        var vm = new ScoreSelectionRowViewModel(selection, () => true);
+
+        Assert.True(vm.IsTypeLocked);
+    }
+
+    [Fact]
+    public void Type_OrdinalRow_CannotBeRetyped()
+    {
+        var selection = MakeSelection("Mid-Term", null, type: ScoreColumnType.Ordinal, aggregate: false);
+        var vm = new ScoreSelectionRowViewModel(selection, () => true);
+
+        vm.Type = ScoreColumnType.Categorical;
+        Assert.Equal(ScoreColumnType.Ordinal, vm.Type);
+
+        vm.Type = ScoreColumnType.Numeric;
+        Assert.Equal(ScoreColumnType.Ordinal, vm.Type);
+    }
+
+    [Fact]
+    public void Type_ConvertingIntoOrdinal_Rejected()
+    {
+        // Ordinal is never a user-selectable target.
+        var selection = MakeSelection("Mid-Term", null, type: ScoreColumnType.Categorical, aggregate: false);
+        var vm = new ScoreSelectionRowViewModel(selection, () => true);
+        var fires = 0;
+        vm.PropertyChanged += (_, _) => fires++;
+
+        vm.Type = ScoreColumnType.Ordinal;
+
+        Assert.Equal(ScoreColumnType.Categorical, vm.Type);
+        Assert.Equal(0, fires);
+    }
 }

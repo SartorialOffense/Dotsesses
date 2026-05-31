@@ -339,6 +339,15 @@ data lives in StudentAttributes and bypasses the violin / correlation /
 aggregate paths). The Display / Aggregate / Correlation bulk All/None
 commands skip Categorical rows for the same reason.
 
+A row whose Type is **Ordinal** (auto-detected from the `~N` suffix
+convention — ADR-0017) shows `Ordinal` in the Type combobox but the
+control is **disabled**: Ordinal is detected from the data, never set or
+cleared by hand. Unlike a plain Categorical, an Ordinal *can* have
+Display and Correlation enabled — it appears in the violin and
+correlation views using `N` as the value, with the stripped label on
+hover — but Display starts off (opt-in) and Aggregate stays disabled (an
+`N` rank is never summed into AggregateScore).
+
 **Significance is special**: it is meaningful for *all* Types. A Numeric
 column with Significance=true becomes a row in the Significance Matrix; a
 Categorical *or* Ordinal column with Significance=true becomes a column.
