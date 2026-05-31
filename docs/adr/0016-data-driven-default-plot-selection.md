@@ -20,7 +20,10 @@ loaded `.dots` files).
   (numeric, categorical) cell; a categorical *qualifies* if its smallest
   p across numerics is **≤ 0.2**; each qualifier contributes its **3
   smallest-p numerics**; the union of qualifying categoricals and those
-  numerics is selected.
+  numerics is selected. A **Grade**/**Grades** categorical is excluded
+  from auto-selection (it's derived from the scores, so it tests as
+  trivially significant — same spirit as excluding Total from the
+  correlation ranking). The user can still enable it in Settings.
 
 `Aggregate` is untouched (still every non-Total numeric; it drives the
 dotplot AggregateScore, independent of which plots show which columns).

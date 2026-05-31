@@ -98,21 +98,31 @@ public static class PlotSelectionCalculator
     /// <paramref name="threshold"/>; for each qualifier the
     /// <paramref name="topNumerics"/> numerics with the smallest p are added.
     /// Returns the union of qualifying categoricals and their selected numerics.
+    /// Categoricals named in <paramref name="excludedCategoricalNames"/>
+    /// (case-insensitive) are never auto-selected — e.g. a Grade column, which
+    /// is derived from the scores and would test as trivially significant.
     /// </summary>
     public static HashSet<string> SelectSignificance(
         IReadOnlyList<string> numericNames,
         IReadOnlyList<string> categoricalNames,
         Func<string, string, double?> pLookup,
         double threshold = 0.2,
-        int topNumerics = 3)
+        int topNumerics = 3,
+        IReadOnlyCollection<string>? excludedCategoricalNames = null)
     {
         ArgumentNullException.ThrowIfNull(numericNames);
         ArgumentNullException.ThrowIfNull(categoricalNames);
         ArgumentNullException.ThrowIfNull(pLookup);
 
+        var excluded = new HashSet<string>(
+            excludedCategoricalNames ?? Array.Empty<string>(),
+            StringComparer.OrdinalIgnoreCase);
+
         var result = new HashSet<string>(StringComparer.Ordinal);
         foreach (var cat in categoricalNames)
         {
+            if (excluded.Contains(cat)) continue;
+
             var ps = numericNames
                 .Select(n => (Name: n, P: pLookup(n, cat)))
                 .Where(t => t.P.HasValue)
