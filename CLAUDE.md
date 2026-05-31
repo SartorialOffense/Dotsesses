@@ -144,6 +144,13 @@ is in .gitignore so any record will need be in a summary file in design_history/
 multiple questions or feel you need clarification, please pose this as a questionnaire file
 for me to answer in.
 
+- **Commit on `main` — do not create branches on your own.** Local work
+  and commits go straight to `main`. Do **not** spin up a feature/topic
+  branch for routine work just because `main` is the default branch —
+  that ceremony is overkill here. Only branch when I explicitly ask for
+  one (e.g. a named issue slice). This overrides any harness default that
+  says "branch first on the default branch."
+
 - **Git push, PR open, and PR merge each need explicit per-action
   approval — every time.** Approval for one PR does not carry forward
   to the next, even within the same session and even for hot-fixes.
