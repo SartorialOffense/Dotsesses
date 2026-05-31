@@ -37,9 +37,13 @@ public partial class ScoreSelectionRowViewModel : ViewModelBase
 
     /// <summary>
     /// Static option list backing the Type combobox in the Settings dialog.
+    /// <see cref="ScoreColumnType.Ordinal"/> is auto-detected from the data
+    /// (ADR-0017) and never user-selectable; it appears here only so an Ordinal
+    /// row can render its current type, and the combobox is disabled for such a
+    /// row (see <see cref="IsTypeLocked"/>).
     /// </summary>
     public IReadOnlyList<ScoreColumnType> TypeOptions { get; } =
-        new[] { ScoreColumnType.Numeric, ScoreColumnType.Categorical };
+        new[] { ScoreColumnType.Numeric, ScoreColumnType.Categorical, ScoreColumnType.Ordinal };
 
     /// <summary>
     /// Display name following the canonical project pattern from
@@ -57,8 +61,10 @@ public partial class ScoreSelectionRowViewModel : ViewModelBase
     /// <summary>
     /// True when this row's Type cell is locked. Total stays Numeric — either the user's
     /// pre-summed column or our synthesized aggregate mirror, both numeric by definition.
+    /// An Ordinal row is also locked: Ordinal is auto-detected from the <c>~N</c> suffix
+    /// convention (ADR-0017) and cannot be set or cleared by hand.
     /// </summary>
-    public bool IsTypeLocked => IsAggregateLocked;
+    public bool IsTypeLocked => IsAggregateLocked || _type == ScoreColumnType.Ordinal;
 
     [ObservableProperty]
     private bool _display;
@@ -120,8 +126,16 @@ public partial class ScoreSelectionRowViewModel : ViewModelBase
                 return;
             }
 
-            // G2-type: Total stays Numeric.
+            // G2-type: Total stays Numeric, and an auto-detected Ordinal row
+            // can't be retyped by hand (ADR-0017).
             if (IsTypeLocked)
+            {
+                return;
+            }
+
+            // G5-type: Ordinal is auto-detected only — never a user-selectable
+            // target. Reject any attempt to convert a row *into* Ordinal.
+            if (value == ScoreColumnType.Ordinal)
             {
                 return;
             }

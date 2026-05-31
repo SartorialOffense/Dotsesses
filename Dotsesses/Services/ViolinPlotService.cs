@@ -26,6 +26,10 @@ public class ViolinPlotService
     /// <param name="dotSize">Size of swarm dots</param>
     /// <param name="swarmSpread">Multiplier for horizontal spread of swarm dots (default 1.0, increase to spread wider)</param>
     /// <param name="theme">Theme name for rendering ('dark' or 'light')</param>
+    /// <param name="ordinalLabelMap">Optional map of (student ID, series name) to the
+    /// Ordinal column's display label (ADR-0017); when present the point's
+    /// <see cref="ViolinDataPoint.ValueLabel"/> carries it so hover shows the label
+    /// (e.g. "✔✔+") instead of the numeric SortOrder.</param>
     /// <returns>Tuple of (SVG content string, list of data points for rendering)</returns>
     public (string SvgContent, List<ViolinDataPoint> DataPoints) GeneratePlot(
         (double Width, double Height) figSize,
@@ -34,7 +38,8 @@ public class ViolinPlotService
         Dictionary<int, string> muppetNameMap,
         double dotSize = 5.0,
         double swarmSpread = 1.0,
-        ThemeName theme = ThemeName.DarkMode)
+        ThemeName theme = ThemeName.DarkMode,
+        Dictionary<(int StudentId, string SeriesName), string>? ordinalLabelMap = null)
     {
         // Convert to format expected by Python module
         var pySeriesList = seriesData
@@ -94,11 +99,15 @@ public class ViolinPlotService
             // Get muppet name for this student
             string muppetName = muppetNameMap.TryGetValue(studentId, out string? name) ? name : "";
 
+            // Ordinal series: the hover label (e.g. "✔✔+") for this point's value.
+            string valueLabel = ordinalLabelMap != null &&
+                ordinalLabelMap.TryGetValue((studentId, series), out string? lbl) ? lbl : "";
+
             // Calculate sigma value for this point's series
             var stats = seriesStats[series];
             var sigmaValue = stats.StdDev > 0 ? (value - stats.Mean) / stats.StdDev : 0;
 
-            dataPoints.Add(new ViolinDataPoint(x, y, studentId, series, color, value, sigmaValue, comment, muppetName));
+            dataPoints.Add(new ViolinDataPoint(x, y, studentId, series, color, value, sigmaValue, comment, muppetName, valueLabel));
         }
 
         return (svgContent, dataPoints);

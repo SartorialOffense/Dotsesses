@@ -519,7 +519,70 @@ public partial class MainWindowViewModel : ViewModelBase
             }
             result.Add((seriesName, seriesScores));
         }
+
+        // Ordinal columns (ADR-0017) are numeric-capable: their data lives in
+        // Attributes but SortOrder (N) is the value, so they can appear in the
+        // violin / correlation views like a Score. Only emit those whose
+        // (Name, Index) is in the selector-derived key set AND typed Ordinal —
+        // a plain Categorical attribute has no numeric value and is skipped.
+        var ordinalKeys = classAssessment.ScoreSelections
+            .Where(s => s.Type == ScoreColumnType.Ordinal)
+            .Where(s => !hasSelections || keySet.Contains((s.Name, s.Index)))
+            .Select(s => (s.Name, s.Index))
+            .ToHashSet();
+        if (ordinalKeys.Count > 0)
+        {
+            foreach (var attr in firstStudent.Attributes)
+            {
+                if (!ordinalKeys.Contains((attr.Name, attr.Index))) continue;
+                var seriesName = attr.Index.HasValue ? $"{attr.Name} {attr.Index}" : attr.Name;
+                var seriesScores = new Dictionary<string, double>();
+                foreach (var assessment in classAssessment.Assessments)
+                {
+                    var studentAttr = assessment.Attributes.FirstOrDefault(a =>
+                        a.Name == attr.Name && a.Index == attr.Index);
+                    if (studentAttr?.SortOrder is int n)
+                    {
+                        seriesScores[$"S{assessment.Id:D3}"] = n;
+                    }
+                }
+                result.Add((seriesName, seriesScores));
+            }
+        }
         return result;
+    }
+
+    /// <summary>
+    /// Builds the hover-label map for Ordinal series in the violin plot
+    /// (ADR-0017): keyed by (studentId, seriesName), the value is the stripped
+    /// categorical label (e.g. "✔✔+") so the tooltip can show it instead of the
+    /// numeric SortOrder. Only Ordinal columns matching the selector contribute;
+    /// numeric Scores have no entry (their tooltip keeps showing the number).
+    /// </summary>
+    public static Dictionary<(int StudentId, string SeriesName), string> BuildOrdinalLabelMap(
+        ClassAssessment classAssessment,
+        Func<ScoreSelection, bool> selector)
+    {
+        ArgumentNullException.ThrowIfNull(classAssessment);
+        ArgumentNullException.ThrowIfNull(selector);
+
+        var map = new Dictionary<(int StudentId, string SeriesName), string>();
+        var ordinalKeys = classAssessment.ScoreSelections
+            .Where(s => s.Type == ScoreColumnType.Ordinal && selector(s))
+            .Select(s => (s.Name, s.Index))
+            .ToHashSet();
+        if (ordinalKeys.Count == 0) return map;
+
+        foreach (var assessment in classAssessment.Assessments)
+        {
+            foreach (var attr in assessment.Attributes)
+            {
+                if (!ordinalKeys.Contains((attr.Name, attr.Index))) continue;
+                var seriesName = attr.Index.HasValue ? $"{attr.Name} {attr.Index}" : attr.Name;
+                map[(assessment.Id, seriesName)] = attr.Value;
+            }
+        }
+        return map;
     }
 
     /// <summary>
@@ -565,11 +628,14 @@ public partial class MainWindowViewModel : ViewModelBase
                 var muppetNameMap = ClassAssessment.MuppetNameMap
                     .ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Name);
 
+                // Ordinal series carry a label for hover (✔✔+ rather than 3); ADR-0017.
+                var ordinalLabelMap = BuildOrdinalLabelMap(ClassAssessment, s => s.Display);
+
                 // Now update the ViewModel on the UI thread
                 await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     ViolinPlotViewModel.SetClassAssessment(ClassAssessment);
-                    ViolinPlotViewModel.UpdateDataAndRegenerate(seriesData, commentMap, muppetNameMap, 3.0);
+                    ViolinPlotViewModel.UpdateDataAndRegenerate(seriesData, commentMap, muppetNameMap, 3.0, ordinalLabelMap);
                 });
 
                 Log("MainWindowViewModel: Violin plot initialization completed");

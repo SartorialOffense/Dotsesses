@@ -618,8 +618,12 @@ public partial class ViolinPlotControl : UserControl
             FontWeight = FontWeight.Bold
         };
 
-        // Score value (colored)
-        scoreText.Inlines.Add(new Avalonia.Controls.Documents.Run($"{Math.Round(point.Value)} ") { Foreground = colorBrush });
+        // Score value (colored). Ordinal series show their label (e.g. "✔✔+")
+        // instead of the numeric SortOrder (ADR-0017).
+        var valueText = string.IsNullOrEmpty(point.ValueLabel)
+            ? $"{Math.Round(point.Value)} "
+            : $"{point.ValueLabel} ";
+        scoreText.Inlines.Add(new Avalonia.Controls.Documents.Run(valueText) { Foreground = colorBrush });
         // Pipe (white)
         scoreText.Inlines.Add(new Avalonia.Controls.Documents.Run("| ") { Foreground = whiteBrush });
         // Sigma value (colored)

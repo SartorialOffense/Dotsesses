@@ -25,6 +25,7 @@ public partial class ViolinPlotViewModel : ViewModelBase
     private double _displayHeight;
     private List<(string SeriesName, Dictionary<string, double> Scores)> _seriesData = new();
     private Dictionary<(int StudentId, string SeriesName), string> _commentMap = new();
+    private Dictionary<(int StudentId, string SeriesName), string> _ordinalLabelMap = new();
     private Dictionary<int, string> _muppetNameMap = new();
     private double _dotSize = 3.0;
     private ClassAssessment? _classAssessment;
@@ -121,11 +122,13 @@ public partial class ViolinPlotViewModel : ViewModelBase
         Dictionary<(int StudentId, string SeriesName), string> commentMap,
         Dictionary<int, string> muppetNameMap,
         double dotSize = 5.0,
-        ThemeName theme = ThemeName.DarkMode)
+        ThemeName theme = ThemeName.DarkMode,
+        Dictionary<(int StudentId, string SeriesName), string>? ordinalLabelMap = null)
     {
         // Store data for later regeneration
         _seriesData = seriesData;
         _commentMap = commentMap;
+        _ordinalLabelMap = ordinalLabelMap ?? new();
         _muppetNameMap = muppetNameMap;
         _dotSize = dotSize;
         _displayWidth = displaySize.Width;
@@ -143,7 +146,8 @@ public partial class ViolinPlotViewModel : ViewModelBase
             commentMap,
             muppetNameMap,
             dotSize,
-            theme: theme);
+            theme: theme,
+            ordinalLabelMap: _ordinalLabelMap);
 
         SvgContent = svgContent;
         _dataPoints = dataPoints;
@@ -168,7 +172,7 @@ public partial class ViolinPlotViewModel : ViewModelBase
             return;
         }
 
-        GeneratePlot((displayWidth, displayHeight), _seriesData, _commentMap, _muppetNameMap, _dotSize, theme);
+        GeneratePlot((displayWidth, displayHeight), _seriesData, _commentMap, _muppetNameMap, _dotSize, theme, _ordinalLabelMap);
     }
 
     /// <summary>
@@ -178,11 +182,13 @@ public partial class ViolinPlotViewModel : ViewModelBase
         List<(string SeriesName, Dictionary<string, double> Scores)> seriesData,
         Dictionary<(int StudentId, string SeriesName), string> commentMap,
         Dictionary<int, string> muppetNameMap,
-        double dotSize)
+        double dotSize,
+        Dictionary<(int StudentId, string SeriesName), string>? ordinalLabelMap = null)
     {
         // Store new data
         _seriesData = seriesData;
         _commentMap = commentMap;
+        _ordinalLabelMap = ordinalLabelMap ?? new();
         _muppetNameMap = muppetNameMap;
         _dotSize = dotSize;
 
@@ -190,7 +196,7 @@ public partial class ViolinPlotViewModel : ViewModelBase
         var displayWidth = _displayWidth > 0 ? _displayWidth : 800;
         var displayHeight = _displayHeight > 0 ? _displayHeight : 400;
 
-        GeneratePlot((displayWidth, displayHeight), _seriesData, _commentMap, _muppetNameMap, _dotSize);
+        GeneratePlot((displayWidth, displayHeight), _seriesData, _commentMap, _muppetNameMap, _dotSize, ThemeName.DarkMode, _ordinalLabelMap);
     }
 
     /// <summary>
