@@ -162,6 +162,37 @@ def compute_cell_pvalue(
     return (_welch_anova_pvalue(valid_groups), excluded)
 
 
+def compute_significance_pvalues(
+    numeric_series: List[Tuple[str, Dict[str, float]]],
+    categorical_series: List[Tuple[str, Dict[str, str]]],
+    test_family: str = 'parametric',
+) -> List[Dict]:
+    """
+    Per (numeric, categorical) cell, group the numeric values by the
+    categorical subgroup over their common students and run the omnibus test
+    (same grouping as the matrix; see compute_cell_pvalue). Returns a flat list
+    of {'num', 'cat', 'p'} where 'p' is NaN when the cell is untestable.
+
+    A single call computes every cell, so the C# side can drive default
+    Significance selection at load time without rendering the matrix or making
+    one interop call per cell (ADR-0016).
+    """
+    results: List[Dict] = []
+    for num_name, num_data in numeric_series:
+        for cat_name, cat_data in categorical_series:
+            subgroup_to_values: Dict[str, List[float]] = {}
+            common_ids = set(cat_data.keys()) & set(num_data.keys())
+            for sid in common_ids:
+                subgroup_to_values.setdefault(cat_data[sid], []).append(num_data[sid])
+            p, _excluded = compute_cell_pvalue(subgroup_to_values, test_family)
+            results.append({
+                'num': num_name,
+                'cat': cat_name,
+                'p': float(p) if p is not None else float('nan'),
+            })
+    return results
+
+
 def _format_pvalue_annotation(p: Optional[float]) -> Tuple[str, bool]:
     """
     Build the in-cell annotation label and whether it is significant.

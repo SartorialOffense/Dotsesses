@@ -27,10 +27,10 @@ public class MainWindowViewModelBuildSeriesDataTests
         var excluded = firstStudentScores.First();
         var excludedDisplayName = DisplayName(excluded);
 
+        // Normalize to all-Display-on, then flip just the excluded column off,
+        // so this exercises the filter independent of the data-driven defaults.
         var newSelections = vm.ClassAssessment.ScoreSelections
-            .Select(s => (s.Name == excluded.Name && s.Index == excluded.Index)
-                ? s with { Display = false }
-                : s)
+            .Select(s => s with { Display = !(s.Name == excluded.Name && s.Index == excluded.Index) })
             .ToList();
         vm.ClassAssessment.ScoreSelections = newSelections;
 
@@ -51,10 +51,10 @@ public class MainWindowViewModelBuildSeriesDataTests
         var excluded = firstStudentScores.Last();
         var excludedDisplayName = DisplayName(excluded);
 
+        // Normalize to all-Correlation-on, then flip just the excluded column
+        // off, so this exercises the filter independent of the data-driven defaults.
         var newSelections = vm.ClassAssessment.ScoreSelections
-            .Select(s => (s.Name == excluded.Name && s.Index == excluded.Index)
-                ? s with { Correlation = false }
-                : s)
+            .Select(s => s with { Correlation = !(s.Name == excluded.Name && s.Index == excluded.Index) })
             .ToList();
         vm.ClassAssessment.ScoreSelections = newSelections;
 
@@ -95,10 +95,10 @@ public class MainWindowViewModelBuildSeriesDataTests
         var excluded = firstStudentScores[0];
         var sampled = firstStudentScores[1];
 
+        // Normalize to all-Display-on, then flip just the excluded column off,
+        // so this exercises the filter independent of the data-driven defaults.
         var newSelections = vm.ClassAssessment.ScoreSelections
-            .Select(s => (s.Name == excluded.Name && s.Index == excluded.Index)
-                ? s with { Display = false }
-                : s)
+            .Select(s => s with { Display = !(s.Name == excluded.Name && s.Index == excluded.Index) })
             .ToList();
         vm.ClassAssessment.ScoreSelections = newSelections;
 
