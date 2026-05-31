@@ -648,10 +648,19 @@ public partial class ViolinPlotControl : UserControl
         // Get canvas width
         double canvasWidth = TooltipsOverlay.Bounds.Width;
 
-        // Position on left if too close to right edge, otherwise on right
-        double leftPos = displayX + 20 + tooltipWidth > canvasWidth
-            ? displayX - tooltipWidth - 20
-            : displayX + 20;
+        // Pinned-to-top tooltips are centered on their series column; beside-
+        // the-dot tooltips sit to the right (or left when near the right edge).
+        double leftPos = pinToTop
+            ? displayX - tooltipWidth / 2
+            : (displayX + 20 + tooltipWidth > canvasWidth
+                ? displayX - tooltipWidth - 20
+                : displayX + 20);
+
+        // Keep edge tooltips fully on-canvas.
+        if (canvasWidth > tooltipWidth)
+        {
+            leftPos = Math.Clamp(leftPos, 0, canvasWidth - tooltipWidth);
+        }
 
         Canvas.SetLeft(tooltipBorder, leftPos);
         // Many-series mode: pin to the top of the plot (still horizontally
