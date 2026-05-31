@@ -24,6 +24,7 @@ public partial class CorrelationPlotViewModel : ViewModelBase
     private double _displayWidth;
     private double _displayHeight;
     private List<(string SeriesName, Dictionary<string, double> Scores)> _seriesData = new();
+    private Dictionary<string, CorrelationColumnInfo> _columnMetadata = new();
     private Dictionary<int, string> _muppetNameMap = new();
     private double _dotSize = 3.0;
     private int _seriesCount;
@@ -90,12 +91,14 @@ public partial class CorrelationPlotViewModel : ViewModelBase
     public void GeneratePlot(
         (double Width, double Height) displaySize,
         List<(string SeriesName, Dictionary<string, double> Scores)> seriesData,
+        Dictionary<string, CorrelationColumnInfo> columnMetadata,
         Dictionary<int, string> muppetNameMap,
         double dotSize = 3.0,
         ThemeName theme = ThemeName.DarkMode)
     {
         // Store data for later regeneration
         _seriesData = seriesData;
+        _columnMetadata = columnMetadata;
         _muppetNameMap = muppetNameMap;
         _dotSize = dotSize;
         _displayWidth = displaySize.Width;
@@ -111,6 +114,7 @@ public partial class CorrelationPlotViewModel : ViewModelBase
         var (svgContent, dataPoints) = _correlationService.GeneratePlot(
             (widthInches, heightInches),
             seriesData,
+            columnMetadata,
             muppetNameMap,
             dotSize,
             ShowCorrelationCoefficients,
@@ -132,7 +136,7 @@ public partial class CorrelationPlotViewModel : ViewModelBase
         if (_seriesData.Count == 0)
             return;
 
-        GeneratePlot((displayWidth, displayHeight), _seriesData, _muppetNameMap, _dotSize, theme);
+        GeneratePlot((displayWidth, displayHeight), _seriesData, _columnMetadata, _muppetNameMap, _dotSize, theme);
     }
 
     /// <summary>
@@ -140,17 +144,19 @@ public partial class CorrelationPlotViewModel : ViewModelBase
     /// </summary>
     public void UpdateDataAndRegenerate(
         List<(string SeriesName, Dictionary<string, double> Scores)> seriesData,
+        Dictionary<string, CorrelationColumnInfo> columnMetadata,
         Dictionary<int, string> muppetNameMap,
         double dotSize)
     {
         _seriesData = seriesData;
+        _columnMetadata = columnMetadata;
         _muppetNameMap = muppetNameMap;
         _dotSize = dotSize;
 
         var displayWidth = _displayWidth > 0 ? _displayWidth : 800;
         var displayHeight = _displayHeight > 0 ? _displayHeight : 600;
 
-        GeneratePlot((displayWidth, displayHeight), _seriesData, _muppetNameMap, _dotSize);
+        GeneratePlot((displayWidth, displayHeight), _seriesData, _columnMetadata, _muppetNameMap, _dotSize);
     }
 
     /// <summary>

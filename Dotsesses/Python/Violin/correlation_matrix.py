@@ -43,17 +43,17 @@ CYCLING_PALETTE = [
 TOTAL_COLOR = '#FF3333'  # Bright red - reserved for Total
 
 
-def get_series_color(series_name: str, series_list: List[str]) -> str:
-    """Get the color for a series based on its position in the list."""
-    if series_name not in series_list:
-        return '#888888'
+def get_series_color(idx: int, is_total: bool) -> str:
+    """
+    Color for a series by its position, with Total drawn red.
 
-    idx = series_list.index(series_name)
-
-    # Last series (Total) is always red
-    if idx == len(series_list) - 1:
+    ADR-0018 slice 1: Total identity is an explicit per-series flag, not the
+    last-series positional assumption it used to be. Non-Total series cycle
+    through CYCLING_PALETTE by index; the Total series is always red wherever
+    it sits in the list (and if no series is flagged Total, none is red).
+    """
+    if is_total:
         return TOTAL_COLOR
-
     return CYCLING_PALETTE[idx % len(CYCLING_PALETTE)]
 
 
@@ -130,6 +130,9 @@ def get_r_squared_color(r_squared: float, theme: str = 'dark') -> str:
 def create_correlation_matrix(
     fig_size: Tuple[float, float],
     series: List[Tuple[str, Dict[str, float]]],
+    column_types: List[str],
+    is_aggregate_component: List[bool],
+    is_total: List[bool],
     theme: str = 'dark',
     dot_size: float = 3.0,
     show_correlation_coefficients: bool = True,
@@ -141,6 +144,15 @@ def create_correlation_matrix(
     Parameters:
     - fig_size: tuple of (width, height) in inches as floats
     - series: list of tuples (series_name, {id: value})
+    - column_types: per-series column kind aligned with `series`, one of
+        'numeric' / 'categorical' / 'ordinal'. Drives the Pearson/Spearman
+        split (slice 3); unused for rendering in slice 1.
+    - is_aggregate_component: per-series flag aligned with `series`, True iff
+        the column is a Numeric AggregateScore component (not Total). Marks the
+        cells the rest-score de-bias corrects (slice 2); unused in slice 1.
+    - is_total: per-series flag aligned with `series`, True for the Total
+        column. Replaces the old 'Total is the last series' assumption — the
+        red Total styling keys off this flag (ADR-0018 slice 1).
     - theme: 'dark' or 'light' for visual theme
     - dot_size: size for scatter dots
     - show_correlation_coefficients: whether to display r values
@@ -157,8 +169,6 @@ def create_correlation_matrix(
     n = len(series)
     if n == 0:
         return ({'TOTAL': 0}, '', [])
-
-    series_names = [s[0] for s in series]
 
     # Create figure with subplots - corner plot (lower triangle only)
     fig, axes = plt.subplots(n, n, figsize=fig_size)
@@ -204,12 +214,13 @@ def create_correlation_matrix(
     # Process each cell
     for i in range(n):
         y_name, y_data = series[i]
-        # Use series color for diagonal KDE/histogram
-        y_series_color = get_series_color(y_name, series_names)
+        # Use series color for diagonal KDE/histogram. Total identity is an
+        # explicit per-series flag now (ADR-0018 slice 1), not last-position.
+        y_series_color = get_series_color(i, is_total[i] if i < len(is_total) else False)
 
         for j in range(n):
             x_name, x_data = series[j]
-            x_series_color = get_series_color(x_name, series_names)
+            x_series_color = get_series_color(j, is_total[j] if j < len(is_total) else False)
             ax = axes[i, j]
 
             if i < j:

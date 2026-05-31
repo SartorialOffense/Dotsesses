@@ -553,6 +553,38 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Builds per-series metadata for the correlation matrix, keyed by the same
+    /// formatted series name <see cref="BuildSeriesData"/> emits (so lookups are
+    /// order-independent). Each entry records the column's
+    /// <see cref="ScoreColumnType"/>, whether it is an AggregateScore component,
+    /// and whether it is Total — letting the Python renderer key behavior off
+    /// explicit flags instead of series position (ADR-0018 slice 1).
+    ///
+    /// Total = a Score named "Total" (case-insensitive) with no Index. An
+    /// aggregate component = a Numeric column with <c>Aggregate == true</c> that
+    /// is not Total itself. Ordinals (ADR-0017) are never components.
+    /// </summary>
+    public static Dictionary<string, CorrelationColumnInfo> BuildCorrelationColumnMetadata(
+        ClassAssessment classAssessment,
+        Func<ScoreSelection, bool> selector)
+    {
+        ArgumentNullException.ThrowIfNull(classAssessment);
+        ArgumentNullException.ThrowIfNull(selector);
+
+        var map = new Dictionary<string, CorrelationColumnInfo>();
+        foreach (var s in classAssessment.ScoreSelections.Where(selector))
+        {
+            var seriesName = s.Index.HasValue ? $"{s.Name} {s.Index}" : s.Name;
+            var isTotal = s.Index == null &&
+                string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase);
+            var isAggregateComponent =
+                s.Type == ScoreColumnType.Numeric && s.Aggregate && !isTotal;
+            map[seriesName] = new CorrelationColumnInfo(s.Type, isAggregateComponent, isTotal);
+        }
+        return map;
+    }
+
+    /// <summary>
     /// Builds the hover-label map for Ordinal series in the violin plot
     /// (ADR-0017): keyed by (studentId, seriesName), the value is the stripped
     /// categorical label (e.g. "✔✔+") so the tooltip can show it instead of the
@@ -673,6 +705,10 @@ public partial class MainWindowViewModel : ViewModelBase
                 // Transform student assessment data into correlation plot series format (CPU work).
                 // Filter by Correlation selection so toggling a Correlation checkbox hides the row/column after Apply.
                 var seriesData = BuildSeriesData(ClassAssessment, s => s.Correlation);
+                // Per-series column metadata (type / aggregate-component / Total
+                // flag) so Python keys behavior off explicit flags, not position
+                // (ADR-0018 slice 1).
+                var columnMetadata = BuildCorrelationColumnMetadata(ClassAssessment, s => s.Correlation);
 
                 // Build muppet name map: student ID -> muppet name
                 var muppetNameMap = ClassAssessment.MuppetNameMap
@@ -681,7 +717,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 // Update ViewModel on UI thread
                 await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                 {
-                    CorrelationPlotViewModel.UpdateDataAndRegenerate(seriesData, muppetNameMap, 3.0);
+                    CorrelationPlotViewModel.UpdateDataAndRegenerate(seriesData, columnMetadata, muppetNameMap, 3.0);
                 });
 
                 Log("MainWindowViewModel: Correlation plot initialization completed");
