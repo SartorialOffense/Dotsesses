@@ -224,7 +224,9 @@ the average of this numeric column?*
 p-values, a categorical column qualifies when its smallest p across the
 numerics is **≤ 0.2**; each qualifier brings in its **3 numerics with the
 smallest p**. The matrix opens on the union of qualifying categoricals and
-those numerics (empty matrix if none qualify). Adjustable in Settings.
+those numerics (empty matrix if none qualify). A **Grade**/**Grades**
+column is never auto-selected — it's derived from the scores and would
+test as trivially significant. Adjustable in Settings.
 
 A plain-language guide for instructors — what the p-value means, the two
 test families, when to prefer each, and citations for papers — lives at

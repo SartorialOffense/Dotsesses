@@ -157,6 +157,28 @@ public class PlotSelectionCalculatorTests
     }
 
     [Fact]
+    public void SelectSignificance_ExcludesNamedCategoricals_CaseInsensitive()
+    {
+        var numerics = new[] { "Q1", "Q2" };
+        var cats = new[] { "Hat", "grade" };  // "grade" would otherwise qualify
+        var p = new Dictionary<(string, string), double?>
+        {
+            [("Q1", "Hat")] = 0.01,            // Hat qualifies via Q1 only
+            // Q2 × Hat omitted → untestable, so Hat doesn't pull Q2
+            [("Q1", "grade")] = 0.001, [("Q2", "grade")] = 0.002, // only "grade" reaches Q2
+        };
+
+        var result = PlotSelectionCalculator.SelectSignificance(
+            numerics, cats, (n, c) => p.TryGetValue((n, c), out var v) ? v : null,
+            excludedCategoricalNames: new[] { "Grade", "Grades" });
+
+        Assert.Contains("Hat", result);
+        Assert.Contains("Q1", result);
+        Assert.DoesNotContain("grade", result);   // excluded despite p well under threshold
+        Assert.DoesNotContain("Q2", result);       // only pulled in via the excluded categorical
+    }
+
+    [Fact]
     public void SelectSignificance_NoQualifiers_IsEmpty()
     {
         var result = PlotSelectionCalculator.SelectSignificance(

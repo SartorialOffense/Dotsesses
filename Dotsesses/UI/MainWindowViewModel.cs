@@ -1674,7 +1674,11 @@ public partial class MainWindowViewModel : ViewModelBase
             significanceNames = PlotSelectionCalculator.SelectSignificance(
                 orderedNumericNames,
                 categoricalSeries.Select(s => s.SeriesName).ToList(),
-                (num, cat) => pvalues.TryGetValue((num, cat), out var p) ? p : null);
+                (num, cat) => pvalues.TryGetValue((num, cat), out var p) ? p : null,
+                // A Grade column is derived from the scores, so it would test as
+                // trivially significant — don't auto-select it (user can still
+                // enable it in Settings).
+                excludedCategoricalNames: new[] { "Grade", "Grades" });
         }
 
         return baseDefaults.Select(s =>
