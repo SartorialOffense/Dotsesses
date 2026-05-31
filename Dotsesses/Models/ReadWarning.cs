@@ -22,6 +22,10 @@ public enum ReadWarningKind
     ConstantColumn,
     /// <summary>A column contained non-numeric values and was auto-classified as a categorical Student Attribute.</summary>
     CategoricalColumnDetected,
+    /// <summary>A categorical column had some values with a <c>~N</c> sort-order suffix and some without (ADR-0017); unsuffixed values sort last.</summary>
+    MixedSortOrderColumn,
+    /// <summary>The same categorical label carried conflicting <c>~N</c> sort orders (ADR-0017); the minimum was used.</summary>
+    OrdinalSortOrderConflict,
 }
 
 /// <summary>

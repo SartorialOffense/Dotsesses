@@ -57,6 +57,13 @@ the JSON default, then silent-rewrite at v3 on first save. This is the
 forward-compatible pattern ADR-0002 endorses; no new migration code is
 needed.
 
+ADR-0017 follows the same pattern: `SavedAttribute` gains a nullable
+`SortOrder` and `Type` gains the `Ordinal` member, bumping
+`SavedState.Version` 5 → 6. The rejection gate stays at `< 2`; pre-v6
+files load with `SortOrder = null` (no suffix) and silent-rewrite at v6
+on first save. `Ordinal` is re-derived from the data at load anyway, so
+nothing is lost when an older file omits it.
+
 ## Considered alternatives
 
 - **Side dictionary on `ClassAssessment`** — keeps `ScoreSelection` as

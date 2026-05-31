@@ -35,7 +35,37 @@ in slice 2, from a user converting a numeric Score column to Categorical
 in the Settings dialog. StudentAttributes appear in the Drill-down
 panel's Attributes list and as the *columns* of the
 **Significance Matrix**, but do not contribute to AggregateScore and
-do not appear in the violin plot or correlation matrix.
+— unless the column is **Ordinal** (see below) — do not appear in the
+violin plot or correlation matrix. Each StudentAttribute carries an
+optional **SortOrder** (`int?`), decoded at load time from a `~N`
+suffix on the cell value (`✔✔+~3` → label `✔✔+`, SortOrder `3`); see
+**Ordinal** and **SortOrder**.
+
+**SortOrder**: An optional non-negative integer on a StudentAttribute,
+decoded at load time from a trailing `~N` suffix on the cell value
+(`Pass~2` → label `Pass`, SortOrder `2`). The suffix is stripped from
+the displayed label everywhere (Significance axis, Drill-down). Match is
+end-anchored, whitespace-tolerant around the `~`, and last-`~`-wins
+(`A~1~2` → label `A~1`, SortOrder `2`). It serves two roles: it orders
+the Subgroup labels of a categorical column in the Significance Matrix
+(unsuffixed values sort *after* suffixed ones, alphabetically among
+themselves), and — when the whole column qualifies as **Ordinal** — it
+*is* the column's numeric value. Conflicts (same label, different `N`)
+resolve to the minimum `N` with a load-time warning; ties (different
+labels, same `N`) break alphabetically without warning.
+
+**Ordinal**: A categorical column in which *every* non-empty cell carries
+a valid `~N` SortOrder — so it has both a label and a numeric value
+(`N`). It is a third **ScoreColumnType** alongside Numeric and
+Categorical. Unlike a plain Categorical, an Ordinal *can* appear in the
+violin/distribution plot and the correlation matrix (using `N` as the
+value, with the label shown on hover); like a Categorical, it acts as a
+Significance Matrix *column* (its labels are Subgroups), never a row, and
+it never contributes to AggregateScore. A categorical column that is only
+*partially* suffixed is **not** Ordinal — it stays Categorical, with the
+partial SortOrders affecting only label order, and a load-time warning is
+emitted. Ordinal status is auto-detected from the data; there is no
+manual type override.
 
 **Subgroup**: The set of Students sharing a particular
 **StudentAttribute** value — e.g. the Students who answered `"Yes"` to
@@ -91,18 +121,23 @@ GradeCurve's target ranges. The Compliance panel shows current count vs
 target range per Grade.
 
 **ScoreSelection**: A user-toggleable record per column with a Type
-discriminator (`Numeric` / `Categorical`) plus four booleans —
-Display, Aggregate, Correlation, Significance — that determine where
-the column participates. Display / Aggregate / Correlation are
-meaningful only when `Type == Numeric`; for Categorical columns the
-data lives in StudentAttributes and bypasses the violin / correlation /
-aggregate paths. Significance is meaningful for *both* Types — Numeric
-columns become Significance Matrix rows, Categorical columns become
-Significance Matrix columns. Persisted on ClassAssessment (see
-ADR-0013, ADR-0014). At fresh load the flags are seeded **data-driven**
-per plot rather than all-on — Total + 10 leftmost for Display, the
-top-r² pairs + Total for Correlation, and qualifying categoricals with
-their strongest numerics for Significance (see ADR-0016).
+discriminator (`Numeric` / `Categorical` / `Ordinal`) plus four
+booleans — Display, Aggregate, Correlation, Significance — that
+determine where the column participates. For `Numeric`, all four are
+meaningful. For `Categorical`, only Significance is meaningful; the data
+lives in StudentAttributes and bypasses the violin / correlation /
+aggregate paths. For `Ordinal`, Display, Correlation, and Significance
+are meaningful but Aggregate is **not** — an Ordinal's `N` is a small
+rank, never a graded points component, so it is never summed into
+AggregateScore. Significance is meaningful for all Types — Numeric
+columns become Significance Matrix rows; Categorical *and* Ordinal
+columns become Significance Matrix columns (an Ordinal is never a row).
+Persisted on ClassAssessment (see ADR-0013, ADR-0014, ADR-0017). At
+fresh load the flags are seeded **data-driven** per plot rather than
+all-on — Total + 10 leftmost for Display (Ordinals are *not* seeded on;
+they are opt-in), the top-r² pairs + Total for Correlation, and
+qualifying categoricals with their strongest numerics for Significance
+(see ADR-0016).
 
 **ClassAssessment**: The post-load dataset for one Class — the
 StudentAssessments, the GradeCurve in use, ScoreSelections,

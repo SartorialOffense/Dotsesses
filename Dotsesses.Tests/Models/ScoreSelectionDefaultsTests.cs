@@ -183,6 +183,87 @@ public class ScoreSelectionDefaultsTests
     }
 
     [Fact]
+    public void DetectOrdinalColumns_AllCellsSuffixed_QualifiesAsOrdinal()
+    {
+        // ADR-0017: a column where every present cell carries a SortOrder is Ordinal.
+        var assessments = new List<StudentAssessment>
+        {
+            new(1, new List<Score> { new("Total", null, 80) },
+                new List<StudentAttribute> { new("Mid-Term", null, "✔", SortOrder: 1) }, "M1"),
+            new(2, new List<Score> { new("Total", null, 70) },
+                new List<StudentAttribute> { new("Mid-Term", null, "✔✔", SortOrder: 2) }, "M2"),
+        };
+
+        var ordinal = ScoreSelectionDefaults.DetectOrdinalColumns(assessments);
+
+        Assert.Contains(("Mid-Term", (int?)null), ordinal);
+    }
+
+    [Fact]
+    public void DetectOrdinalColumns_PartiallySuffixed_DoesNotQualify()
+    {
+        var assessments = new List<StudentAssessment>
+        {
+            new(1, new List<Score> { new("Total", null, 80) },
+                new List<StudentAttribute> { new("Mid-Term", null, "Pass", SortOrder: 2) }, "M1"),
+            new(2, new List<Score> { new("Total", null, 70) },
+                new List<StudentAttribute> { new("Mid-Term", null, "Incomplete") }, "M2"),
+        };
+
+        var ordinal = ScoreSelectionDefaults.DetectOrdinalColumns(assessments);
+
+        Assert.DoesNotContain(("Mid-Term", (int?)null), ordinal);
+    }
+
+    [Fact]
+    public void DetectOrdinalColumns_SparseButAllPresentSuffixed_Qualifies()
+    {
+        // The rule is over PRESENT cells; an absent cell (student 2 has no Mid-Term)
+        // does not disqualify the column.
+        var assessments = new List<StudentAssessment>
+        {
+            new(1, new List<Score> { new("Total", null, 80) },
+                new List<StudentAttribute> { new("Mid-Term", null, "✔", SortOrder: 1) }, "M1"),
+            new(2, new List<Score> { new("Total", null, 70) },
+                new List<StudentAttribute>(), "M2"),
+        };
+
+        var ordinal = ScoreSelectionDefaults.DetectOrdinalColumns(assessments);
+
+        Assert.Contains(("Mid-Term", (int?)null), ordinal);
+    }
+
+    [Fact]
+    public void GenerateDefaults_OrdinalColumn_TypedOrdinalDisplayOffAggregateOff()
+    {
+        var scores = new List<Score> { new("Total", null, 30) };
+        var attributes = new List<StudentAttribute> { new("Mid-Term", null, "✔", SortOrder: 1) };
+        var ordinalColumns = new HashSet<(string, int?)> { ("Mid-Term", null) };
+
+        var result = ScoreSelectionDefaults.GenerateDefaults(scores, attributes, ordinalColumns);
+
+        var midterm = result.First(s => s.Name == "Mid-Term");
+        Assert.Equal(ScoreColumnType.Ordinal, midterm.Type);
+        Assert.False(midterm.Display);     // Ordinal violins are opt-in
+        Assert.False(midterm.Aggregate);   // N is a rank, never aggregated
+        Assert.True(midterm.Significance);
+    }
+
+    [Fact]
+    public void GenerateDefaults_AttributeNotInOrdinalSet_StaysCategorical()
+    {
+        var scores = new List<Score> { new("Total", null, 30) };
+        var attributes = new List<StudentAttribute> { new("Submitted Outline", null, "Yes") };
+
+        var result = ScoreSelectionDefaults.GenerateDefaults(
+            scores, attributes, new HashSet<(string, int?)>());
+
+        var outline = result.First(s => s.Name == "Submitted Outline");
+        Assert.Equal(ScoreColumnType.Categorical, outline.Type);
+        Assert.True(outline.Display);
+    }
+
+    [Fact]
     public void GenerateDefaults_NoAttributes_BehavesLikeOneArgOverload()
     {
         // Arrange — verify the convenience overload (just scores) matches the

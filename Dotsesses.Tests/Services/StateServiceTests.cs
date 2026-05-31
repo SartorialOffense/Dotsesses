@@ -74,7 +74,7 @@ public class StateServiceTests : IDisposable
 
         // Assert
         Assert.NotNull(loadedState);
-        Assert.Equal(5, loadedState.Version);
+        Assert.Equal(6, loadedState.Version);
         Assert.Equal("original_source.xlsx", loadedState.SourceFile);
         Assert.Equal(2, loadedState.Students.Count);
         // Slots are A, B, C (post-#18 fix: catch-all is F, lowest in
@@ -210,12 +210,12 @@ public class StateServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveAsync_WritesVersion5()
+    public async Task SaveAsync_WritesVersion6()
     {
-        var filePath = Path.Combine(_testDirectory, "v5_check.json");
+        var filePath = Path.Combine(_testDirectory, "v6_check.json");
         await _stateService.SaveAsync(filePath, CreateTestStudents(), TestFixtures.SessionForGrading(), Array.Empty<ScoreSelection>());
         var json = await File.ReadAllTextAsync(filePath);
-        Assert.Contains("\"version\": 5", json);
+        Assert.Contains("\"version\": 6", json);
     }
 
     [Fact]
@@ -316,6 +316,63 @@ public class StateServiceTests : IDisposable
         var attr = round.Single().Attributes.Single();
         Assert.Equal("Yes", attr.Value);
         Assert.Equal("explanatory note", attr.Comment);
+    }
+
+    [Fact]
+    public async Task RoundTrip_PreservesAttributeSortOrder()
+    {
+        // ADR-0017: StudentAttribute gained an optional SortOrder decoded from a
+        // ~N suffix; it must survive a save/load round-trip.
+        var filePath = Path.Combine(_testDirectory, "attribute_sortorder.json");
+        var students = new List<StudentAssessment>
+        {
+            new StudentAssessment(
+                1,
+                new List<Score> { new("Total", null, 100) },
+                new List<StudentAttribute> { new("Mid-Term", null, "✔✔+", SortOrder: 3) },
+                "Muppet"),
+        };
+        await _stateService.SaveAsync(filePath, students, TestFixtures.SessionForGrading(), Array.Empty<ScoreSelection>());
+
+        var loaded = await _stateService.LoadAsync(filePath);
+        var (round, _) = _stateService.ConvertToStudents(loaded);
+
+        var attr = round.Single().Attributes.Single();
+        Assert.Equal("✔✔+", attr.Value);
+        Assert.Equal(3, attr.SortOrder);
+    }
+
+    [Fact]
+    public async Task LoadAsync_PreV6File_DefaultsAttributeSortOrderToNull()
+    {
+        // A pre-v6 file predates ADR-0017 and has no sortOrder field on its
+        // attributes — it must silently migrate to a null SortOrder (ADR-0002).
+        var filePath = Path.Combine(_testDirectory, "v5_legacy.json");
+        var v5Content = """
+            {
+              "version": 5,
+              "savedAt": "2024-01-01T00:00:00Z",
+              "sourceFile": "legacy.xlsx",
+              "students": [
+                {
+                  "id": 1,
+                  "muppetName": "Muppet",
+                  "scores": [ { "name": "Total", "index": null, "value": 100 } ],
+                  "attributes": [ { "name": "Outline", "index": null, "value": "Yes" } ]
+                }
+              ],
+              "cursors": [],
+              "scoreSelections": []
+            }
+            """;
+        await File.WriteAllTextAsync(filePath, v5Content);
+
+        var loaded = await _stateService.LoadAsync(filePath);
+        var (round, _) = _stateService.ConvertToStudents(loaded);
+
+        var attr = round.Single().Attributes.Single();
+        Assert.Equal("Yes", attr.Value);
+        Assert.Null(attr.SortOrder);
     }
 
     [Fact]

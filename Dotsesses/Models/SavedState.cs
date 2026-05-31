@@ -7,7 +7,7 @@ namespace Dotsesses.Models;
 /// </summary>
 public class SavedState
 {
-    public int Version { get; set; } = 5;
+    public int Version { get; set; } = 6;
     public DateTime SavedAt { get; set; }
     public string? SourceFile { get; set; }
     public List<SavedStudent> Students { get; set; } = new();
@@ -49,7 +49,10 @@ public class SavedScore
 /// <summary>
 /// Saved student attribute. The <c>Comment</c> field is null on v2 files (which
 /// pre-date the Numeric↔Categorical switch); v3 files written after slice 2 of
-/// ADR-0013 may carry per-cell comments preserved across a type conversion.
+/// ADR-0013 may carry per-cell comments preserved across a type conversion. The
+/// <c>SortOrder</c> field is null on pre-v6 files (which pre-date ADR-0017's
+/// <c>~N</c> sort-order suffix); it migrates cleanly as null per the ADR-0002
+/// first-save-rewrites pattern.
 /// </summary>
 public class SavedAttribute
 {
@@ -57,6 +60,7 @@ public class SavedAttribute
     public int? Index { get; set; }
     public string Value { get; set; } = string.Empty;
     public string? Comment { get; set; }
+    public int? SortOrder { get; set; }
 }
 
 /// <summary>

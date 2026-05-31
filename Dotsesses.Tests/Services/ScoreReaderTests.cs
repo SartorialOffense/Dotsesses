@@ -462,6 +462,117 @@ public class ScoreReaderTests : IDisposable
             w.Kind == ReadWarningKind.CategoricalColumnDetected && w.Message.Contains("Submitted Outline"));
     }
 
+    // ===== Sort-order suffix (ADR-0017) =====
+
+    [Fact]
+    public void Read_CategoricalValuesWithSuffix_StripLabelAndDecodeSortOrder()
+    {
+        var path = WriteFixture(s =>
+        {
+            s.Cell("A1").Value = "ID";
+            s.Cell("B1").Value = "Mid-Term";
+            s.Cell("C1").Value = "Total";
+            s.Cell("A2").Value = 1; s.Cell("B2").Value = "✔✔+~3"; s.Cell("C2").Value = 80;
+            s.Cell("A3").Value = 2; s.Cell("B3").Value = "✔~1";   s.Cell("C3").Value = 70;
+        });
+
+        var result = new ScoreReader().Read(path);
+
+        var a1 = result.Students[0].Attributes.Single(a => a.Name == "Mid-Term");
+        var a2 = result.Students[1].Attributes.Single(a => a.Name == "Mid-Term");
+        Assert.Equal("✔✔+", a1.Value);
+        Assert.Equal(3, a1.SortOrder);
+        Assert.Equal("✔", a2.Value);
+        Assert.Equal(1, a2.SortOrder);
+    }
+
+    [Fact]
+    public void Read_CategoricalValuesWithoutSuffix_HaveNullSortOrder()
+    {
+        var path = WriteFixture(s =>
+        {
+            s.Cell("A1").Value = "ID";
+            s.Cell("B1").Value = "Submitted Outline";
+            s.Cell("C1").Value = "Total";
+            s.Cell("A2").Value = 1; s.Cell("B2").Value = "Yes"; s.Cell("C2").Value = 80;
+            s.Cell("A3").Value = 2; s.Cell("B3").Value = "No";  s.Cell("C3").Value = 70;
+        });
+
+        var result = new ScoreReader().Read(path);
+
+        Assert.All(result.Students, st =>
+            Assert.Null(st.Attributes.Single(a => a.Name == "Submitted Outline").SortOrder));
+        Assert.DoesNotContain(result.Warnings, w => w.Kind == ReadWarningKind.MixedSortOrderColumn);
+    }
+
+    [Fact]
+    public void Read_MixedSuffixColumn_EmitsMixedWarning()
+    {
+        // Some values suffixed, some not → still Categorical, with a warning.
+        var path = WriteFixture(s =>
+        {
+            s.Cell("A1").Value = "ID";
+            s.Cell("B1").Value = "Mid-Term";
+            s.Cell("C1").Value = "Total";
+            s.Cell("A2").Value = 1; s.Cell("B2").Value = "Fail~1";     s.Cell("C2").Value = 80;
+            s.Cell("A3").Value = 2; s.Cell("B3").Value = "Pass~2";     s.Cell("C3").Value = 70;
+            s.Cell("A4").Value = 3; s.Cell("B4").Value = "Incomplete"; s.Cell("C4").Value = 60;
+        });
+
+        var result = new ScoreReader().Read(path);
+
+        Assert.Contains(result.Warnings, w =>
+            w.Kind == ReadWarningKind.MixedSortOrderColumn && w.Message.Contains("Mid-Term"));
+        var incomplete = result.Students[2].Attributes.Single(a => a.Name == "Mid-Term");
+        Assert.Equal("Incomplete", incomplete.Value);
+        Assert.Null(incomplete.SortOrder);
+    }
+
+    [Fact]
+    public void Read_ConflictingSortOrdersForSameLabel_ResolvesToMinAndWarns()
+    {
+        // "Pass" appears with both ~2 and ~5 → resolve to the minimum (2), warn.
+        var path = WriteFixture(s =>
+        {
+            s.Cell("A1").Value = "ID";
+            s.Cell("B1").Value = "Mid-Term";
+            s.Cell("C1").Value = "Total";
+            s.Cell("A2").Value = 1; s.Cell("B2").Value = "Pass~2"; s.Cell("C2").Value = 80;
+            s.Cell("A3").Value = 2; s.Cell("B3").Value = "Pass~5"; s.Cell("C3").Value = 70;
+            s.Cell("A4").Value = 3; s.Cell("B4").Value = "Fail~1"; s.Cell("C4").Value = 60;
+        });
+
+        var result = new ScoreReader().Read(path);
+
+        Assert.Contains(result.Warnings, w =>
+            w.Kind == ReadWarningKind.OrdinalSortOrderConflict && w.Message.Contains("Pass"));
+        // Both "Pass" attributes normalized to the minimum order.
+        var passOrders = result.Students
+            .SelectMany(st => st.Attributes)
+            .Where(a => a.Name == "Mid-Term" && a.Value == "Pass")
+            .Select(a => a.SortOrder);
+        Assert.All(passOrders, o => Assert.Equal(2, o));
+    }
+
+    [Fact]
+    public void Read_FullySuffixedColumn_EmitsNoMixedOrConflictWarning()
+    {
+        var path = WriteFixture(s =>
+        {
+            s.Cell("A1").Value = "ID";
+            s.Cell("B1").Value = "Mid-Term";
+            s.Cell("C1").Value = "Total";
+            s.Cell("A2").Value = 1; s.Cell("B2").Value = "Low~1";  s.Cell("C2").Value = 80;
+            s.Cell("A3").Value = 2; s.Cell("B3").Value = "High~3"; s.Cell("C3").Value = 70;
+            s.Cell("A4").Value = 3; s.Cell("B4").Value = "Mid~2";  s.Cell("C4").Value = 60;
+        });
+
+        var result = new ScoreReader().Read(path);
+
+        Assert.DoesNotContain(result.Warnings, w => w.Kind == ReadWarningKind.MixedSortOrderColumn);
+        Assert.DoesNotContain(result.Warnings, w => w.Kind == ReadWarningKind.OrdinalSortOrderConflict);
+    }
+
     // ===== Hard errors =====
 
     [Fact]

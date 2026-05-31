@@ -1621,9 +1621,11 @@ public partial class MainWindowViewModel : ViewModelBase
         if (!ClassAssessment.Assessments.Any()) return;
 
         var firstStudent = ClassAssessment.Assessments.First();
+        var ordinalColumns = ScoreSelectionDefaults.DetectOrdinalColumns(ClassAssessment.Assessments);
         var baseDefaults = ScoreSelectionDefaults.GenerateDefaults(
             firstStudent.Scores,
-            firstStudent.Attributes);
+            firstStudent.Attributes,
+            ordinalColumns);
 
         ClassAssessment.ScoreSelections = ApplyDataDrivenSelection(baseDefaults);
 
@@ -1682,11 +1684,15 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             var name = SeriesNameOf(s);
             bool isNumeric = s.Type == ScoreColumnType.Numeric;
+            bool isCategorical = s.Type == ScoreColumnType.Categorical;
             return s with
             {
                 Display = isNumeric ? displayNames.Contains(name) : s.Display,
                 Correlation = isNumeric && correlationNames.Contains(name),
-                Significance = significanceNames != null
+                // Ordinal columns aren't part of the categorical significance scan
+                // (ADR-0017 — they join the matrix as columns in a later slice), so
+                // leave their base Significance rather than force-clearing it.
+                Significance = significanceNames != null && (isNumeric || isCategorical)
                     ? significanceNames.Contains(name)
                     : s.Significance,
             };

@@ -4,6 +4,7 @@ using System.Data;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using Dotsesses.Calculators;
 using Dotsesses.Models;
 using ExcelDataReader;
 
@@ -234,7 +235,11 @@ public class ScoreReader
                     if (cellValue == null || cellValue == DBNull.Value) continue;
                     var text = cellValue.ToString()?.Trim();
                     if (string.IsNullOrEmpty(text)) continue;
-                    attributes.Add(new StudentAttribute(scoreName, null, text));
+                    // Decode the optional ~N sort-order suffix (ADR-0017): the label is
+                    // stored stripped, the rank as SortOrder. Cross-column conflict
+                    // resolution / mixed-column detection happens in a post-pass below.
+                    var (label, sortOrder) = SortOrderSuffixParser.Parse(text);
+                    attributes.Add(new StudentAttribute(scoreName, null, label, SortOrder: sortOrder));
                     continue;
                 }
 
@@ -351,6 +356,14 @@ public class ScoreReader
             }
         }
 
+        // ===== Sort-order suffix analysis (ADR-0017) =====
+        // Per categorical column, surface mixed-suffix columns and resolve
+        // same-label / different-N conflicts to the minimum N (normalizing every
+        // student's SortOrder so downstream ordering and Ordinal detection are
+        // consistent). The whole-column "every cell suffixed" Ordinal decision is
+        // made later from the normalized SortOrders (see ScoreSelectionDefaults).
+        AnalyzeSortOrders(students, scoreColumns, categoricalColumns, warnings);
+
         // ===== Total synthesis warning =====
         // The actual Total Scores were appended inside the row loop above so
         // that the StudentAssessment constructor's default aggregate set
@@ -383,6 +396,79 @@ public class ScoreReader
         }
 
         return new ReadResult(named, warnings);
+    }
+
+    /// <summary>
+    /// Post-pass over the parsed categorical columns (ADR-0017). For each column
+    /// that carries any <c>~N</c> sort-order suffix:
+    /// <list type="bullet">
+    /// <item>If some present cells are suffixed and some are not, emit a
+    /// <see cref="ReadWarningKind.MixedSortOrderColumn"/> warning (the column
+    /// stays Categorical — only a fully-suffixed column becomes Ordinal).</item>
+    /// <item>If the same label carries different N values, resolve to the minimum
+    /// N, emit an <see cref="ReadWarningKind.OrdinalSortOrderConflict"/> warning,
+    /// and normalize every student's SortOrder for that label to the minimum.</item>
+    /// </list>
+    /// </summary>
+    private static void AnalyzeSortOrders(
+        List<StudentAssessment> students,
+        Dictionary<int, string> scoreColumns,
+        HashSet<int> categoricalColumns,
+        List<ReadWarning> warnings)
+    {
+        foreach (var (columnIndex, scoreName) in scoreColumns.OrderBy(kvp => kvp.Key))
+        {
+            if (!categoricalColumns.Contains(columnIndex)) continue;
+
+            var columnAttrs = students
+                .SelectMany(s => s.Attributes.Where(a =>
+                    string.Equals(a.Name, scoreName, StringComparison.Ordinal) && a.Index == null))
+                .ToList();
+            if (columnAttrs.Count == 0) continue;
+
+            var suffixed = columnAttrs.Where(a => a.SortOrder.HasValue).ToList();
+            if (suffixed.Count == 0) continue; // plain categorical — nothing to analyze
+
+            if (suffixed.Count < columnAttrs.Count)
+            {
+                warnings.Add(new ReadWarning(
+                    ReadWarningKind.MixedSortOrderColumn,
+                    $"'{scoreName}' has sort-order suffixes (~N) on some values but not all; " +
+                    "unsuffixed values will sort after the suffixed ones."));
+            }
+
+            // Resolve same-label / different-N conflicts to the minimum N.
+            var resolved = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var group in suffixed.GroupBy(a => a.Value, StringComparer.Ordinal))
+            {
+                var orders = group.Select(a => a.SortOrder!.Value).Distinct().OrderBy(n => n).ToList();
+                resolved[group.Key] = orders[0];
+                if (orders.Count > 1)
+                {
+                    warnings.Add(new ReadWarning(
+                        ReadWarningKind.OrdinalSortOrderConflict,
+                        $"'{scoreName}' value '{group.Key}' has conflicting sort orders " +
+                        $"({string.Join(", ", orders)}); using {orders[0]}."));
+                }
+            }
+
+            // Normalize every student's attribute for this column to the resolved min N.
+            foreach (var student in students)
+            {
+                for (int i = 0; i < student.Attributes.Count; i++)
+                {
+                    var a = student.Attributes[i];
+                    if (a.Index != null ||
+                        !string.Equals(a.Name, scoreName, StringComparison.Ordinal)) continue;
+                    if (a.SortOrder.HasValue &&
+                        resolved.TryGetValue(a.Value, out var minN) &&
+                        a.SortOrder.Value != minN)
+                    {
+                        student.Attributes[i] = a with { SortOrder = minN };
+                    }
+                }
+            }
+        }
     }
 
     private static bool IsBlankRow(DataRow row)

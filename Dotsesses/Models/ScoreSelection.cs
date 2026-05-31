@@ -6,11 +6,20 @@ namespace Dotsesses.Models;
 /// participate in plots and AggregateScore; Categorical columns appear
 /// only in the drill-down's Attributes section and the (planned)
 /// color-by-attribute selector.
+///
+/// <see cref="Ordinal"/> is a categorical column in which *every* cell
+/// carries a <c>~N</c> sort-order suffix, so it has both a label and a
+/// numeric value. Its data still lives in <see cref="StudentAttribute"/>
+/// (with <see cref="StudentAttribute.SortOrder"/> set), but unlike a plain
+/// Categorical it can participate in the violin and correlation views
+/// (using N as the value) while acting as a Significance Matrix *column*.
+/// It never contributes to AggregateScore. See ADR-0017.
 /// </summary>
 public enum ScoreColumnType
 {
     Numeric,
     Categorical,
+    Ordinal,
 }
 
 /// <summary>
@@ -18,9 +27,9 @@ public enum ScoreColumnType
 /// </summary>
 /// <param name="Name">Column name (matches <see cref="Score.Name"/> or <see cref="StudentAttribute.Name"/>)</param>
 /// <param name="Index">Optional index for multiple columns of same name</param>
-/// <param name="Type">Whether the column is Numeric or Categorical. Display/Aggregate/Correlation are meaningless when Categorical.</param>
+/// <param name="Type">Numeric, Categorical, or Ordinal. For Categorical all three of Display/Aggregate/Correlation are meaningless; for Ordinal, Display and Correlation are meaningful but Aggregate is not (an Ordinal's N is a rank, never summed into AggregateScore).</param>
 /// <param name="Display">Whether this score is shown in the violin plot</param>
 /// <param name="Aggregate">Whether this score contributes to the computed aggregate</param>
 /// <param name="Correlation">Whether this score participates in the correlation matrix</param>
-/// <param name="Significance">Whether this column participates in the Significance Matrix (Numeric rows / Categorical columns). Unlike the other flags, meaningful for both Types.</param>
+/// <param name="Significance">Whether this column participates in the Significance Matrix (Numeric rows / Categorical + Ordinal columns). Unlike the other flags, meaningful for all Types.</param>
 public record ScoreSelection(string Name, int? Index, ScoreColumnType Type, bool Display, bool Aggregate, bool Correlation, bool Significance = true);

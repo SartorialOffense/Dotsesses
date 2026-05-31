@@ -61,7 +61,7 @@ public class StateService
 
         var state = new SavedState
         {
-            Version = 5,
+            Version = 6,
             SavedAt = DateTime.UtcNow,
             SourceFile = sourceFile,
             SignificanceTestFamily = significanceTestFamily,
@@ -81,7 +81,8 @@ public class StateService
                     Name = a.Name,
                     Index = a.Index,
                     Value = a.Value,
-                    Comment = a.Comment
+                    Comment = a.Comment,
+                    SortOrder = a.SortOrder
                 }).ToList()
             }).ToList(),
             Cursors = savedCursors,
@@ -143,7 +144,7 @@ public class StateService
                 new Score(s.Name, s.Index, s.Value, s.Comment)).ToList();
 
             var attributes = saved.Attributes.Select(a =>
-                new StudentAttribute(a.Name, a.Index, a.Value, a.Comment)).ToList();
+                new StudentAttribute(a.Name, a.Index, a.Value, a.Comment, a.SortOrder)).ToList();
 
             var student = new StudentAssessment(
                 saved.Id,
