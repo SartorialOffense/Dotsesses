@@ -197,4 +197,47 @@ public class PlotSelectionCalculatorTests
             (_, _) => null);
         Assert.Empty(result);
     }
+
+    // ===== SelectTopCellNumerics (Optimize) =====
+
+    private static readonly Dictionary<(string, string), double?> OptimizeGrid = new()
+    {
+        [("Q1", "Hat")] = 0.01, [("Q2", "Hat")] = 0.30, [("Q3", "Hat")] = 0.04, [("Q4", "Hat")] = 0.50,
+        [("Q1", "Section")] = 0.02, [("Q2", "Section")] = 0.20, [("Q3", "Section")] = 0.90,
+        // (Q4, Section) omitted → untestable
+    };
+
+    private static double? OptimizeLookup(string n, string c) =>
+        OptimizeGrid.TryGetValue((n, c), out var v) ? v : null;
+
+    [Fact]
+    public void SelectTopCellNumerics_TakesNumericsOfLowestPCells_NoCategoricals()
+    {
+        // Sorted cells: (Q1,Hat).01, (Q1,Section).02, (Q3,Hat).04, ...
+        // Top 3 cells → numerics {Q1, Q3} (Q1 twice → distinct).
+        var result = PlotSelectionCalculator.SelectTopCellNumerics(
+            new[] { "Q1", "Q2", "Q3", "Q4" }, new[] { "Hat", "Section" }, OptimizeLookup, topCells: 3);
+
+        Assert.Equal(new HashSet<string> { "Q1", "Q3" }, result);
+        Assert.DoesNotContain("Hat", result);       // categoricals are never returned
+        Assert.DoesNotContain("Section", result);
+    }
+
+    [Fact]
+    public void SelectTopCellNumerics_FewerCellsThanN_ReturnsAllTestableNumerics()
+    {
+        var result = PlotSelectionCalculator.SelectTopCellNumerics(
+            new[] { "Q1", "Q2", "Q3", "Q4" }, new[] { "Hat", "Section" }, OptimizeLookup, topCells: 100);
+
+        // Every numeric has at least one testable cell.
+        Assert.Equal(new HashSet<string> { "Q1", "Q2", "Q3", "Q4" }, result);
+    }
+
+    [Fact]
+    public void SelectTopCellNumerics_AllUntestable_IsEmpty()
+    {
+        var result = PlotSelectionCalculator.SelectTopCellNumerics(
+            new[] { "Q1", "Q2" }, new[] { "Hat" }, (_, _) => null, topCells: 10);
+        Assert.Empty(result);
+    }
 }

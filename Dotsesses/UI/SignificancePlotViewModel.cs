@@ -53,6 +53,17 @@ public partial class SignificancePlotViewModel : ViewModelBase
     /// </summary>
     public IMessenger Messenger => _messenger;
 
+    /// <summary>
+    /// Invoked when the user clicks Optimize. Wired by MainWindowViewModel
+    /// (the single consumer that owns the selections — direct callback per
+    /// ADR-0004). Re-picks the matrix's numeric rows to the most significant
+    /// for the currently-displayed categoricals.
+    /// </summary>
+    public Action? OptimizeRequested { get; set; }
+
+    /// <summary>Raised from the Optimize button in the View code-behind.</summary>
+    public void RequestOptimize() => OptimizeRequested?.Invoke();
+
     public SignificancePlotViewModel(
         SignificancePlotService service,
         IMessenger messenger)

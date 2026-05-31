@@ -213,6 +213,11 @@ public partial class MainWindowViewModel : ViewModelBase
         _violinPlotViewModel = violinPlotViewModel;
         _correlationPlotViewModel = correlationPlotViewModel;
         _significancePlotViewModel = significancePlotViewModel;
+        // null in the test factory; guarded so CreateForTesting stays valid.
+        if (significancePlotViewModel != null)
+        {
+            significancePlotViewModel.OptimizeRequested = OnOptimizeSignificance;
+        }
         _hoverDelayService = hoverDelayService;
         _stateService = stateService;
         _workspaceFactory = workspaceFactory;
@@ -1641,10 +1646,6 @@ public partial class MainWindowViewModel : ViewModelBase
     private IReadOnlyList<ScoreSelection> ApplyDataDrivenSelection(
         IReadOnlyList<ScoreSelection> baseDefaults)
     {
-        // Series name == the join key the plots/calculator use.
-        static string SeriesName(ScoreSelection s) =>
-            s.Index.HasValue ? $"{s.Name} {s.Index}" : s.Name;
-
         var numericSel = baseDefaults.Where(s => s.Type == ScoreColumnType.Numeric).ToList();
         var numericSeries = BuildSeriesData(ClassAssessment!, s => s.Type == ScoreColumnType.Numeric);
         var categoricalSeries = BuildCategoricalSeriesData(ClassAssessment!, s => s.Type == ScoreColumnType.Categorical);
@@ -1652,7 +1653,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var orderedNumericNames = numericSeries.Select(s => s.SeriesName).ToList();
         var totalName = numericSel
             .Where(s => string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase) && s.Index == null)
-            .Select(SeriesName)
+            .Select(SeriesNameOf)
             .FirstOrDefault();
 
         var displayNames = PlotSelectionCalculator.SelectDistribution(orderedNumericNames, totalName);
@@ -1667,14 +1668,10 @@ public partial class MainWindowViewModel : ViewModelBase
         HashSet<string>? significanceNames = null;
         if (_significancePlotService != null && categoricalSeries.Count > 0)
         {
-            var pvalues = _significancePlotService.ComputeCellPValues(
-                numericSeries.Select(s => (s.SeriesName, s.Scores)).ToList(),
-                categoricalSeries.Select(s => (s.SeriesName, s.Subgroups)).ToList(),
-                SignificanceTestFamily.Parametric);
             significanceNames = PlotSelectionCalculator.SelectSignificance(
                 orderedNumericNames,
                 categoricalSeries.Select(s => s.SeriesName).ToList(),
-                (num, cat) => pvalues.TryGetValue((num, cat), out var p) ? p : null,
+                BuildSignificancePLookup(numericSeries, categoricalSeries, SignificanceTestFamily.Parametric),
                 // A Grade column is derived from the scores, so it would test as
                 // trivially significant — don't auto-select it (user can still
                 // enable it in Settings).
@@ -1683,7 +1680,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         return baseDefaults.Select(s =>
         {
-            var name = SeriesName(s);
+            var name = SeriesNameOf(s);
             bool isNumeric = s.Type == ScoreColumnType.Numeric;
             return s with
             {
@@ -1694,6 +1691,70 @@ public partial class MainWindowViewModel : ViewModelBase
                     : s.Significance,
             };
         }).ToList();
+    }
+
+    /// <summary>The series-name join key used by the plots and the selection
+    /// calculator: <c>"Name Index"</c> when indexed, else <c>"Name"</c>.</summary>
+    private static string SeriesNameOf(ScoreSelection s) =>
+        s.Index.HasValue ? $"{s.Name} {s.Index}" : s.Name;
+
+    /// <summary>
+    /// Builds a per-cell p-value lookup (numeric series name, categorical series
+    /// name) → p, by running the omnibus test for the given test family. Shared
+    /// by the load-time auto-select and the interactive Optimize. Returns an
+    /// all-null lookup when the Python service is unavailable.
+    /// </summary>
+    private Func<string, string, double?> BuildSignificancePLookup(
+        List<(string SeriesName, Dictionary<string, double> Scores)> numericSeries,
+        List<(string SeriesName, Dictionary<string, string> Subgroups)> categoricalSeries,
+        SignificanceTestFamily testFamily)
+    {
+        if (_significancePlotService == null || categoricalSeries.Count == 0)
+        {
+            return (_, _) => null;
+        }
+
+        var pvalues = _significancePlotService.ComputeCellPValues(
+            numericSeries.Select(s => (s.SeriesName, s.Scores)).ToList(),
+            categoricalSeries.Select(s => (s.SeriesName, s.Subgroups)).ToList(),
+            testFamily);
+        return (num, cat) => pvalues.TryGetValue((num, cat), out var p) ? p : null;
+    }
+
+    /// <summary>
+    /// Optimize the Significance Matrix: holding the currently-displayed
+    /// categorical columns fixed, rank every (numeric × displayed-categorical)
+    /// cell by p (using the matrix's current test family), take the 10
+    /// lowest-p cells, and set the matrix's numeric rows to the numerics in
+    /// them — replacing the current rows. Categoricals, Display, Correlation
+    /// and Aggregate are untouched. Invoked via the Optimize button on the
+    /// Significance plot (callback wired in the constructor).
+    /// </summary>
+    private void OnOptimizeSignificance()
+    {
+        if (ClassAssessment == null || _significancePlotService == null) return;
+
+        var numericSeries = BuildSeriesData(ClassAssessment, s => s.Type == ScoreColumnType.Numeric);
+        var categoricalSeries = BuildCategoricalSeriesData(
+            ClassAssessment, s => s.Significance && s.Type == ScoreColumnType.Categorical);
+        if (categoricalSeries.Count == 0) return; // nothing displayed to optimize against
+
+        var testFamily = SignificancePlotViewModel?.TestFamily ?? SignificanceTestFamily.Parametric;
+        var pLookup = BuildSignificancePLookup(numericSeries, categoricalSeries, testFamily);
+
+        var numericSet = PlotSelectionCalculator.SelectTopCellNumerics(
+            numericSeries.Select(s => s.SeriesName).ToList(),
+            categoricalSeries.Select(s => s.SeriesName).ToList(),
+            pLookup,
+            topCells: 10);
+
+        var newSelections = ClassAssessment.ScoreSelections.Select(s =>
+            s.Type == ScoreColumnType.Numeric
+                ? s with { Significance = numericSet.Contains(SeriesNameOf(s)) }
+                : s) // displayed categoricals stay selected; others stay as-is
+            .ToList();
+
+        ApplyScoreSelections(newSelections);
     }
 
     /// <summary>
