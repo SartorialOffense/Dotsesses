@@ -262,6 +262,10 @@ public partial class CorrelationPlotControl : UserControl
                 Fill = Brushes.Transparent,
                 Tag = (i, point.StudentId)
             };
+            // Per-cell stats tooltip (ADR-0018 slice 3). Avalonia's ToolTip
+            // handles show/hide/positioning; the dots are the only hit-tested
+            // surface, so the tip rides on each dot's hit area.
+            ToolTip.SetTip(hitArea, CorrelationPlotViewModel.BuildPointTooltip(point));
             Canvas.SetLeft(hitArea, displayX - 7.5);
             Canvas.SetTop(hitArea, displayY - 7.5);
             PointsOverlay.Children.Add(hitArea);

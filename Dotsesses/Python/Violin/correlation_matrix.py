@@ -11,6 +11,9 @@ import io
 from typing import Tuple, List, Dict, Optional
 from colorsys import rgb_to_hls, hls_to_rgb
 import math
+from scipy import stats as _stats
+
+from stats_common import significance_stars
 
 
 def apply_theme(theme: str = 'dark'):
@@ -159,6 +162,37 @@ def _rest_score_debias(
     return (x_data, y_data, False)
 
 
+def _cell_correlation(
+    x_vals: List[float],
+    y_vals: List[float],
+    method: str,
+) -> Tuple[float, Optional[float]]:
+    """
+    Correlation coefficient and RAW p-value for a cell (ADR-0018 slice 3).
+
+    `method` is 'spearman' for any cell touching an Ordinal column (rank-based
+    ρ) and 'pearson' otherwise (r). scipy returns the coefficient and its raw
+    two-sided p in one call. Returns (coefficient, p) — p is None when the test
+    is undefined (fewer than 2 points, or a constant input that makes the
+    coefficient NaN). The coefficient is 0.0 when undefined so the r² color
+    falls back to the low end.
+    """
+    if len(x_vals) < 2:
+        return (0.0, None)
+    try:
+        if method == 'spearman':
+            res = _stats.spearmanr(x_vals, y_vals)
+            coef, p = float(res.statistic), float(res.pvalue)
+        else:
+            res = _stats.pearsonr(x_vals, y_vals)
+            coef, p = float(res.statistic), float(res.pvalue)
+    except (ValueError, FloatingPointError):
+        return (0.0, None)
+    if math.isnan(coef) or (p is not None and math.isnan(p)):
+        return (0.0, None)
+    return (coef, p)
+
+
 def create_correlation_matrix(
     fig_size: Tuple[float, float],
     series: List[Tuple[str, Dict[str, float]]],
@@ -210,6 +244,9 @@ def create_correlation_matrix(
         bool(is_aggregate_component[k]) if k < len(is_aggregate_component) else False
         for k in range(n)
     ]
+    column_types = [
+        str(column_types[k]) if k < len(column_types) else 'numeric' for k in range(n)
+    ]
 
     # Create figure with subplots - corner plot (lower triangle only)
     fig, axes = plt.subplots(n, n, figsize=fig_size)
@@ -239,6 +276,10 @@ def create_correlation_matrix(
     # cell is rendered empty. All downstream passes (r², scatter, regression,
     # point extraction) read this one dict so they never disagree.
     cell_data: Dict[Tuple[int, int], Tuple[Dict[str, float], Dict[str, float], bool, bool]] = {}
+    # Per-cell inference (ADR-0018 slice 3): method (pearson/spearman), signed
+    # coefficient r/ρ, raw p, N, and stars. A cell touching an Ordinal column
+    # uses Spearman. Repeated onto every dot in the cell for the hover tooltip.
+    cell_stats: Dict[Tuple[int, int], Dict] = {}
     r_squared_matrix = {}
     for i in range(n):
         _, y_data = series[i]
@@ -249,9 +290,14 @@ def create_correlation_matrix(
                 is_total[j], is_total[i],
                 is_aggregate_component[j], is_aggregate_component[i])
 
+            # Spearman for any Ordinal-touching cell; Pearson otherwise. De-bias
+            # already happened above, so an ordinal component feeding Total is
+            # de-biased first (Total − X) then ranked (slice 3 precedence).
+            method = 'spearman' if ('ordinal' in (column_types[i], column_types[j])) else 'pearson'
+
             common_ids = set(eff_x.keys()) & set(eff_y.keys())
             blank = False
-            r_sq = 0.0
+            coef, p, n_cell = 0.0, None, len(common_ids)
             if len(common_ids) > 1:
                 x_vals = [eff_x[sid] for sid in common_ids]
                 y_vals = [eff_y[sid] for sid in common_ids]
@@ -259,16 +305,20 @@ def create_correlation_matrix(
                     # Degenerate rest score (single-component Total). Blank it.
                     blank = True
                 else:
-                    try:
-                        r = np.corrcoef(x_vals, y_vals)[0, 1]
-                        r_sq = r ** 2 if not np.isnan(r) else 0.0
-                    except Exception:
-                        r_sq = 0.0
+                    coef, p = _cell_correlation(x_vals, y_vals, method)
             elif corrected and len(common_ids) < 2:
                 blank = True
 
             cell_data[(i, j)] = (eff_x, eff_y, corrected, blank)
-            r_squared_matrix[(i, j)] = r_sq
+            cell_stats[(i, j)] = {
+                'method': method,
+                'r': coef,
+                'p': p,
+                'n': n_cell,
+                'corrected': corrected,
+                'stars': significance_stars(p),
+            }
+            r_squared_matrix[(i, j)] = coef ** 2
 
     # Process each cell
     for i in range(n):
@@ -339,18 +389,21 @@ def create_correlation_matrix(
                         except Exception:
                             pass
 
-                    # Calculate and show correlation coefficient (with r²)
+                    # Show the coefficient + raw-p significance stars (ADR-0018
+                    # slice 3). Label is 'r=' for Pearson, 'ρ=' for Spearman.
+                    # Stars are the soft "worth a closer look" flag, computed
+                    # from raw p; all cells are shown regardless.
                     if show_correlation_coefficients and len(x_vals) > 1:
-                        r = np.sqrt(r_sq) if r_sq > 0 else 0.0
-                        # Check sign of correlation
-                        try:
-                            r_signed = np.corrcoef(x_vals, y_vals)[0, 1]
-                            if not np.isnan(r_signed):
-                                ax.annotate(f'r={r_signed:.2f}', xy=(0.95, 0.05),
-                                           xycoords='axes fraction', ha='right',
-                                           fontsize=8, color=stat_label_color)
-                        except Exception:
-                            pass
+                        stats = cell_stats.get((i, j), {})
+                        coef = stats.get('r', 0.0)
+                        stars = stats.get('stars', '')
+                        symbol = 'ρ' if stats.get('method') == 'spearman' else 'r'
+                        label = f'{symbol}={coef:.2f}'
+                        if stars:
+                            label += stars
+                        ax.annotate(label, xy=(0.95, 0.05),
+                                   xycoords='axes fraction', ha='right',
+                                   fontsize=8, color=stat_label_color)
 
             # Labels only on edges
             if j == 0 and i > 0:
@@ -432,6 +485,18 @@ def create_correlation_matrix(
             r_sq = r_squared_matrix.get((i, j), 0.0)
             cell_color = get_r_squared_color(r_sq, theme)
 
+            # Cell-level inference repeated on every dot for the hover tooltip
+            # (ADR-0018 slice 3). p is NaN when undefined (maps back to null C#).
+            cs = cell_stats.get((i, j), {})
+            cell_p = cs.get('p')
+            cell_extra = {
+                'r': float(cs.get('r', 0.0)),
+                'p_value': float(cell_p) if cell_p is not None else float('nan'),
+                'n': int(cs.get('n', len(common_ids))),
+                'method': cs.get('method', 'pearson'),
+                'corrected': bool(corrected),
+            }
+
             # Get the corresponding PathCollection
             if collection_idx < len(path_collections):
                 pc = path_collections[collection_idx]
@@ -464,7 +529,8 @@ def create_correlation_matrix(
                             'y_series': y_name,
                             'x_value': eff_x[sid],
                             'y_value': eff_y[sid],
-                            'color': cell_color  # Color by r² value
+                            'color': cell_color,  # Color by r² value
+                            **cell_extra,
                         })
 
                 # Mark points for removal from SVG (will render in C#)
@@ -509,7 +575,8 @@ def create_correlation_matrix(
                         'y_series': y_name,
                         'x_value': eff_x[sid],
                         'y_value': eff_y[sid],
-                        'color': cell_color  # Color by r² value
+                        'color': cell_color,  # Color by r² value
+                        **cell_extra,
                     })
 
     # Convert back to string

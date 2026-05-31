@@ -207,6 +207,63 @@ public partial class CorrelationPlotViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Builds the hover tooltip text for a correlation cell from one of its
+    /// data points (ADR-0018 slice 3). Surfaces the effect-size headline (r²),
+    /// the coefficient + method (Pearson r / Spearman ρ), the raw p and N as
+    /// supporting detail, and a "corrected" note when the cell used the
+    /// rest-score de-bias. Pure/static so the formatting is unit-testable
+    /// independent of the Avalonia control that attaches it.
+    /// </summary>
+    public static string BuildPointTooltip(CorrelationDataPoint p)
+    {
+        var ci = System.Globalization.CultureInfo.InvariantCulture;
+        var symbol = p.Method == "spearman" ? "ρ" : "r";
+        var methodName = p.Method == "spearman" ? "Spearman" : "Pearson";
+        var rSquared = p.R * p.R;
+
+        string pText;
+        if (p.PValue is not double pv)
+        {
+            pText = "p —";
+        }
+        else if (pv < 0.001)
+        {
+            pText = "p<.001";
+        }
+        else
+        {
+            // ".034" style — strip the leading zero, matching the in-cell stars.
+            pText = "p=" + pv.ToString("0.000", ci).TrimStart('0');
+        }
+
+        var stars = SignificanceStars(p.PValue);
+        var lines = new List<string>
+        {
+            $"{p.XSeries} × {p.YSeries}",
+            $"r²={rSquared.ToString("0.00", ci)}  ({methodName} {symbol}={p.R.ToString("0.00", ci)})",
+            $"{pText}{(stars.Length > 0 ? " " + stars : "")}   N={p.N}",
+        };
+        if (p.Corrected)
+        {
+            lines.Add("corrected (rest score)");
+        }
+        return string.Join("\n", lines);
+    }
+
+    /// <summary>
+    /// Star tiers for a raw p-value, mirroring the Python <c>significance_stars</c>
+    /// helper (ADR-0018 decision 4). Kept in sync for the C#-built tooltip text.
+    /// </summary>
+    private static string SignificanceStars(double? p)
+    {
+        if (p is not double v || double.IsNaN(v)) return "";
+        if (v < 0.001) return "***";
+        if (v < 0.01) return "**";
+        if (v < 0.05) return "*";
+        return "";
+    }
+
+    /// <summary>
     /// Gets the number of series in the current plot.
     /// </summary>
     public int SeriesCount => _seriesCount;

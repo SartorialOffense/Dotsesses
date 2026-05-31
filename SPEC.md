@@ -199,22 +199,40 @@ with swarm overlay.
 
 ## Correlation matrix
 
-Sibling tab in the bottom-right surface. Pearson correlation between
-every pair of Scores whose **Correlation** ScoreSelection flag is on.
-No synthetic AggregateScore series is added to the matrix — correlating
-an aggregate against its own components would be misleading.
+Sibling tab in the bottom-right surface. Correlation between every pair of
+Scores whose **Correlation** ScoreSelection flag is on. No synthetic
+AggregateScore series is added to the matrix — correlating an aggregate
+against its own components would be misleading.
+
+**Coefficient & method** (ADR-0018): a cell uses **Pearson r** for a
+Numeric×Numeric pair and **Spearman ρ** for any cell touching an **Ordinal**
+column (rank-based, since an Ordinal's value is a rank). The in-cell label
+reads `r=…` or `ρ=…` accordingly, and the cell color encodes the effect-size
+headline **r²** (= r²/ρ²) on a 0–1 scale. Every cell is shown — none is hidden
+for being weak or non-significant.
+
+**Significance stars**: appended to the in-cell coefficient from the **raw**
+(uncorrected) p — `*` p<.05, `**` p<.01, `***` p<.001 — the same universal
+tiers as the Significance Matrix. They are a soft "worth a closer look" flag,
+not a gate. (Exploratory screening — uncorrected; treat as leads, not
+confirmation.)
+
+**Hover tooltip**: hovering a dot shows that cell's stats — `r²` (headline),
+the coefficient + method (Pearson r / Spearman ρ), the raw `p` + stars, the
+sample size `N`, and a "corrected (rest score)" note when the cell was
+de-biased.
 
 **Rest-score de-bias** (ADR-0018): a cell relating an aggregate component
 against the **Total** column is de-biased automatically — the component is
 correlated against the rest score `Total − component` instead of the full
 Total (which contains the component and would inflate the correlation). The
-de-bias is applied transparently: the dots, fitted line, r, and r² color
-all reflect the corrected values, with no special cell marker. Because the
-cell is unmarked, the corrected fact is disclosed here in the spec (and, once
-the per-cell tooltip lands, in the tooltip's `corrected` field). A
-single-component Total makes the rest score identically zero, so that one
-cell renders blank. Component-vs-component and Total-vs-non-component cells
-are unaffected.
+de-bias is applied transparently: the dots, fitted line, coefficient, and r²
+color all reflect the corrected values, with no special cell marker — the
+corrected fact surfaces only in the tooltip's "corrected" note. An Ordinal
+component feeding Total is de-biased first, then ranked (Spearman). A
+single-component Total makes the rest score identically zero, so that one cell
+renders blank. Component-vs-component and Total-vs-non-component cells are
+unaffected.
 
 **Default selection** (fresh load, see ADR-0016): the columns appearing
 in the **4 highest-r² pairs** among non-Total numerics, plus the **Total**

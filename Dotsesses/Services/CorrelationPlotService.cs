@@ -109,6 +109,14 @@ public class CorrelationPlotService
             var yValue = pointDict["y_value"].As<double>();
             var color = pointDict["color"].As<string>();
 
+            // Cell-level inference (ADR-0018 slice 3). p_value arrives as NaN
+            // when the cell was untestable — map that back to a null PValue.
+            var rRaw = pointDict["r"].As<double>();
+            var pRaw = pointDict["p_value"].As<double>();
+            var n = pointDict["n"].As<int>();
+            var method = pointDict["method"].As<string>();
+            var corrected = pointDict["corrected"].As<bool>();
+
             // Parse student ID from string format "S001" -> 1
             int studentId = int.Parse(idStr.TrimStart('S'));
 
@@ -117,7 +125,13 @@ public class CorrelationPlotService
 
             dataPoints.Add(new CorrelationDataPoint(
                 cellRow, cellCol, x, y, studentId,
-                xSeries, ySeries, xValue, yValue, color, muppetName));
+                xSeries, ySeries, xValue, yValue, color,
+                R: rRaw,
+                PValue: double.IsNaN(pRaw) ? null : pRaw,
+                N: n,
+                Method: method,
+                Corrected: corrected,
+                MuppetName: muppetName));
         }
 
         return (svgContent, dataPoints);
