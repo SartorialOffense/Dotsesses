@@ -81,6 +81,8 @@ public class SignificancePlotService
             // p_value arrives as NaN when the cell was untestable (<2 valid
             // groups / zero-variance group) — map that back to a null PValue.
             var pValueRaw = d["p_value"].As<double>();
+            // effect_size arrives as NaN when the cell was untestable (ADR-0018).
+            var effectRaw = d["effect_size"].As<double>();
             dataPoints.Add(new SignificanceDataPoint(
                 CellRow: d["cell_row"].As<int>(),
                 CellCol: d["cell_col"].As<int>(),
@@ -94,6 +96,7 @@ public class SignificancePlotService
                 N: d["n"].As<int>(),
                 Color: d["color"].As<string>(),
                 PValue: double.IsNaN(pValueRaw) ? null : pValueRaw,
+                EffectSize: double.IsNaN(effectRaw) ? null : effectRaw,
                 TestFamily: testFamily,
                 Excluded: d["excluded"].As<bool>()));
         }

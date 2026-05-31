@@ -9,6 +9,11 @@ namespace Dotsesses.Models;
 /// in a cell carries that cell's omnibus <see cref="PValue"/> (null when the
 /// cell is untestable) and a flag for whether its subgroup was
 /// <see cref="Excluded"/> from the test for being too small (N&lt;2).
+///
+/// ADR-0018 adds <see cref="EffectSize"/> — the cell's variance-explained
+/// effect size (η² parametric / ε² non-parametric) on a 0–1 scale, comparable
+/// to r² on the correlation tab. It is the headline; p is supporting detail.
+/// Also repeated on every dot in the cell; null when untestable.
 /// </summary>
 public record SignificanceDataPoint(
     int CellRow,
@@ -23,5 +28,6 @@ public record SignificanceDataPoint(
     int N,
     string Color,
     double? PValue = null,
+    double? EffectSize = null,
     SignificanceTestFamily TestFamily = SignificanceTestFamily.Parametric,
     bool Excluded = false);

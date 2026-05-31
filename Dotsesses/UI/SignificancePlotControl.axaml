@@ -42,5 +42,13 @@
                 <ComboBoxItem>Non-parametric</ComboBoxItem>
             </ComboBox>
         </StackPanel>
+
+        <!-- Exploratory caveat (ADR-0018): leads are not confirmation. -->
+        <TextBlock Text="Exploratory — uncorrected; treat as leads, not confirmation"
+                   HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                   Margin="6,0,0,4"
+                   FontSize="10" FontStyle="Italic"
+                   Opacity="0.6"
+                   IsHitTestVisible="False" />
     </Grid>
 </UserControl>

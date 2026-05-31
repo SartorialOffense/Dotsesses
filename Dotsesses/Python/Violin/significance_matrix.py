@@ -37,9 +37,11 @@ screening view, not a confirmatory multiple-comparison procedure.
 
 Returns: (timing_dict, svg_string, point_data_list). Each point dict has
 {cell_row, cell_col, x, y, cat_col, num_col, subgroup, mean, sem, n, color,
-p_value, test_family, excluded}. `p_value` is the cell's omnibus p (NaN
-when the cell is untestable) and is repeated on every dot in the cell;
-`excluded` flags a dot whose subgroup was dropped from the test (N<2).
+p_value, effect_size, test_family, excluded}. `p_value` is the cell's omnibus
+p (NaN when untestable) and `effect_size` is the cell's variance-explained
+effect size (η² parametric / ε² non-parametric, NaN when untestable, ADR-0018);
+both are repeated on every dot in the cell. `excluded` flags a dot whose
+subgroup was dropped from the test (N<2).
 """
 import math
 import time
@@ -138,6 +140,70 @@ def _kruskal_pvalue(groups: List[List[float]]) -> Optional[float]:
     return None if (p is None or math.isnan(p)) else float(p)
 
 
+def _eta_squared(groups: List[List[float]]) -> Optional[float]:
+    """
+    Eta-squared (η²) = SS_between / SS_total — the fraction of the numeric
+    variance explained by subgroup membership (ADR-0018, parametric path).
+    Computed over the same valid groups the Welch test uses. Returns None when
+    undefined (fewer than 2 groups, <2 total values, or zero total variance —
+    all values identical). Mildly upward-biased as a population estimator, which
+    we accept for an exploratory headline.
+    """
+    if len(groups) < 2:
+        return None
+    all_vals = [v for g in groups for v in g]
+    n = len(all_vals)
+    if n < 2:
+        return None
+    grand_mean = sum(all_vals) / n
+    ss_total = sum((v - grand_mean) ** 2 for v in all_vals)
+    if ss_total <= 0.0:
+        return None
+    ss_between = sum(
+        len(g) * (float(np.mean(g)) - grand_mean) ** 2 for g in groups)
+    return float(ss_between / ss_total)
+
+
+def _epsilon_squared(groups: List[List[float]]) -> Optional[float]:
+    """
+    Epsilon-squared (ε²) = H / (n − 1), the rank-based "variance explained" for
+    Kruskal–Wallis (ADR-0018, non-parametric path), where H is the KW statistic
+    and n the total sample. 0–1, directly comparable to η²/r². Returns None when
+    undefined (fewer than 2 groups, or scipy rejects the input).
+    """
+    if len(groups) < 2:
+        return None
+    n = sum(len(g) for g in groups)
+    if n < 2:
+        return None
+    try:
+        h, _p = _stats.kruskal(*groups)
+    except ValueError:
+        return None
+    if h is None or math.isnan(h):
+        return None
+    return float(h / (n - 1))
+
+
+def _partition_valid_groups(
+    subgroup_to_values: Dict[str, List[float]],
+) -> Tuple[List[List[float]], set]:
+    """
+    Split a cell's subgroups into the groups eligible for testing (N≥2, the
+    only ones with within-group variance) and the labels excluded for being too
+    small (N==1). Shared by the p-value and effect-size computations so they
+    always test the same groups.
+    """
+    valid_groups: List[List[float]] = []
+    excluded: set = set()
+    for sg, values in subgroup_to_values.items():
+        if len(values) >= 2:
+            valid_groups.append(values)
+        elif len(values) >= 1:
+            excluded.add(sg)
+    return valid_groups, excluded
+
+
 def compute_cell_pvalue(
     subgroup_to_values: Dict[str, List[float]],
     test_family: str,
@@ -149,13 +215,7 @@ def compute_cell_pvalue(
     cell is testable only if ≥2 valid groups remain. Returns
     (p_value_or_None, excluded_subgroup_labels).
     """
-    valid_groups: List[List[float]] = []
-    excluded: set = set()
-    for sg, values in subgroup_to_values.items():
-        if len(values) >= 2:
-            valid_groups.append(values)
-        elif len(values) >= 1:
-            excluded.add(sg)
+    valid_groups, excluded = _partition_valid_groups(subgroup_to_values)
 
     if len(valid_groups) < 2:
         return (None, excluded)
@@ -163,6 +223,25 @@ def compute_cell_pvalue(
     if test_family == 'nonparametric':
         return (_kruskal_pvalue(valid_groups), excluded)
     return (_welch_anova_pvalue(valid_groups), excluded)
+
+
+def compute_cell_effect_size(
+    subgroup_to_values: Dict[str, List[float]],
+    test_family: str,
+) -> Optional[float]:
+    """
+    Variance-explained effect size for a cell on a 0–1 scale (ADR-0018): η²
+    (parametric / Welch path) or ε² (non-parametric / Kruskal path). This is the
+    headline both stats tabs lead with — comparable to r² on the correlation
+    tab. Uses the same valid groups as compute_cell_pvalue; returns None when
+    the cell is untestable.
+    """
+    valid_groups, _excluded = _partition_valid_groups(subgroup_to_values)
+    if len(valid_groups) < 2:
+        return None
+    if test_family == 'nonparametric':
+        return _epsilon_squared(valid_groups)
+    return _eta_squared(valid_groups)
 
 
 def compute_significance_pvalues(
@@ -212,6 +291,34 @@ def _format_pvalue_annotation(p: Optional[float]) -> Tuple[str, bool]:
         p_text = 'p=' + f'{p:.3f}'.lstrip('0')  # e.g. 'p=.003'
     label = (p_text + ' ' + stars).strip()
     return (label, bool(stars))
+
+
+def _format_cell_annotation(
+    p: Optional[float],
+    effect: Optional[float],
+    test_family: str,
+) -> Tuple[str, bool]:
+    """
+    Build the in-cell annotation, effect-size-led (ADR-0018). The headline is
+    the variance-explained effect size (η² parametric / ε² non-parametric); the
+    raw p + stars sit beneath as supporting detail. Untestable cells (p is None)
+    render a lone em-dash. Returns (label, is_sig) where is_sig drives the bold
+    / strong-color styling.
+    """
+    if p is None:
+        return ('—', False)
+    stars = significance_stars(p)
+    symbol = 'ε²' if test_family == 'nonparametric' else 'η²'
+    if effect is None:
+        headline = f'{symbol}=—'
+    else:
+        headline = symbol + '=' + f'{effect:.2f}'.lstrip('0')  # e.g. 'η²=.42'
+    if p < 0.001:
+        p_text = 'p<.001'
+    else:
+        p_text = 'p=' + f'{p:.3f}'.lstrip('0')
+    support = (p_text + ' ' + stars).strip()
+    return (headline + '\n' + support, bool(stars))
 
 
 def create_significance_matrix(
@@ -278,6 +385,9 @@ def create_significance_matrix(
     # cell_pvalues[(i, j)] = (p_value_or_None, excluded_subgroup_labels) from
     # the per-cell omnibus test (see compute_cell_pvalue / ADR-0014 slice 4).
     cell_pvalues: Dict[Tuple[int, int], Tuple[Optional[float], set]] = {}
+    # cell_effects[(i, j)] = variance-explained effect size (η²/ε², ADR-0018) —
+    # the headline; None when untestable. Repeated on every dot in the cell.
+    cell_effects: Dict[Tuple[int, int], Optional[float]] = {}
     # Also collect per categorical column the canonical subgroup → color-index
     # map so the same subgroup gets the same color across all rows in a column.
     column_subgroup_index: Dict[int, Dict[str, int]] = {}
@@ -322,6 +432,7 @@ def create_significance_matrix(
                 row_stats.append((sg, mean_val, sem, n))
             cell_stats[(i, j)] = row_stats
             cell_pvalues[(i, j)] = compute_cell_pvalue(subgroup_to_values, test_family)
+            cell_effects[(i, j)] = compute_cell_effect_size(subgroup_to_values, test_family)
 
     # ----- Per-row y-limits: [min(m-SEM), max(m+SEM)] +/- 5% padding -----
     row_ylims: Dict[int, Tuple[float, float]] = {}
@@ -427,8 +538,9 @@ def create_significance_matrix(
             # untestable cells render faint. Skipped entirely for cells with no
             # dots at all (nothing was tested and nothing is shown).
             p_val, _excluded = cell_pvalues.get((i, j), (None, set()))
+            eff_val = cell_effects.get((i, j))
             if stats:
-                anno_label, anno_sig = _format_pvalue_annotation(p_val)
+                anno_label, anno_sig = _format_cell_annotation(p_val, eff_val, test_family)
                 ax.text(
                     0.97, 0.95, anno_label,
                     transform=ax.transAxes,
@@ -520,6 +632,7 @@ def create_significance_matrix(
         sg_to_idx = column_subgroup_index[j]
 
         cell_p, cell_excluded = cell_pvalues.get((i, j), (None, set()))
+        cell_eff = cell_effects.get((i, j))
         if len(svg_points) == len(stats):
             for k, (sg, mean_val, sem, n) in enumerate(stats):
                 color_idx = sg_to_idx.get(sg, 0)
@@ -539,6 +652,9 @@ def create_significance_matrix(
                     # (NaN when untestable); `excluded` flags a dot dropped
                     # from the test for N<2. See ADR-0014 slice 4.
                     'p_value': float(cell_p) if cell_p is not None else float('nan'),
+                    # Variance-explained effect size (η²/ε²) — the headline; NaN
+                    # when untestable. Repeated on every dot (ADR-0018 slice 4).
+                    'effect_size': float(cell_eff) if cell_eff is not None else float('nan'),
                     'test_family': test_family,
                     'excluded': bool(sg in cell_excluded),
                 })

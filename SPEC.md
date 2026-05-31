@@ -284,18 +284,25 @@ test families, when to prefer each, and citations for papers — lives at
   ```
 
   N=1 collapses to `Q1: 78.3 (N = 1)` (no ± since SEM is undefined).
-  The tooltip also carries the cell's test result line (see below) —
-  e.g. `Welch ANOVA: p = 0.003`, `Kruskal–Wallis: not testable
-  (< 2 groups with N ≥ 2)`, or `excluded from test: N < 2` on a dot
-  whose subgroup was dropped.
-- **Significance annotation** (top-right corner of each cell): the cell's
-  omnibus p-value plus tiered stars — `*` p<.05, `**` p<.01,
-  `***` p<.001. Significant cells render **bold** in a strong color;
-  non-significant cells render their p faint/grey with no star; cells that
-  can't be tested show an em-dash (`—`). Cells with no dots get no
-  annotation. p-values are **raw / uncorrected** — the matrix is an
-  exploratory screening view, not a confirmatory multiple-comparison
-  procedure.
+  The tooltip is **effect-size-led** (ADR-0018): it leads with the cell's
+  variance-explained headline — `η²=.42 variance explained` (Welch path) or
+  `ε²=.30 variance explained` (Kruskal path) — then a supporting line with the
+  raw p + stars and test name (e.g. `p=.003 ** · Welch ANOVA`). Untestable
+  cells say `not testable (< 2 groups with N ≥ 2)`; a dropped dot says
+  `excluded from test: N < 2`.
+- **Cell annotation** (top-right corner): **effect-size-led** (ADR-0018). The
+  headline is the variance-explained effect size — `η²=.42` (parametric) or
+  `ε²=.30` (non-parametric) — with the raw p + tiered stars (`*` p<.05,
+  `**` p<.01, `***` p<.001) demoted to a line beneath. Significant cells render
+  **bold** in a strong color; non-significant cells faint/grey; untestable
+  cells show a lone em-dash (`—`). Cells with no dots get no annotation.
+  p-values are **raw / uncorrected** — the effect size is the headline because
+  at class-sized N the p mostly reports sample size, not whether the
+  relationship matters; both are leads for an exploratory screening view, not a
+  confirmatory multiple-comparison procedure.
+- **Exploratory caveat** (ADR-0018): a faint bottom-left note — *"Exploratory —
+  uncorrected; treat as leads, not confirmation"* — sits on both this tab and
+  the Correlation tab, so the framing is visible without hovering.
 - **Test family selector** (top-right combo box): switches every cell between
   *Parametric* (Welch's ANOVA — reduces to Welch's t for 2 subgroups) and
   *Non-parametric* (Kruskal–Wallis — reduces to Mann–Whitney for 2). One

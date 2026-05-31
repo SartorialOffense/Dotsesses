@@ -178,6 +178,10 @@ public partial class SignificancePlotViewModel : ViewModelBase
         var testName = p.TestFamily == SignificanceTestFamily.Nonparametric
             ? "Kruskal–Wallis"
             : "Welch ANOVA";
+        // ε² accompanies Kruskal–Wallis, η² accompanies Welch ANOVA (ADR-0018).
+        var effectSymbol = p.TestFamily == SignificanceTestFamily.Nonparametric
+            ? "ε²"
+            : "η²";
 
         string statLine;
         if (p.Excluded)
@@ -190,9 +194,30 @@ public partial class SignificancePlotViewModel : ViewModelBase
         }
         else
         {
-            statLine = $"{testName}: p = {p.PValue.Value:0.###}";
+            // Effect-size-led (ADR-0018): the variance-explained headline first,
+            // raw p + test demoted to a supporting line beneath.
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            var headline = p.EffectSize is double e
+                ? $"{effectSymbol}={e.ToString("0.00", ci).TrimStart('0')} variance explained"
+                : $"{effectSymbol}=—";
+            var stars = SignificanceStars(p.PValue);
+            var pText = "p=" + p.PValue.Value.ToString("0.###", ci).TrimStart('0');
+            statLine = $"{headline}\n{pText}{(stars.Length > 0 ? " " + stars : "")} · {testName}";
         }
 
         return head + "\n" + statLine;
+    }
+
+    /// <summary>
+    /// Star tiers for a raw p-value (ADR-0018 decision 4) — mirrors the Python
+    /// <c>significance_stars</c> helper for the C#-built tooltip text.
+    /// </summary>
+    private static string SignificanceStars(double? p)
+    {
+        if (p is not double v || double.IsNaN(v)) return "";
+        if (v < 0.001) return "***";
+        if (v < 0.01) return "**";
+        if (v < 0.05) return "*";
+        return "";
     }
 }
