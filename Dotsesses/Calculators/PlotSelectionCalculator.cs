@@ -119,28 +119,76 @@ public static class PlotSelectionCalculator
             StringComparer.OrdinalIgnoreCase);
 
         var result = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var cat in categoricalNames)
+        foreach (var group in TestableCells(numericNames, categoricalNames, pLookup, excluded)
+                     .GroupBy(c => c.Cat))
         {
-            if (excluded.Contains(cat)) continue;
+            var cells = group.ToList();
+            if (cells.Min(c => c.P) > threshold) continue;  // no numeric near significant
 
-            var ps = numericNames
-                .Select(n => (Name: n, P: pLookup(n, cat)))
-                .Where(t => t.P.HasValue)
-                .Select(t => (t.Name, P: t.P!.Value))
-                .ToList();
-            if (ps.Count == 0) continue;
-            if (ps.Min(t => t.P) > threshold) continue;
-
-            result.Add(cat);
-            foreach (var t in ps
-                         .OrderBy(t => t.P)
-                         .ThenBy(t => t.Name, StringComparer.Ordinal)
+            result.Add(group.Key);
+            foreach (var c in cells
+                         .OrderBy(c => c.P)
+                         .ThenBy(c => c.Num, StringComparer.Ordinal)
                          .Take(topNumerics))
             {
-                result.Add(t.Name);
+                result.Add(c.Num);
             }
         }
         return result;
+    }
+
+    /// <summary>
+    /// Optimize selection: rank every testable (numeric × categorical) cell by
+    /// p ascending, take the <paramref name="topCells"/> lowest, and return the
+    /// distinct **numeric** names appearing in them. Categoricals are not
+    /// returned — the caller keeps the displayed categorical set fixed and only
+    /// re-picks the numeric rows. Shares the cell enumeration with
+    /// <see cref="SelectSignificance"/>.
+    /// </summary>
+    public static HashSet<string> SelectTopCellNumerics(
+        IReadOnlyList<string> numericNames,
+        IReadOnlyList<string> categoricalNames,
+        Func<string, string, double?> pLookup,
+        int topCells = 10,
+        IReadOnlyCollection<string>? excludedCategoricalNames = null)
+    {
+        ArgumentNullException.ThrowIfNull(numericNames);
+        ArgumentNullException.ThrowIfNull(categoricalNames);
+        ArgumentNullException.ThrowIfNull(pLookup);
+
+        var excluded = new HashSet<string>(
+            excludedCategoricalNames ?? Array.Empty<string>(),
+            StringComparer.OrdinalIgnoreCase);
+
+        return TestableCells(numericNames, categoricalNames, pLookup, excluded)
+            .OrderBy(c => c.P)
+            .ThenBy(c => c.Cat, StringComparer.Ordinal)
+            .ThenBy(c => c.Num, StringComparer.Ordinal)
+            .Take(topCells)
+            .Select(c => c.Num)
+            .ToHashSet(StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// Enumerates the testable (numeric × categorical) cells with a computable
+    /// p-value, skipping excluded categoricals. Shared by
+    /// <see cref="SelectSignificance"/> and <see cref="SelectTopCellNumerics"/>.
+    /// </summary>
+    private static IEnumerable<(string Num, string Cat, double P)> TestableCells(
+        IReadOnlyList<string> numericNames,
+        IReadOnlyList<string> categoricalNames,
+        Func<string, string, double?> pLookup,
+        ISet<string> excludedCategoricals)
+    {
+        foreach (var cat in categoricalNames)
+        {
+            if (excludedCategoricals.Contains(cat)) continue;
+            foreach (var num in numericNames)
+            {
+                var p = pLookup(num, cat);
+                if (p.HasValue) yield return (num, cat, p.Value);
+            }
+        }
     }
 
     /// <summary>

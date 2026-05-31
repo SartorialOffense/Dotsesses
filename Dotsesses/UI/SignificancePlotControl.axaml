@@ -17,20 +17,30 @@
             <Canvas x:Name="PointsOverlay" Background="Transparent" />
         </Grid>
 
-        <!-- Controls overlay (top-right): per-cell test family selector. The
+        <!-- Controls overlay (top-right): test-family selector + Optimize. The
              matrix p-values are RAW / exploratory-screening (see ADR-0014). -->
-        <ComboBox x:Name="TestFamilyCombo"
-                  HorizontalAlignment="Right"
-                  VerticalAlignment="Top"
-                  Margin="0,0,8,0"
-                  MinWidth="0"
-                  FontSize="11"
-                  SelectedIndex="0"
-                  Opacity="0.9"
-                  SelectionChanged="OnTestFamilyChanged"
-                  ToolTip.Tip="Per-cell omnibus test. Parametric = Welch's ANOVA (reduces to Welch's t for 2 groups); Non-parametric = Kruskal–Wallis (reduces to Mann–Whitney). p-values are uncorrected — this is an exploratory screening view.">
-            <ComboBoxItem>Parametric</ComboBoxItem>
-            <ComboBoxItem>Non-parametric</ComboBoxItem>
-        </ComboBox>
+        <StackPanel HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Orientation="Horizontal"
+                    Spacing="6"
+                    Margin="0,0,8,0">
+            <Button x:Name="OptimizeButton"
+                    FontSize="11"
+                    Padding="8,2"
+                    Opacity="0.9"
+                    Content="Optimize"
+                    Click="OnOptimizeClick"
+                    ToolTip.Tip="Re-pick the numeric rows to the 10 most significant (lowest-p) for the categorical columns currently shown, using the selected test family." />
+            <ComboBox x:Name="TestFamilyCombo"
+                      MinWidth="0"
+                      FontSize="11"
+                      SelectedIndex="0"
+                      Opacity="0.9"
+                      SelectionChanged="OnTestFamilyChanged"
+                      ToolTip.Tip="Per-cell omnibus test. Parametric = Welch's ANOVA (reduces to Welch's t for 2 groups); Non-parametric = Kruskal–Wallis (reduces to Mann–Whitney). p-values are uncorrected — this is an exploratory screening view.">
+                <ComboBoxItem>Parametric</ComboBoxItem>
+                <ComboBoxItem>Non-parametric</ComboBoxItem>
+            </ComboBox>
+        </StackPanel>
     </Grid>
 </UserControl>

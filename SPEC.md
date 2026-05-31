@@ -270,6 +270,13 @@ test families, when to prefer each, and citations for papers — lives at
   workspace (SavedState v5; v4 files open as Parametric). The same family
   handles categorical columns with 2 or 2+ values — no group-count
   branching. Default: Parametric.
+- **Optimize button** (top-right, beside the selector): holding the
+  currently-shown **categorical** columns fixed, ranks every (numeric ×
+  shown-categorical) cell by p (using the selected test family), takes the
+  **10 lowest-p cells**, and sets the matrix's **numeric** rows to the
+  numerics in them — replacing the current rows. A quick way to collapse a
+  wide matrix to the strongest relationships for the attributes on screen.
+  Shares the p-value machinery with the load-time auto-select (ADR-0016).
 - **Small-N test policy**: subgroups with N<2 are dropped from the test
   (their dots still render); the cell is tested only if ≥2 valid subgroups
   remain, otherwise the annotation is `—`.

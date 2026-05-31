@@ -114,6 +114,15 @@ public partial class SignificancePlotControl : UserControl
     /// the current theme. No-ops when the selection already matches the VM
     /// (e.g. when the combo is being synced from the VM on load).
     /// </summary>
+    /// <summary>
+    /// Optimize button: ask the VM (→ MainWindowViewModel) to re-pick the most
+    /// significant numeric rows for the categoricals currently shown.
+    /// </summary>
+    private void OnOptimizeClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        (DataContext as SignificancePlotViewModel)?.RequestOptimize();
+    }
+
     private void OnTestFamilyChanged(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (DataContext is not SignificancePlotViewModel vm) return;

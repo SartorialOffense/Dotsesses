@@ -82,3 +82,22 @@ dotplot AggregateScore, independent of which plots show which columns).
 - Selection is now data-dependent, so default-selection tests assert
   structural invariants (Total-always-in, ≤ 11 display, ≤ 9 correlation)
   rather than all-true.
+
+## Addendum: the Significance "Optimize" button
+
+An interactive **Optimize** button on the Significance plot reuses this
+machinery. Holding the currently-displayed categorical columns fixed, it
+ranks every (numeric × shown-categorical) cell by p — using the matrix's
+**current** test family (not always Welch) — takes the 10 lowest-p cells,
+and sets the numeric rows to the numerics in them (replacing the current
+rows). Shared code: `SignificancePlotService.ComputeCellPValues` (the
+p-grid), a private `TestableCells` cell-enumerator in
+`PlotSelectionCalculator` (used by both `SelectSignificance` and the new
+`SelectTopCellNumerics`), and a `BuildSignificancePLookup` helper +
+`ApplyScoreSelections` on `MainWindowViewModel`. The difference is the
+selection rule: auto-select qualifies categoricals (min p ≤ 0.2) and
+takes top-3 numerics each; Optimize takes a global top-10 cells over a
+fixed categorical set and returns only numerics. The button reaches
+`MainWindowViewModel` through a direct callback
+(`SignificancePlotViewModel.OptimizeRequested`) per ADR-0004
+(single consumer).
