@@ -133,29 +133,28 @@ def get_r_squared_color(r_squared: float, theme: str = 'dark') -> str:
 def _rest_score_debias(
     x_data: Dict[str, float],
     y_data: Dict[str, float],
-    x_is_total: bool,
-    y_is_total: bool,
+    x_is_target: bool,
+    y_is_target: bool,
     x_is_bias_correct: bool,
     y_is_bias_correct: bool,
 ) -> Tuple[Dict[str, float], Dict[str, float], bool]:
     """
-    Apply the corrected item-total (rest-score) de-bias to a Total × bias-correct
-    cell (ADR-0018).
+    Apply the corrected item-total (rest-score) de-bias to a target × bias-correct
+    cell (ADR-0018). A de-bias target is the Total or Exam column.
 
-    Correlating a column X against a Total that *contains* X correlates X partly
+    Correlating a column X against a target T that *contains* X correlates X partly
     with itself, inflating r. The classical-test-theory fix is to correlate X
-    against the rest score Total − X (per common student). We correct ONLY when
-    exactly one axis is Total and the other is flagged for bias correction (its
-    BiasCorrect flag — e.g. an aggregate component, or a composite column whose
-    value is contained in Total); every other cell is returned unchanged.
+    against the rest score T − X (per common student). We correct X against a
+    target **only when X precedes that target in column order** (so Exam, for
+    example, only claims the columns before it). In the lower-triangle layout the
+    earlier column is always on x (`x = series[j]`, `y = series[i]`, `j < i`), so
+    "X before the target" is exactly the case where the **y-axis is the target and
+    the x-axis is bias-correct** — the single branch below. (A column is therefore
+    never corrected against itself.) Every other cell is returned unchanged.
 
     Returns (eff_x_data, eff_y_data, corrected).
     """
-    if x_is_total and y_is_bias_correct:
-        common = set(x_data) & set(y_data)
-        rest = {sid: x_data[sid] - y_data[sid] for sid in common}
-        return (rest, y_data, True)
-    if y_is_total and x_is_bias_correct:
+    if y_is_target and x_is_bias_correct:
         common = set(x_data) & set(y_data)
         rest = {sid: y_data[sid] - x_data[sid] for sid in common}
         return (x_data, rest, True)
@@ -199,6 +198,7 @@ def create_correlation_matrix(
     column_types: List[str],
     is_bias_correct: List[bool],
     is_total: List[bool],
+    is_debias_target: List[bool],
     theme: str = 'dark',
     dot_size: float = 3.0,
     show_correlation_coefficients: bool = True,
@@ -214,12 +214,15 @@ def create_correlation_matrix(
         'numeric' / 'categorical' / 'ordinal'. Drives the Pearson/Spearman
         split (an Ordinal-touching cell uses Spearman).
     - is_bias_correct: per-series flag aligned with `series`, True iff the
-        column should be rest-score de-biased against Total (its BiasCorrect
-        flag). Marks the cells the rest-score de-bias corrects (ADR-0018),
-        decoupled from aggregate membership.
+        column should be rest-score de-biased against a target (its BiasCorrect
+        flag). Decoupled from aggregate membership (ADR-0018).
     - is_total: per-series flag aligned with `series`, True for the Total
-        column. Replaces the old 'Total is the last series' assumption — the
-        red Total styling keys off this flag (ADR-0018 slice 1).
+        column. The red Total styling keys off this flag (ADR-0018 slice 1).
+    - is_debias_target: per-series flag aligned with `series`, True for a
+        de-bias target column (Total or Exam). A bias-correct column is
+        corrected against a target only when it precedes the target in column
+        order — which the lower-triangle layout enforces automatically (the
+        earlier column is always on x; see `_rest_score_debias`).
     - theme: 'dark' or 'light' for visual theme
     - dot_size: size for scatter dots
     - show_correlation_coefficients: whether to display r values
@@ -243,6 +246,10 @@ def create_correlation_matrix(
     is_total = [bool(is_total[k]) if k < len(is_total) else False for k in range(n)]
     is_bias_correct = [
         bool(is_bias_correct[k]) if k < len(is_bias_correct) else False
+        for k in range(n)
+    ]
+    is_debias_target = [
+        bool(is_debias_target[k]) if k < len(is_debias_target) else False
         for k in range(n)
     ]
     column_types = [
@@ -288,7 +295,7 @@ def create_correlation_matrix(
             _, x_data = series[j]
             eff_x, eff_y, corrected = _rest_score_debias(
                 x_data, y_data,
-                is_total[j], is_total[i],
+                is_debias_target[j], is_debias_target[i],
                 is_bias_correct[j], is_bias_correct[i])
 
             # Spearman for any Ordinal-touching cell; Pearson otherwise. De-bias

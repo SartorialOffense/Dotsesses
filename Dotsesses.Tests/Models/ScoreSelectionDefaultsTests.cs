@@ -183,15 +183,17 @@ public class ScoreSelectionDefaultsTests
     }
 
     [Fact]
-    public void GenerateDefaults_SeedsBiasCorrect_FromAggregateMembership()
+    public void GenerateDefaults_SeedsBiasCorrect_OnlyForColumnsBeforeTotal()
     {
-        // ADR-0018: BiasCorrect seeds the same as Aggregate — on for numeric
-        // non-Total components, off for Total / Categorical / Ordinal — so the
-        // de-bias starts where it did before, then becomes independently toggleable.
+        // ADR-0018: BiasCorrect (de-bias) seeds on only for numeric columns BEFORE
+        // the Total column in sheet order — the components rolling up into Total.
+        // Total and any column after it (e.g. a curved score) seed off.
         var scores = new List<Score>
         {
             new("Q1", null, 10),
+            new("Exam", null, 20),
             new("Total", null, 30),
+            new("Curved", null, 33),  // post-Total — must NOT be bias-corrected
         };
         var attributes = new List<StudentAttribute>
         {
@@ -200,9 +202,11 @@ public class ScoreSelectionDefaultsTests
 
         var result = ScoreSelectionDefaults.GenerateDefaults(scores, attributes);
 
-        Assert.True(result.First(s => s.Name == "Q1").BiasCorrect);     // numeric component
-        Assert.False(result.First(s => s.Name == "Total").BiasCorrect); // not corrected vs itself
-        Assert.False(result.First(s => s.Name == "Hat").BiasCorrect);   // categorical
+        Assert.True(result.First(s => s.Name == "Q1").BiasCorrect);      // before Total
+        Assert.True(result.First(s => s.Name == "Exam").BiasCorrect);    // before Total
+        Assert.False(result.First(s => s.Name == "Total").BiasCorrect);  // the target itself
+        Assert.False(result.First(s => s.Name == "Curved").BiasCorrect); // after Total
+        Assert.False(result.First(s => s.Name == "Hat").BiasCorrect);    // categorical
     }
 
     [Fact]

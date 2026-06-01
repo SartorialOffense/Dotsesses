@@ -142,4 +142,74 @@ public class CorrelationDebiasTests
         // no points at all.
         Assert.Empty(points);
     }
+
+    // ===== Exam as a second de-bias target (before-target scoping) =====
+
+    [Fact]
+    public void ExamTarget_CorrectsColumnsBeforeIt_ButNotAfter()
+    {
+        // Column order [Q1, Exam, HW, Total]: Q1 precedes Exam; HW sits between
+        // Exam and Total. A column is de-biased against a target only when it
+        // precedes that target (ADR-0018).
+        var series = new List<(string, Dictionary<string, double>)>
+        {
+            ("Q1",    Col(r => r.Q1)),
+            ("Exam",  Col(r => r.Q1 + r.Q2)),       // Exam contains Q1 (and Q2)
+            ("HW",    Col(r => r.Extra)),           // homework, after Exam
+            ("Total", Col(r => r.Q1 + r.Q2 + r.Q3)),
+        };
+        var meta = new Dictionary<string, CorrelationColumnInfo>
+        {
+            ["Q1"]    = new(ScoreColumnType.Numeric, BiasCorrect: true,  IsTotal: false, IsDebiasTarget: false),
+            ["Exam"]  = new(ScoreColumnType.Numeric, BiasCorrect: true,  IsTotal: false, IsDebiasTarget: true),
+            ["HW"]    = new(ScoreColumnType.Numeric, BiasCorrect: true,  IsTotal: false, IsDebiasTarget: false),
+            ["Total"] = new(ScoreColumnType.Numeric, BiasCorrect: false, IsTotal: true,  IsDebiasTarget: true),
+        };
+
+        var points = Generate(series, meta);
+
+        // Q1 × Exam → Exam axis de-biased to Exam − Q1 (Q1 precedes Exam).
+        var q1Exam = points.Where(p => p.XSeries == "Q1" && p.YSeries == "Exam").ToList();
+        Assert.Equal(Rows.Length, q1Exam.Count);
+        foreach (var p in q1Exam)
+        {
+            var row = Rows.Single(r => r.Id == p.StudentId);
+            Assert.True(p.Corrected);
+            Assert.Equal(row.Q2, p.YValue, precision: 6);   // (Q1+Q2) − Q1 = Q2
+            Assert.Equal(row.Q1, p.XValue, precision: 6);
+        }
+
+        // HW × Exam → NOT corrected (HW comes after Exam). In the cell Exam is the
+        // earlier axis (x), HW the later (y); the de-bias only fires when the
+        // later axis is the target, so neither value is altered.
+        var examHw = points.Where(p => p.XSeries == "Exam" && p.YSeries == "HW").ToList();
+        Assert.Equal(Rows.Length, examHw.Count);
+        foreach (var p in examHw)
+        {
+            var row = Rows.Single(r => r.Id == p.StudentId);
+            Assert.False(p.Corrected);
+            Assert.Equal(row.Q1 + row.Q2, p.XValue, precision: 6);  // raw Exam
+            Assert.Equal(row.Extra, p.YValue, precision: 6);        // raw HW
+        }
+
+        // Exam × Total → Total − Exam (Exam precedes Total).
+        var examTotal = points.Where(p => p.XSeries == "Exam" && p.YSeries == "Total").ToList();
+        Assert.Equal(Rows.Length, examTotal.Count);
+        foreach (var p in examTotal)
+        {
+            var row = Rows.Single(r => r.Id == p.StudentId);
+            Assert.True(p.Corrected);
+            Assert.Equal(row.Q3, p.YValue, precision: 6);   // (Q1+Q2+Q3) − (Q1+Q2) = Q3
+        }
+
+        // HW × Total → Total − HW (HW precedes Total).
+        var hwTotal = points.Where(p => p.XSeries == "HW" && p.YSeries == "Total").ToList();
+        Assert.Equal(Rows.Length, hwTotal.Count);
+        foreach (var p in hwTotal)
+        {
+            var row = Rows.Single(r => r.Id == p.StudentId);
+            Assert.True(p.Corrected);
+            Assert.Equal((row.Q1 + row.Q2 + row.Q3) - row.Extra, p.YValue, precision: 6);
+        }
+    }
 }

@@ -6,9 +6,9 @@ namespace Dotsesses.Models;
 ///
 /// Numeric defaults: Display=true and Correlation=true; Aggregate=true except for "Total"
 /// (case-insensitive), which is excluded so the aggregate is not double-counted with a
-/// pre-summed Total column. BiasCorrect seeds the same as Aggregate (true for numeric
-/// non-Total, false for Total) — the correlation rest-score de-bias starts on for the
-/// usual components but is then independently toggleable (ADR-0018).
+/// pre-summed Total column. BiasCorrect (correlation rest-score de-bias) seeds on only for
+/// numeric columns *before* the Total column in sheet order — the components that roll up
+/// into Total; Total and any column after it seed off (ADR-0018). Independently toggleable.
 ///
 /// Categorical defaults: Display=true (so the drill-down's Attributes section is populated),
 /// Aggregate=false, Correlation=false — those flags are meaningless for categorical columns.
@@ -38,6 +38,13 @@ public static class ScoreSelectionDefaults
 
         var result = new List<ScoreSelection>(scores.Count + attributes.Count);
 
+        // De-bias (BiasCorrect) seeds on only for numeric columns that appear
+        // *before* the Total column in sheet order (ADR-0018): those are the
+        // components that roll up into Total. Total itself and any column after
+        // it (curved score, percentile, …) seed off. `passedTotal` flips once we
+        // reach Total; if there's no real Total column, ScoreReader appends a
+        // synthesized one last, so every real numeric correctly seeds on.
+        var passedTotal = false;
         foreach (var score in scores)
         {
             var isTotalColumn = string.Equals(score.Name, "Total", StringComparison.OrdinalIgnoreCase);
@@ -49,10 +56,11 @@ public static class ScoreSelectionDefaults
                 Aggregate: !isTotalColumn,
                 Correlation: true,
                 Significance: true,
-                // De-bias seeds from aggregate membership (ADR-0018): a numeric
-                // non-Total component is corrected against Total by default, then
-                // independently toggleable. Total isn't corrected against itself.
-                BiasCorrect: !isTotalColumn));
+                BiasCorrect: !passedTotal && !isTotalColumn));
+            if (isTotalColumn)
+            {
+                passedTotal = true;
+            }
         }
 
         foreach (var attribute in attributes)

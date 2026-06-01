@@ -56,6 +56,9 @@ public class CorrelationPlotService
         var columnTypes = new List<string>(seriesData.Count);
         var biasCorrect = new List<bool>(seriesData.Count);
         var isTotal = new List<bool>(seriesData.Count);
+        // De-bias targets = Total OR Exam (ADR-0018). Kept separate from isTotal
+        // because isTotal also drives the red styling (Total only).
+        var isDebiasTarget = new List<bool>(seriesData.Count);
         foreach (var (name, _) in seriesData)
         {
             if (columnMetadata.TryGetValue(name, out var info))
@@ -63,26 +66,30 @@ public class CorrelationPlotService
                 columnTypes.Add(ColumnTypeToPython(info.Type));
                 biasCorrect.Add(info.BiasCorrect);
                 isTotal.Add(info.IsTotal);
+                isDebiasTarget.Add(info.IsTotal || info.IsDebiasTarget);
             }
             else
             {
                 columnTypes.Add("numeric");
                 biasCorrect.Add(false);
-                isTotal.Add(name.Equals("Total", StringComparison.OrdinalIgnoreCase));
+                var isTotalByName = name.Equals("Total", StringComparison.OrdinalIgnoreCase);
+                isTotal.Add(isTotalByName);
+                isDebiasTarget.Add(isTotalByName ||
+                    name.Equals("Exam", StringComparison.OrdinalIgnoreCase));
             }
         }
 
         // Convert theme enum to Python string
         var themeStr = theme == ThemeName.LightMode ? "light" : "dark";
 
-        // Call Python module (the bias-correct list is passed positionally as
-        // the renderer's is_bias_correct parameter).
+        // Call Python module (the per-series flag lists are passed positionally).
         var result = _correlationModule.CreateCorrelationMatrix(
             (figSize.Width, figSize.Height),
             pySeriesList,
             columnTypes,
             biasCorrect,
             isTotal,
+            isDebiasTarget,
             themeStr,
             dotSize,
             showCorrelationCoefficients,

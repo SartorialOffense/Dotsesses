@@ -114,4 +114,33 @@ public class BuildCorrelationColumnMetadataTests
         Assert.False(map.ContainsKey("Composite"));
         Assert.True(map.ContainsKey("Total"));
     }
+
+    [Fact]
+    public void Exam_IsADebiasTarget_AndStaysBiasCorrect()
+    {
+        // ADR-0018: Exam (matched by name) is an additional de-bias target — but
+        // it's also bias-correct so it's itself corrected against Total. Total is
+        // a target too; plain components and Total are not Exam-targets.
+        var students = new List<StudentAssessment>
+        {
+            new(1, new List<Score> { new("Q1", null, 8), new("Exam", null, 40), new("Total", null, 90) },
+                new List<StudentAttribute>(), "m1"),
+        };
+        var ca = new ClassAssessment(students, new List<CutoffCountRange>(),
+            new Dictionary<int, MuppetNameInfo>(), new Dictionary<string, string>());
+        ca.ScoreSelections = new List<ScoreSelection>
+        {
+            new("Q1", null, ScoreColumnType.Numeric, Display: true, Aggregate: true, Correlation: true, Significance: true, BiasCorrect: true),
+            new("Exam", null, ScoreColumnType.Numeric, Display: true, Aggregate: true, Correlation: true, Significance: true, BiasCorrect: true),
+            new("Total", null, ScoreColumnType.Numeric, Display: true, Aggregate: false, Correlation: true, Significance: true, BiasCorrect: false),
+        };
+
+        var map = MainWindowViewModel.BuildCorrelationColumnMetadata(ca, s => s.Correlation);
+
+        Assert.True(map["Exam"].IsDebiasTarget);   // an extra de-bias target
+        Assert.True(map["Exam"].BiasCorrect);      // and itself corrected vs Total
+        Assert.False(map["Exam"].IsTotal);         // but not the red Total
+        Assert.False(map["Q1"].IsDebiasTarget);    // plain component
+        Assert.False(map["Total"].IsDebiasTarget); // Total target rides on IsTotal, not this flag
+    }
 }

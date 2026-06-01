@@ -113,17 +113,20 @@ rather than summed from components, and the Settings Aggregate column is
 hidden.
 
 **Rest score / corrected item-total correlation**: When the correlation
-matrix relates a column whose value is *contained in* Total against Total
-itself, Total contains that column, so a naive correlation correlates it
-partly with itself and inflates `r`. The classical-test-theory fix is to
-correlate the column against the **rest score** — `Total − column`, per
-Student — yielding the **corrected item-total correlation**. Applied to
-`Total × BiasCorrect` cells, where **BiasCorrect** is an explicit
-per-column flag (see ScoreSelection) — *not* aggregate membership, so a
-**composite column** (e.g. `Q1-Q4 = Q1+Q2+Q3+Q4`) can be de-biased
-without being summed into the aggregate (which would double-count its
-parts). A single-component Total makes the rest score identically zero
-(undefined correlation), so that cell is blanked. See ADR-0018.
+matrix relates a column whose value is *contained in* a **target** column
+(Total or Exam) against that target, the target contains the column, so a
+naive correlation correlates it partly with itself and inflates `r`. The
+classical-test-theory fix is to correlate the column against the **rest
+score** — `target − column`, per Student — yielding the **corrected
+item-total correlation**. Applied to `target × BiasCorrect` cells, where
+**BiasCorrect** is an explicit per-column flag (see ScoreSelection) — *not*
+aggregate membership, so a **composite column** (e.g. `Q1-Q4 = Q1+Q2+Q3+Q4`)
+can be de-biased without being summed into the aggregate. A column is
+corrected against a target only when it **precedes** that target in sheet
+order: `Total` (last) claims everything before it, `Exam` claims only the
+columns before *it* (Exam itself is corrected against Total). `BiasCorrect`
+seeds on for numeric columns before Total. A degenerate rest score
+(`target − column ≡ 0`) blanks the cell. See ADR-0018.
 
 **Effect size / variance explained**: The headline both exploratory-stats
 tabs lead with — the fraction of variation in the Score a variable

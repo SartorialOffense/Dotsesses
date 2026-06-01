@@ -60,12 +60,14 @@ Untestable cells render `—` (mirrors ADR-0015).
 ρ / ρ² identically. Spearman's p comes straight from `spearmanr` — not a
 reused Pearson t-formula.
 
-**5. Rest-score de-bias driven by an explicit `BiasCorrect` flag.** For
-any cell where one axis is `Total` and the other carries the per-column
-**`BiasCorrect`** flag ("Bias Correct" in Settings; Numeric, non-Total),
-correlate that column `X` against the **rest score** `Total − X` per
-student (the corrected item-total correlation from classical test theory)
-before computing r, r², and the fitted line.
+**5. Rest-score de-bias driven by an explicit `BiasCorrect` flag, against
+Total or Exam.** For any cell where one axis is a **de-bias target** and the
+other carries the per-column **`BiasCorrect`** flag ("Bias Correct" in
+Settings; Numeric, non-Total) **and the bias-correct column precedes the
+target in sheet order**, correlate that column `X` against the **rest score**
+`T − X` per student (the corrected item-total correlation from classical test
+theory) before computing r, r², and the fitted line. De-bias targets are
+`Total` **and** `Exam` (matched by name).
 
 The trigger is the explicit flag — **not** aggregate membership.
 *(Amendment, 2026: this slice originally keyed the correction on
@@ -73,18 +75,27 @@ The trigger is the explicit flag — **not** aggregate membership.
 **composite column** like `Q1-Q4 = Q1+Q2+Q3+Q4` overlaps Total and needs
 de-biasing, but the user must keep it **out** of the aggregate or its
 parts are double-counted. Tying de-bias to `Aggregate` made that
-impossible. `BiasCorrect` decouples the two: it **seeds** from the old
-rule (`Numeric && Aggregate && !Total`) so existing projects correct the
-same cells, then is independently toggleable — a composite gets
-`Aggregate` off + `BiasCorrect` on.)* Scope:
+impossible. `BiasCorrect` decouples the two — a composite gets `Aggregate`
+off + `BiasCorrect` on. A later amendment seeded `BiasCorrect` for the
+numeric columns **before Total** and added `Exam` as a second target.)*
+Scope:
 
-- Only `Total × BiasCorrect` cells are corrected; every other cell
-  (component-vs-component, `Total` vs an un-flagged column, ordinal, the
-  diagonal) is unchanged.
-- **Guard:** a single-component Total (or any flagged column equal to
-  Total) makes `Total − X ≡ 0` → undefined → the cell is blanked.
+- A bias-correct column is corrected against a target only when it
+  **precedes** that target in column order — so `Exam` claims only the
+  columns before it, while `Total` (last) claims everything before it. The
+  correlation matrix's lower-triangle layout enforces this for free: the
+  earlier column is always the x-axis, so the de-bias fires only when the
+  **y-axis is a target and the x-axis is bias-correct**. `Exam` itself,
+  preceding `Total`, is corrected against `Total` (`Total − Exam`); a column
+  between `Exam` and `Total` is corrected vs `Total` but not vs `Exam`.
+- `BiasCorrect` **seeds** on for numeric columns before `Total`; `Total` and
+  any column after it seed off.
+- **Guard:** a degenerate rest score (`T − X ≡ 0`, zero variance) → the cell
+  is blanked. A column is never corrected against itself (impossible in a cell).
 - We do **not** validate that a `BiasCorrect` column's value is actually
-  contained in Total — `Total − X` trusts the user's assertion.
+  contained in its target — the correction trusts the flags/names, now scoped
+  by column order so `Exam` only claims the columns before it.
+- Red styling stays `Total`-only; `Exam` is a de-bias target but not reddened.
 
 Correction is rendered **transparently** — no special cell marker. The
 "corrected" fact surfaces only in the tooltip (and SPEC), because the

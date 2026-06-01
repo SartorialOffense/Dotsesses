@@ -578,12 +578,18 @@ public partial class MainWindowViewModel : ViewModelBase
             var seriesName = s.Index.HasValue ? $"{s.Name} {s.Index}" : s.Name;
             var isTotal = s.Index == null &&
                 string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase);
+            // De-bias targets: Total (always) and Exam (an additional anchor,
+            // matched by name — ADR-0018). A bias-correct column is corrected
+            // against a target only when it precedes the target in sheet order.
+            var isExam = s.Index == null &&
+                string.Equals(s.Name, "Exam", StringComparison.OrdinalIgnoreCase);
             // De-bias is driven by the explicit BiasCorrect flag, not aggregate
             // membership (ADR-0018). Guard to Numeric non-Total defensively — the
-            // Settings UI already only lets those rows carry the flag.
+            // Settings UI already only lets those rows carry the flag. Exam stays
+            // bias-correct so it is itself corrected against Total.
             var biasCorrect =
                 s.Type == ScoreColumnType.Numeric && s.BiasCorrect && !isTotal;
-            map[seriesName] = new CorrelationColumnInfo(s.Type, biasCorrect, isTotal);
+            map[seriesName] = new CorrelationColumnInfo(s.Type, biasCorrect, isTotal, IsDebiasTarget: isExam);
         }
         return map;
     }

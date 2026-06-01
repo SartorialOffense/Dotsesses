@@ -225,20 +225,23 @@ sample size `N`, and a "corrected (rest score)" note when the cell was
 de-biased.
 
 **Rest-score de-bias** (ADR-0018): a cell relating a column flagged **Bias
-Correct** against the **Total** column is de-biased — that column is correlated
-against the rest score `Total − column` instead of the full Total (which
-contains it and would inflate the correlation). Bias Correct is a per-column
-toggle in Settings (Numeric, non-Total), independent of Aggregate, so a
-**composite column** (e.g. `Q1-Q4 = Q1+Q2+Q3+Q4`) can be de-biased without
-being summed into the aggregate — set its Aggregate off and Bias Correct on.
-The flag seeds from aggregate membership at load, so by default the usual
-components are de-biased exactly as before. The de-bias is applied
-transparently: the dots, fitted line, coefficient, and r² color all reflect the
-corrected values, with no special cell marker — the corrected fact surfaces
-only in the tooltip's "corrected" note. An Ordinal column feeding Total is
-de-biased first, then ranked (Spearman). A single-component Total makes the rest
-score identically zero, so that one cell renders blank. Cells not involving a
-Bias-Correct column (or not involving Total) are unaffected.
+Correct** against a **target** column (**Total** or **Exam**) is de-biased —
+that column is correlated against the rest score `target − column` instead of
+the full target (which contains it and would inflate the correlation), but
+**only when the column precedes the target** in sheet order. So `Total` (last
+column) claims every Bias-Correct column before it, while `Exam` claims only the
+columns before *it*; `Exam` itself, preceding `Total`, is corrected against
+`Total`, and a column between `Exam` and `Total` is corrected vs Total but not
+vs Exam. Bias Correct is a per-column toggle in Settings (Numeric, non-Total),
+independent of Aggregate, so a **composite column** (e.g. `Q1-Q4 = Q1+Q2+Q3+Q4`)
+can be de-biased without being summed into the aggregate. It **seeds on for
+numeric columns before Total** at load (Total and post-Total columns off). The
+de-bias is applied transparently: the dots, fitted line, coefficient, and r²
+color all reflect the corrected values, with no special cell marker — the
+corrected fact surfaces only in the tooltip's "corrected" note. An Ordinal
+column feeding a target is de-biased first, then ranked (Spearman). A degenerate
+rest score (`target − column ≡ 0`) renders that cell blank. `Exam` is matched by
+name like `Total`; red styling stays Total-only.
 
 **Default selection** (fresh load, see ADR-0016): the columns appearing
 in the **4 highest-r² pairs** among non-Total numerics, plus the **Total**

@@ -21,7 +21,15 @@ namespace Dotsesses.Models;
 /// Index). Replaces the old "Total is the last series" positional assumption;
 /// the red Total styling keys off this flag.
 /// </param>
+/// <param name="IsDebiasTarget">
+/// True for an *additional* rest-score de-bias target beyond Total — currently the
+/// <c>Exam</c> column (matched by name). A bias-correct column is corrected against
+/// a target only when it precedes the target in sheet order. Total is always a
+/// target too (via <see cref="IsTotal"/>); the red styling stays Total-only, so
+/// this is kept separate from <see cref="IsTotal"/>. See ADR-0018.
+/// </param>
 public record CorrelationColumnInfo(
     ScoreColumnType Type,
     bool BiasCorrect,
-    bool IsTotal);
+    bool IsTotal,
+    bool IsDebiasTarget = false);
