@@ -3,7 +3,8 @@ Significance Matrix plot.
 
 Matrix of small cells: one row per Numeric column, one column per Categorical
 column. Each cell shows, per Subgroup (distinct value of the categorical
-column), a **box plot** (median / IQR / whiskers) with the **individual student
+column), a **box** (median + IQR box; whiskers dropped — every student point is
+shown, so the points already convey the range) with the **individual student
 scores jittered on top**, at x = subgroup_index (ADR-0019). This shows spread
 and overlap — what an exploratory "do these groups differ?" view needs — rather
 than the old mean ± SEM dot, which hid the spread and overstated separation.
@@ -17,7 +18,7 @@ Subgroup ordering within a column: caller-supplied via `ordered_subgroups`
 (ADR-0017) — suffixed labels by their ~N rank, then unsuffixed alphabetical.
 
 Y-axis scale: shared per row, spanning the actual student-value min/max across
-all cells in the row, padded by 5% (so every box/point/whisker fits).
+all cells in the row, generously padded so the symbols have vertical room.
 
 Small-N handling:
 - N=0 → subgroup omitted entirely.
@@ -343,7 +344,7 @@ def create_significance_matrix(
     """
     Build the significance matrix.
 
-    Each cell shows, per subgroup, a box plot (median / IQR / whiskers) with the
+    Each cell shows, per subgroup, a box (median + IQR; no whiskers) with the
     individual student scores jittered on top — so a reader sees spread and
     overlap, not just central tendency (ADR-0019, replacing the old mean ± SEM
     dot). The per-cell η²/ε² + p annotation and the exploratory caveat are
@@ -537,13 +538,14 @@ def create_significance_matrix(
             points = cell_points.get((i, j), [])
             sg_to_idx = column_subgroup_index[j]
 
-            # Box per subgroup (median / IQR / whiskers), N>=2 (ADR-0019). The
-            # box is non-interactive SVG decoration; fliers off (we show every
-            # point) and means off (the optional CI overlay covers that). The
-            # structural lines (box edge, median, whiskers, caps) are drawn in
-            # the theme-contrast color (white on dark, near-black on light) so
-            # they stand out against the colored fill and points; the fill keeps
-            # the subgroup color (translucent) so groups stay identifiable.
+            # Box per subgroup — IQR box + median line only, N>=2 (ADR-0019).
+            # Whiskers/caps are dropped: every student point is shown, so the
+            # points already convey the full range. Fliers off, means off (the
+            # optional CI overlay covers the mean). The box edge + median are
+            # drawn in the theme-contrast color (white on dark, near-black on
+            # light) so they stand out against the colored fill and points; the
+            # fill keeps the subgroup color (translucent) so groups stay
+            # identifiable.
             for (sg, mean_val, sem, n, values) in stats:
                 if n < 2:
                     continue
@@ -551,12 +553,13 @@ def create_significance_matrix(
                 color = get_subgroup_color(slot)
                 bp = ax.boxplot(
                     [values], positions=[slot], widths=0.25,
-                    showfliers=False, showmeans=False, patch_artist=True, zorder=4,
+                    showfliers=False, showmeans=False, showcaps=False,
+                    patch_artist=True, zorder=4,
                     medianprops=dict(color=sig_text_color, linewidth=1.6),
-                    whiskerprops=dict(color=sig_text_color, linewidth=1.1),
-                    capprops=dict(color=sig_text_color, linewidth=1.1),
                     boxprops=dict(edgecolor=sig_text_color, linewidth=1.1),
                 )
+                for whisker in bp['whiskers']:
+                    whisker.set_visible(False)
                 for patch in bp['boxes']:
                     patch.set_facecolor(color)
                     patch.set_alpha(0.25)
@@ -577,7 +580,7 @@ def create_significance_matrix(
                     ys.append(value)
                     pt_colors.append(get_subgroup_color(slot))
                 ax.scatter(xs, ys, s=(dot_size * 0.8) ** 2, c=pt_colors,
-                           edgecolors='none', alpha=0.25, zorder=3)
+                           edgecolors='none', alpha=0.30, zorder=3)
                 scatter_cells.append((i, j))
 
             # Optional mean ± 95% CI overlay (never SEM). Drawn with vlines /

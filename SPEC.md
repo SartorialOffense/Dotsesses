@@ -270,10 +270,10 @@ A plain-language guide for instructors — what the p-value means, the two
 test families, when to prefer each, and citations for papers — lives at
 [`docs/significance-guide.md`](docs/significance-guide.md).
 
-- Each cell shows, per **Subgroup** of its categorical column, a **box plot**
-  (median / IQR / whiskers) with the **individual student scores jittered on
-  top** (ADR-0019) — so the reader sees spread and overlap, not just a centre
-  point. Subgroup x-position is ordered by **SortOrder** — values with a `~N`
+- Each cell shows, per **Subgroup** of its categorical column, a **box**
+  (median + IQR; no whiskers — every point is shown, so the cloud conveys the
+  range) with the **individual student scores jittered on top** (ADR-0019) — so
+  the reader sees spread and overlap, not just a centre point. Subgroup x-position is ordered by **SortOrder** — values with a `~N`
   suffix come first in `N` order, then unsuffixed values alphabetically (a
   column with no suffixes stays fully alphabetical; see ADR-0017). A point's
   y-position is that student's score. Small-N: N=0 omits the subgroup; N=1 shows
@@ -284,7 +284,7 @@ test families, when to prefer each, and citations for papers — lives at
   (the index resets per column, so "Yes" in *Hat* and "Yes" in
   *Submitted Outline* may be different colors).
 - Y-scale: shared per row, spanning the actual student-value min/max across the
-  row (× 5% padding) so every box / point / whisker fits.
+  row with generous padding, so the symbols have vertical breathing room.
 - **Mean ± 95% CI toggle** (top-right, "Mean ± 95% CI"): an opt-in overlay
   drawing each subgroup's mean ± 95% confidence interval on top of the box —
   **never SEM**. Session-only (not persisted), off by default.

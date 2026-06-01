@@ -17,8 +17,9 @@ and sample size. The owner asked to **show the data**.
 
 ## (b) What landed
 
-Per subgroup, per cell: a **box** (median / IQR / whiskers, translucent fill) with
-the **individual student scores jittered on top**. Acceptance criteria from the
+Per subgroup, per cell: a **box** (median + IQR, translucent fill; whiskers
+dropped — every point is shown, so the cloud conveys the range) with the
+**individual student scores jittered on top**. Acceptance criteria from the
 handoff — show every student (the cloud is also the N cue), show spread/overlap,
 stay readable in small cells, fit the app's look — drove the choices.
 
@@ -38,7 +39,7 @@ stay readable in small cells, fit the app's look — drove the choices.
   shipped point coords to C# to re-draw on a hit-testable Canvas overlay. Reused:
   the **box stays in the SVG** (decoration); the **student points** go through that
   extract-and-redraw path. **Only the student scatter may emit `<use>` markers** —
-  box/whiskers/median and the CI overlay use lines/patches (CI via `vlines`/`hlines`,
+  the box/median and the CI overlay use lines/patches (CI via `vlines`/`hlines`,
   no markers) so point extraction stays unambiguous.
 - **Jitter is deterministic** (fixed-seed `RandomState`) so points don't jump on
   resize. A local jitter, not a cross-module beeswarm import, to keep the change

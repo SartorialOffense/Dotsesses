@@ -22,8 +22,10 @@ and is it worth a closer look?* — SEM is the wrong mark:
 
 ## Decision
 
-Render, per subgroup in each cell, a **box plot (median / IQR / whiskers) with
-the individual student scores jittered on top**.
+Render, per subgroup in each cell, a **box (median + IQR) with the individual
+student scores jittered on top**. Whiskers and caps are **omitted** — every
+student is a visible point, so the cloud already shows the full range and the
+whiskers were redundant clutter.
 
 - **Show every student.** Class-sized groups make this feasible, and the visible
   point cloud doubles as the per-group sample-size cue.
@@ -33,9 +35,9 @@ the individual student scores jittered on top**.
   (fixed-seed) horizontal jitter so they don't jump on resize; extracted and
   removed from the SVG, then re-drawn on the C# Canvas overlay for hover (the
   established pattern). **Only the student scatter may emit SVG `<use>` markers** —
-  box/whiskers/median/CI use lines/patches so point extraction stays unambiguous.
+  the box/median/CI use lines/patches so point extraction stays unambiguous.
 - **Per-row y-scale** now spans the actual student-value min/max (was mean ± SEM),
-  so boxes, points, and whiskers fit.
+  so the boxes and points fit, with generous padding for vertical breathing room.
 - **Small-N / tiny cells:** N=0 omits the subgroup; N=1 shows the lone point (no
   box); N≥2 box + points; and a genuinely narrow cell degrades to **box-only**
   (jitter skipped) rather than forcing an unreadable cloud.

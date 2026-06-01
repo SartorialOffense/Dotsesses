@@ -70,8 +70,8 @@ manual type override.
 **Subgroup**: The set of Students sharing a particular
 **StudentAttribute** value — e.g. the Students who answered `"Yes"` to
 *Submitted Outline* form one Subgroup. Each cell of the
-**Significance Matrix** shows each Subgroup's **distribution** — a box plot
-(median / IQR / whiskers) with the individual student scores jittered on top
+**Significance Matrix** shows each Subgroup's **distribution** — a box
+(median + IQR; no whiskers) with the individual student scores jittered on top
 (ADR-0019) — so spread and overlap are visible, not just central tendency.
 Subgroups are ordered left-to-right by their **SortOrder** (suffixed labels by
 `~N` rank, then unsuffixed alphabetically) rather than purely
