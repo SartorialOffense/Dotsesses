@@ -544,7 +544,10 @@ def create_significance_matrix(
                 ax.text(
                     0.97, 0.95, anno_label,
                     transform=ax.transAxes,
-                    ha='right', va='top',
+                    # Block stays anchored top-right (ha='right'), but the two
+                    # lines (effect size + p) are left-aligned with each other
+                    # (ma='left') so they read as a tidy left-justified stack.
+                    ha='right', va='top', ma='left',
                     fontsize=6.5,
                     fontweight='bold' if anno_sig else 'normal',
                     color=sig_text_color if anno_sig else faint_text_color,
