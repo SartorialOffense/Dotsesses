@@ -518,7 +518,7 @@ def create_significance_matrix(
     # points horizontally within their subgroup's x-slot (slot width 1.0).
     # Box-only fallback: when columns get too narrow to read a point cloud,
     # draw the box alone. cell_w_in is the approximate per-cell width in inches.
-    JITTER_HALF_WIDTH = 0.22
+    JITTER_HALF_WIDTH = 0.11
     MIN_CELL_WIDTH_IN_FOR_POINTS = 0.8
     cell_w_in = fig_size[0] / max(n_cols, 1)
     draw_points = cell_w_in >= MIN_CELL_WIDTH_IN_FOR_POINTS
@@ -544,7 +544,7 @@ def create_significance_matrix(
                 slot = sg_to_idx.get(sg, 0)
                 color = get_subgroup_color(slot)
                 bp = ax.boxplot(
-                    [values], positions=[slot], widths=0.5,
+                    [values], positions=[slot], widths=0.25,
                     showfliers=False, showmeans=False, patch_artist=True, zorder=2,
                     medianprops=dict(color=color, linewidth=1.4),
                     whiskerprops=dict(color=color, linewidth=1.0, alpha=0.8),
@@ -571,7 +571,7 @@ def create_significance_matrix(
                     ys.append(value)
                     pt_colors.append(get_subgroup_color(slot))
                 ax.scatter(xs, ys, s=(dot_size * 0.8) ** 2, c=pt_colors,
-                           edgecolors='none', alpha=0.7, zorder=3)
+                           edgecolors='none', alpha=0.5, zorder=3)
                 scatter_cells.append((i, j))
 
             # Optional mean ± 95% CI overlay (never SEM). Drawn with vlines /
@@ -586,7 +586,7 @@ def create_significance_matrix(
                     ax.vlines(slot, mean_val - half, mean_val + half,
                               color=sig_text_color, linewidth=1.3, alpha=0.9, zorder=4)
                     for yy in (mean_val - half, mean_val, mean_val + half):
-                        ax.hlines(yy, slot - 0.12, slot + 0.12,
+                        ax.hlines(yy, slot - 0.06, slot + 0.06,
                                   color=sig_text_color, linewidth=1.3, alpha=0.9, zorder=4)
 
             # In-cell significance annotation (top-right corner). Significant
