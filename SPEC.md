@@ -501,9 +501,10 @@ single combined dialog lists each one. The categories it flags:
   correlation matrix, and significance matrix, plus a grade-breakdown
   table. Plots render in the light theme (dark text on white) while the
   bright `CYCLING_PALETTE` dot colors are preserved. The significance
-  slide carries a footer documenting the per-cell test used (Welch's
-  ANOVA / Kruskal–Wallis), the star tiers, and that the p-values are raw
-  (exploratory).
+  slide carries a footer documenting the per-cell symbols (box = IQR,
+  line = median, dots = individual students), the per-cell test used
+  (Welch's ANOVA / Kruskal–Wallis), the star tiers, and that the p-values
+  are raw (exploratory).
 - **Copy plot** to clipboard for individual plots.
 
 ## Snapshot mode (for automated UI verification)

@@ -27,7 +27,7 @@ public class PowerPointExportService
     private const int ContentY = 50;
     private const int ContentWidth = 860;  // SlideWidth - 2*MarginX
     private const int MaxContentHeight = 460; // SlideHeight - ContentY - margin
-    private const int FooterHeight = 28; // bottom caption band (points)
+    private const int FooterHeight = 46; // bottom caption band (points) — fits a 2-line legend+test note
 
     /// <summary>
     /// Exports a complete presentation with DotPlot, ViolinPlot, CorrelationPlot,
@@ -234,16 +234,19 @@ public class PowerPointExportService
     }
 
     /// <summary>
-    /// Builds the Significance Matrix slide footer describing the per-cell
-    /// omnibus test that produced the cell p-values and stars, the star tiers,
-    /// and that the p-values are raw (exploratory). See ADR-0015.
+    /// Builds the Significance Matrix slide footer. Leads with a brief legend
+    /// for the per-cell symbols (IQR box, median line, individual-student dots —
+    /// ADR-0019), then documents the per-cell omnibus test, the star tiers, and
+    /// that the p-values are raw (exploratory). See ADR-0015 / ADR-0019.
     /// </summary>
     private static string BuildSignificanceFooter(SignificanceTestFamily testFamily)
     {
         var testName = testFamily == SignificanceTestFamily.Nonparametric
             ? "Kruskal–Wallis (non-parametric)"
             : "Welch's ANOVA (parametric)";
-        return $"Per-cell test: {testName}.  Stars: * p<.05   ** p<.01   *** p<.001.  " +
+        return "Each cell, per subgroup: box = IQR (middle 50%), line = median, " +
+               "dots = individual students.  " +
+               $"Per-cell test: {testName}.  Stars: * p<.05   ** p<.01   *** p<.001.  " +
                "Raw, uncorrected p-values — exploratory screening.";
     }
 
