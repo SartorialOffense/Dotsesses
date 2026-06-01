@@ -207,6 +207,9 @@ public class PowerPointExportService
     /// </summary>
     private void AddFooter(Presentation pres, int slideNumber, string footer)
     {
+        // The footer may be multi-line: each "\n"-separated segment becomes its
+        // own paragraph (one visual line), rather than relying on word-wrap.
+        var lines = footer.Split('\n');
         var shapes = pres.Slide(slideNumber).Shapes;
         shapes.AddShape(
             x: MarginX,
@@ -214,7 +217,7 @@ public class PowerPointExportService
             width: ContentWidth,
             height: FooterHeight - 4,
             Geometry.Rectangle,
-            footer);
+            lines[0]);
 
         var footerShape = shapes.Last();
         footerShape.Fill?.SetNoFill();
@@ -222,32 +225,43 @@ public class PowerPointExportService
         footerShape.SetFontColor("555555");
 
         var textBox = footerShape.TextBox;
-        if (textBox != null && textBox.Paragraphs.Count > 0)
+        if (textBox != null)
         {
-            var paragraph = textBox.Paragraphs[0];
-            if (paragraph.Portions.Count > 0)
+            for (int li = 1; li < lines.Length; li++)
             {
-                var portion = paragraph.Portions[0];
-                portion.Font.Size = 10;
+                textBox.Paragraphs.Add();
+                textBox.Paragraphs.Last().Text = lines[li];
+            }
+            foreach (var paragraph in textBox.Paragraphs)
+            {
+                paragraph.SetFontSize(9);
             }
         }
     }
 
     /// <summary>
-    /// Builds the Significance Matrix slide footer. Leads with a brief legend
-    /// for the per-cell symbols (IQR box, median line, individual-student dots —
-    /// ADR-0019), then documents the per-cell omnibus test, the star tiers, and
-    /// that the p-values are raw (exploratory). See ADR-0015 / ADR-0019.
+    /// Builds the Significance Matrix slide footer as two lines (joined by a
+    /// newline, rendered as two paragraphs by <see cref="AddFooter"/>): a stats
+    /// line (test, effect size, stars, raw-p caveat) and a symbols line (IQR box,
+    /// median line, individual-student dots — ADR-0019). See ADR-0015 / ADR-0018
+    /// / ADR-0019.
     /// </summary>
     private static string BuildSignificanceFooter(SignificanceTestFamily testFamily)
     {
         var testName = testFamily == SignificanceTestFamily.Nonparametric
             ? "Kruskal–Wallis (non-parametric)"
             : "Welch's ANOVA (parametric)";
-        return "Each cell, per subgroup: box = IQR (middle 50%), line = median, " +
-               "dots = individual students.  " +
-               $"Per-cell test: {testName}.  Stars: * p<.05   ** p<.01   *** p<.001.  " +
-               "Raw, uncorrected p-values — exploratory screening.";
+        var effectSymbol = testFamily == SignificanceTestFamily.Nonparametric ? "ε²" : "η²";
+
+        var statsLine =
+            $"Stats — per-cell test: {testName};  effect size {effectSymbol} = " +
+            "variance explained (0–1, the headline);  stars: * p<.05  ** p<.01  *** p<.001;  " +
+            "raw, uncorrected p (exploratory screening).";
+        var symbolsLine =
+            "Symbols — per subgroup: box = IQR (middle 50%), centre line = median, " +
+            "dots = individual students.";
+
+        return statsLine + "\n" + symbolsLine;
     }
 
     /// <summary>
