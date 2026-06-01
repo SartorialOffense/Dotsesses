@@ -36,8 +36,7 @@ public class SignificancePlotService
         double dotSize = 5.0,
         ThemeName theme = ThemeName.DarkMode,
         SignificanceTestFamily testFamily = SignificanceTestFamily.Parametric,
-        List<(string Name, List<string> Order)>? subgroupOrders = null,
-        bool showCi = false)
+        List<(string Name, List<string> Order)>? subgroupOrders = null)
     {
         var pyNumeric = numericSeries
             .Select(s => (s.Name, (IReadOnlyDictionary<string, double>)s.Values.AsReadOnly()))
@@ -70,8 +69,7 @@ public class SignificancePlotService
             pyOrdered,
             themeStr,
             dotSize,
-            testFamilyStr,
-            showCi);
+            testFamilyStr);
 
         string svgContent = result.Item2;
         var pointDataList = result.Item3;

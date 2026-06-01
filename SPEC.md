@@ -293,9 +293,6 @@ test families, when to prefer each, and citations for papers — lives at
   *Submitted Outline* may be different colors).
 - Y-scale: shared per row, spanning the actual student-value min/max across the
   row with generous padding, so the symbols have vertical breathing room.
-- **Mean ± 95% CI toggle** (top-right, "Mean ± 95% CI"): an opt-in overlay
-  drawing each subgroup's mean ± 95% confidence interval on top of the box —
-  **never SEM**. Session-only (not persisted), off by default.
 - Hover tooltip on each **student point** (ADR-0019) — the point is one student:
 
   ```
@@ -327,13 +324,9 @@ test families, when to prefer each, and citations for papers — lives at
   workspace (SavedState v5; v4 files open as Parametric). The same family
   handles categorical columns with 2 or 2+ values — no group-count
   branching. Default: Parametric.
-- **Optimize button** (top-right, beside the selector): holding the
-  currently-shown **categorical** columns fixed, ranks every (numeric ×
-  shown-categorical) cell by p (using the selected test family), takes the
-  **10 lowest-p cells**, and sets the matrix's **numeric** rows to the
-  numerics in them — replacing the current rows. A quick way to collapse a
-  wide matrix to the strongest relationships for the attributes on screen.
-  Shares the p-value machinery with the load-time auto-select (ADR-0016).
+- **Copy button** (top-right, beside the selector): copies a print-friendly
+  (light-inverted) PNG of the plot to the clipboard, matching the Distribution
+  and Correlation tabs.
 - **Small-N test policy**: subgroups with N<2 are dropped from the test
   (their dots still render); the cell is tested only if ≥2 valid subgroups
   remain, otherwise the annotation is `—`.

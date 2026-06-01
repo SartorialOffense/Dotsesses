@@ -213,11 +213,6 @@ public partial class MainWindowViewModel : ViewModelBase
         _violinPlotViewModel = violinPlotViewModel;
         _correlationPlotViewModel = correlationPlotViewModel;
         _significancePlotViewModel = significancePlotViewModel;
-        // null in the test factory; guarded so CreateForTesting stays valid.
-        if (significancePlotViewModel != null)
-        {
-            significancePlotViewModel.OptimizeRequested = OnOptimizeSignificance;
-        }
         _hoverDelayService = hoverDelayService;
         _stateService = stateService;
         _workspaceFactory = workspaceFactory;
@@ -1908,45 +1903,6 @@ public partial class MainWindowViewModel : ViewModelBase
         return (num, cat) => pvalues.TryGetValue((num, cat), out var p) ? p : null;
     }
 
-    /// <summary>
-    /// Optimize the Significance Matrix: holding the currently-displayed
-    /// categorical columns fixed, rank every (numeric × displayed-categorical)
-    /// cell by p (using the matrix's current test family), take the 10
-    /// lowest-p cells, and set the matrix's numeric rows to the numerics in
-    /// them — replacing the current rows. Categoricals, Display, Correlation
-    /// and Aggregate are untouched. Invoked via the Optimize button on the
-    /// Significance plot (callback wired in the constructor).
-    /// </summary>
-    private void OnOptimizeSignificance()
-    {
-        if (ClassAssessment == null || _significancePlotService == null) return;
-
-        var numericSeries = BuildSeriesData(ClassAssessment, s => s.Type == ScoreColumnType.Numeric);
-        // Ordinal columns are Significance Matrix columns too (ADR-0017), so
-        // they count as optimization targets. Ordering isn't needed here —
-        // ComputeCellPValues (the only consumer below) is order-independent.
-        var categoricalSeries = BuildCategoricalSeriesData(
-            ClassAssessment, s => s.Significance &&
-                (s.Type == ScoreColumnType.Categorical || s.Type == ScoreColumnType.Ordinal));
-        if (categoricalSeries.Count == 0) return; // nothing displayed to optimize against
-
-        var testFamily = SignificancePlotViewModel?.TestFamily ?? SignificanceTestFamily.Parametric;
-        var pLookup = BuildSignificancePLookup(numericSeries, categoricalSeries, testFamily);
-
-        var numericSet = PlotSelectionCalculator.SelectTopCellNumerics(
-            numericSeries.Select(s => s.SeriesName).ToList(),
-            categoricalSeries.Select(s => s.SeriesName).ToList(),
-            pLookup,
-            topCells: 10);
-
-        var newSelections = ClassAssessment.ScoreSelections.Select(s =>
-            s.Type == ScoreColumnType.Numeric
-                ? s with { Significance = numericSet.Contains(SeriesNameOf(s)) }
-                : s) // displayed categoricals stay selected; others stay as-is
-            .ToList();
-
-        ApplyScoreSelections(newSelections);
-    }
 
     /// <summary>
     /// Orchestrates a recompute of all selection-derived state in response to the user

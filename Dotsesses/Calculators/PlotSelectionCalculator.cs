@@ -138,41 +138,9 @@ public static class PlotSelectionCalculator
     }
 
     /// <summary>
-    /// Optimize selection: rank every testable (numeric × categorical) cell by
-    /// p ascending, take the <paramref name="topCells"/> lowest, and return the
-    /// distinct **numeric** names appearing in them. Categoricals are not
-    /// returned — the caller keeps the displayed categorical set fixed and only
-    /// re-picks the numeric rows. Shares the cell enumeration with
-    /// <see cref="SelectSignificance"/>.
-    /// </summary>
-    public static HashSet<string> SelectTopCellNumerics(
-        IReadOnlyList<string> numericNames,
-        IReadOnlyList<string> categoricalNames,
-        Func<string, string, double?> pLookup,
-        int topCells = 10,
-        IReadOnlyCollection<string>? excludedCategoricalNames = null)
-    {
-        ArgumentNullException.ThrowIfNull(numericNames);
-        ArgumentNullException.ThrowIfNull(categoricalNames);
-        ArgumentNullException.ThrowIfNull(pLookup);
-
-        var excluded = new HashSet<string>(
-            excludedCategoricalNames ?? Array.Empty<string>(),
-            StringComparer.OrdinalIgnoreCase);
-
-        return TestableCells(numericNames, categoricalNames, pLookup, excluded)
-            .OrderBy(c => c.P)
-            .ThenBy(c => c.Cat, StringComparer.Ordinal)
-            .ThenBy(c => c.Num, StringComparer.Ordinal)
-            .Take(topCells)
-            .Select(c => c.Num)
-            .ToHashSet(StringComparer.Ordinal);
-    }
-
-    /// <summary>
     /// Enumerates the testable (numeric × categorical) cells with a computable
-    /// p-value, skipping excluded categoricals. Shared by
-    /// <see cref="SelectSignificance"/> and <see cref="SelectTopCellNumerics"/>.
+    /// p-value, skipping excluded categoricals. Used by
+    /// <see cref="SelectSignificance"/>.
     /// </summary>
     private static IEnumerable<(string Num, string Cat, double P)> TestableCells(
         IReadOnlyList<string> numericNames,

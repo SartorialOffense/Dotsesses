@@ -10,8 +10,8 @@ namespace Dotsesses.Tests.Python;
 /// ADR-0019 — the Significance Matrix cell shows a box + jittered individual
 /// student points per subgroup (replacing the mean ± SEM dot). Verified through
 /// the real Python module via CSnakes: the returned points are now ONE PER
-/// STUDENT (each with its own score), the box doesn't corrupt the point
-/// extraction, and the CI toggle renders either way.
+/// STUDENT (each with its own score) and the box doesn't corrupt the point
+/// extraction.
 /// </summary>
 [Collection(PythonCollection.Name)]
 public class SignificanceBoxJitterTests
@@ -41,19 +41,19 @@ public class SignificanceBoxJitterTests
         return (num, cat);
     }
 
-    private List<SignificanceDataPoint> Generate(bool showCi)
+    private List<SignificanceDataPoint> Generate()
     {
         var (num, cat) = Cell();
         var service = new SignificancePlotService(_fixture.Env);
         var (_, points) = service.GeneratePlot((6.0, 6.0), num, cat, 5.0,
-            ThemeName.DarkMode, SignificanceTestFamily.Parametric, subgroupOrders: null, showCi: showCi);
+            ThemeName.DarkMode, SignificanceTestFamily.Parametric, subgroupOrders: null);
         return points;
     }
 
     [Fact]
     public void ReturnsOnePointPerStudent_CarryingItsOwnScoreAndSubgroup()
     {
-        var points = Generate(showCi: false);
+        var points = Generate();
 
         // One point per student that has both values (5), not one per subgroup (2).
         Assert.Equal(5, points.Count);
@@ -78,23 +78,11 @@ public class SignificanceBoxJitterTests
     }
 
     [Fact]
-    public void CiToggle_RendersTheSamePoints_EitherWay()
-    {
-        // The CI overlay is decoration drawn with plain lines (no markers), so it
-        // must not add/remove extracted student points.
-        var off = Generate(showCi: false);
-        var on = Generate(showCi: true);
-
-        Assert.Equal(5, off.Count);
-        Assert.Equal(5, on.Count);
-    }
-
-    [Fact]
     public void EveryPoint_CarriesCellLevelEffectSizeAndP()
     {
         // Cell-level inference is repeated on each student point (unchanged from
         // the per-subgroup model) so the η²/p annotation + any consumer still work.
-        var points = Generate(showCi: false);
+        var points = Generate();
 
         Assert.All(points, p =>
         {

@@ -27,6 +27,17 @@ public partial class SignificancePlotControl : UserControl
         DataContextChanged += OnDataContextChanged;
         Loaded += OnLoaded;
         SizeChanged += OnSizeChanged;
+        CopySignificancePlotButton.Click += OnCopySignificancePlotClick;
+    }
+
+    private async void OnCopySignificancePlotClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var topLevel = TopLevel.GetTopLevel(this);
+        var clipboard = topLevel?.Clipboard;
+        if (clipboard == null) return;
+        if (DataContext is not SignificancePlotViewModel vm) return;
+
+        await ImageCopyService.CopyControlToClipboardAsync(this, clipboard, vm.Messenger);
     }
 
     private void OnLoaded(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -114,15 +125,6 @@ public partial class SignificancePlotControl : UserControl
     /// the current theme. No-ops when the selection already matches the VM
     /// (e.g. when the combo is being synced from the VM on load).
     /// </summary>
-    /// <summary>
-    /// Optimize button: ask the VM (→ MainWindowViewModel) to re-pick the most
-    /// significant numeric rows for the categoricals currently shown.
-    /// </summary>
-    private void OnOptimizeClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        (DataContext as SignificancePlotViewModel)?.RequestOptimize();
-    }
-
     private void OnTestFamilyChanged(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (DataContext is not SignificancePlotViewModel vm) return;
@@ -141,32 +143,17 @@ public partial class SignificancePlotControl : UserControl
         }
     }
 
-    private void OnConfidenceIntervalChanged(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        if (DataContext is not SignificancePlotViewModel vm) return;
-
-        var show = ConfidenceIntervalCheck.IsChecked == true;
-        if (vm.ShowConfidenceInterval == show) return;
-
-        vm.ShowConfidenceInterval = show;
-
-        var b = SignificancePlotArea.Bounds;
-        if (b.Width > 0 && b.Height > 0 && !string.IsNullOrEmpty(vm.SvgContent))
-        {
-            vm.RegeneratePlot(b.Width, b.Height, _currentTheme);
-        }
-    }
-
     private void OnRenderWithThemeMessage(object recipient, RenderWithThemeMessage message)
     {
         _currentTheme = message.Theme;
         Background = ThemeColors.BackgroundBrush(_currentTheme);
 
-        // Hide the test-family combo while rendering for export / clipboard
-        // (the only path that switches to LightMode) so the interactive chrome
-        // doesn't bleed into the captured image; restore it on the DarkMode
-        // switch that follows.
+        // Hide the interactive chrome (test-family combo + copy button) while
+        // rendering for export / clipboard (the only path that switches to
+        // LightMode) so it doesn't bleed into the captured image; restore it on
+        // the DarkMode switch that follows.
         TestFamilyCombo.IsVisible = message.Theme == ThemeName.DarkMode;
+        CopySignificancePlotButton.IsVisible = message.Theme == ThemeName.DarkMode;
 
         Dispatcher.UIThread.Post(() =>
         {

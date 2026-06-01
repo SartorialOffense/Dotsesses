@@ -47,32 +47,12 @@ public partial class SignificancePlotViewModel : ViewModelBase
     private SignificanceTestFamily _testFamily = SignificanceTestFamily.Parametric;
 
     /// <summary>
-    /// Whether each cell overlays a mean ± 95% CI marker on top of the box +
-    /// points (never SEM — ADR-0019). Session-only view preference (NOT
-    /// persisted, mirroring the Correlation diagonal toggle); the control
-    /// regenerates on change.
-    /// </summary>
-    [ObservableProperty]
-    private bool _showConfidenceInterval;
-
-    /// <summary>
     /// Scoped messenger for this VM's workspace (see ADR-0012). Exposed for
     /// the View code-behind even though Significance has no cross-view sync —
     /// keeping the symmetric shape lets future features (e.g. theme-render
     /// broadcast) reach this control without a refactor.
     /// </summary>
     public IMessenger Messenger => _messenger;
-
-    /// <summary>
-    /// Invoked when the user clicks Optimize. Wired by MainWindowViewModel
-    /// (the single consumer that owns the selections — direct callback per
-    /// ADR-0004). Re-picks the matrix's numeric rows to the most significant
-    /// for the currently-displayed categoricals.
-    /// </summary>
-    public Action? OptimizeRequested { get; set; }
-
-    /// <summary>Raised from the Optimize button in the View code-behind.</summary>
-    public void RequestOptimize() => OptimizeRequested?.Invoke();
 
     public SignificancePlotViewModel(
         SignificancePlotService service,
@@ -108,8 +88,7 @@ public partial class SignificancePlotViewModel : ViewModelBase
             dotSize,
             theme,
             TestFamily,
-            _subgroupOrders,
-            showCi: ShowConfidenceInterval);
+            _subgroupOrders);
 
         SvgContent = svgContent;
         _dataPoints = dataPoints;

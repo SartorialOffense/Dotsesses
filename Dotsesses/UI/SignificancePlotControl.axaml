@@ -17,20 +17,13 @@
             <Canvas x:Name="PointsOverlay" Background="Transparent" />
         </Grid>
 
-        <!-- Controls overlay (top-right): test-family selector + Optimize. The
+        <!-- Controls overlay (top-right): test-family selector + copy. The
              matrix p-values are RAW / exploratory-screening (see ADR-0014). -->
         <StackPanel HorizontalAlignment="Right"
                     VerticalAlignment="Top"
                     Orientation="Horizontal"
                     Spacing="6"
-                    Margin="0,0,8,0">
-            <Button x:Name="OptimizeButton"
-                    FontSize="11"
-                    Padding="8,2"
-                    Opacity="0.9"
-                    Content="Optimize"
-                    Click="OnOptimizeClick"
-                    ToolTip.Tip="Re-pick the numeric rows to the 10 most significant (lowest-p) for the categorical columns currently shown, using the selected test family." />
+                    Margin="0,4,8,0">
             <ComboBox x:Name="TestFamilyCombo"
                       MinWidth="0"
                       FontSize="11"
@@ -41,12 +34,17 @@
                 <ComboBoxItem>Parametric</ComboBoxItem>
                 <ComboBoxItem>Non-parametric</ComboBoxItem>
             </ComboBox>
-            <CheckBox x:Name="ConfidenceIntervalCheck"
-                      FontSize="11"
-                      Opacity="0.9"
-                      Content="Mean ± 95% CI"
-                      IsCheckedChanged="OnConfidenceIntervalChanged"
-                      ToolTip.Tip="Overlay each subgroup's mean ± 95% confidence interval on top of the box + points (never SEM). Shows whether the group averages differ." />
+            <!-- Copy button (matches the Distribution / Correlation tabs) -->
+            <Button x:Name="CopySignificancePlotButton"
+                    Width="28" Height="28"
+                    Background="#3A3A3C"
+                    Foreground="White"
+                    BorderThickness="0"
+                    CornerRadius="4"
+                    Opacity="0.7"
+                    ToolTip.Tip="Copy to clipboard (inverted for print)">
+                <TextBlock Text="&#x1F4CB;" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Button>
         </StackPanel>
 
         <!-- Exploratory caveat (ADR-0018): leads are not confirmation. -->

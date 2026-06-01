@@ -53,6 +53,13 @@ so per-point hover doesn't need to repeat them.
 persisted, no SavedState bump). **Never SEM.** Drawn with plain lines (no
 markers) so it doesn't pollute point extraction; skipped for N < 2.
 
+> **Amendment (2026-06-01):** the optional mean ± 95% CI overlay and its toggle
+> were **removed** — the checkbox, the `show_ci` parameter through
+> `create_significance_matrix` / `SignificancePlotService` / the VM, and the
+> overlay-drawing block. The box + jitter decision above stands; only the opt-in
+> CI addon is gone. (The Significance tab also gained a copy-to-clipboard button,
+> matching the other plot tabs.)
+
 ## Consequences
 
 - `SignificanceDataPoint` becomes **per-student** (`StudentId`, `Value`; `Mean`/

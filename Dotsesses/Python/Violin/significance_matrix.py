@@ -27,8 +27,6 @@ Small-N handling:
 Narrow cells degrade to box-only (the jitter is skipped) so a point cloud is
 never forced into an unreadable space.
 
-An optional mean ± 95% CI overlay (`show_ci`) can be drawn on top — never SEM.
-
 Inferential layer (ADR-0014, "slice 4"): each cell runs ONE omnibus test
 over its subgroups and prints the resulting p-value + tiered significance
 stars in the cell corner. The `test_family` argument switches all cells
@@ -339,7 +337,6 @@ def create_significance_matrix(
     theme: str = 'dark',
     dot_size: float = 5.0,
     test_family: str = 'parametric',
-    show_ci: bool = False,
 ) -> Tuple[Dict[str, int], str, List[Dict]]:
     """
     Build the significance matrix.
@@ -365,8 +362,6 @@ def create_significance_matrix(
     test_family : 'parametric' (Welch's ANOVA) or 'nonparametric'
         (Kruskal–Wallis) — the omnibus test run per cell for the in-cell
         p-value annotation.
-    show_ci : when True, overlay each subgroup's mean ± 95% CI (never SEM).
-        Drawn as plain lines (no markers) so it doesn't pollute point extraction.
 
     Returns
     -------
@@ -540,8 +535,8 @@ def create_significance_matrix(
 
             # Box per subgroup — IQR box + median line only, N>=2 (ADR-0019).
             # Whiskers/caps are dropped: every student point is shown, so the
-            # points already convey the full range. Fliers off, means off (the
-            # optional CI overlay covers the mean). The box edge + median are
+            # points already convey the full range. Fliers off, means off. The
+            # box edge + median are
             # drawn in the theme-contrast color (white on dark, near-black on
             # light) so they stand out against the colored fill and points; the
             # fill keeps the subgroup color (translucent) so groups stay
@@ -582,21 +577,6 @@ def create_significance_matrix(
                 ax.scatter(xs, ys, s=(dot_size * 0.8) ** 2, c=pt_colors,
                            edgecolors='none', alpha=0.30, zorder=3)
                 scatter_cells.append((i, j))
-
-            # Optional mean ± 95% CI overlay (never SEM). Drawn with vlines /
-            # hlines only — NO markers — so it produces no <use> elements that
-            # would pollute the per-student point extraction below (ADR-0019).
-            if show_ci:
-                for (sg, mean_val, sem, n, values) in stats:
-                    if n < 2 or math.isnan(sem):
-                        continue
-                    slot = sg_to_idx.get(sg, 0)
-                    half = float(_stats.t.ppf(0.975, n - 1)) * sem
-                    ax.vlines(slot, mean_val - half, mean_val + half,
-                              color=sig_text_color, linewidth=1.3, alpha=0.9, zorder=4)
-                    for yy in (mean_val - half, mean_val, mean_val + half):
-                        ax.hlines(yy, slot - 0.06, slot + 0.06,
-                                  color=sig_text_color, linewidth=1.3, alpha=0.9, zorder=4)
 
             # In-cell significance annotation (top-right corner). Significant
             # cells render bold + tiered stars in a strong color; non-sig /
