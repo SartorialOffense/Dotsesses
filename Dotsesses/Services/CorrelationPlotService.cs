@@ -117,6 +117,7 @@ public class CorrelationPlotService
             var ySeries = pointDict["y_series"].As<string>();
             var xValue = pointDict["x_value"].As<double>();
             var yValue = pointDict["y_value"].As<double>();
+            var yRaw = pointDict["y_raw"].As<double>();
             var color = pointDict["color"].As<string>();
 
             // Cell-level inference (ADR-0018 slice 3). p_value arrives as NaN
@@ -141,7 +142,8 @@ public class CorrelationPlotService
                 N: n,
                 Method: method,
                 Corrected: corrected,
-                MuppetName: muppetName));
+                MuppetName: muppetName,
+                YRaw: yRaw));
         }
 
         return (svgContent, dataPoints);

@@ -540,6 +540,11 @@ def create_correlation_matrix(
                             'y_series': y_name,
                             'x_value': eff_x[sid],
                             'y_value': eff_y[sid],
+                            # Raw target value before de-bias (Total/Exam). The
+                            # tooltip shows the subtraction target − x = rest so
+                            # the de-bias is visible per dot. Equals y_value when
+                            # the cell is not corrected.
+                            'y_raw': float(y_data[sid]),
                             'color': cell_color,  # Color by r² value
                             **cell_extra,
                         })
@@ -586,6 +591,7 @@ def create_correlation_matrix(
                         'y_series': y_name,
                         'x_value': eff_x[sid],
                         'y_value': eff_y[sid],
+                        'y_raw': float(y_data[sid]),  # see SVG-matched branch
                         'color': cell_color,  # Color by r² value
                         **cell_extra,
                     })

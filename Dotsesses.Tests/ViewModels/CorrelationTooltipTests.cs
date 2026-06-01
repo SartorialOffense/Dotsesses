@@ -14,9 +14,10 @@ public class CorrelationTooltipTests
 {
     private static CorrelationDataPoint Point(
         string xSeries = "A", string ySeries = "B", double r = 0.5,
-        double? p = 0.02, int n = 30, string method = "pearson", bool corrected = false)
-        => new(0, 1, 0, 0, 1, xSeries, ySeries, 0, 0, "#fff",
-               R: r, PValue: p, N: n, Method: method, Corrected: corrected);
+        double? p = 0.02, int n = 30, string method = "pearson", bool corrected = false,
+        double xValue = 0, double yValue = 0, double yRaw = 0)
+        => new(0, 1, 0, 0, 1, xSeries, ySeries, xValue, yValue, "#fff",
+               R: r, PValue: p, N: n, Method: method, Corrected: corrected, YRaw: yRaw);
 
     [Fact]
     public void LeadsWithEffectSize_AndNamesPearson()
@@ -80,5 +81,38 @@ public class CorrelationTooltipTests
             CorrelationPlotViewModel.BuildPointTooltip(Point(corrected: true)));
         Assert.DoesNotContain("corrected",
             CorrelationPlotViewModel.BuildPointTooltip(Point(corrected: false)));
+    }
+
+    [Fact]
+    public void UncorrectedDot_ShowsRawValues_NoSubtraction()
+    {
+        var text = CorrelationPlotViewModel.BuildPointTooltip(
+            Point(xSeries: "Q1", ySeries: "Q2", corrected: false,
+                  xValue: 12, yValue: 15, yRaw: 15));
+
+        Assert.Contains("Q1 = 12", text);
+        Assert.Contains("Q2 = 15", text);
+        Assert.DoesNotContain("−", text);   // no subtraction for a raw cell
+    }
+
+    [Fact]
+    public void CorrectedDot_SpellsOutTheRestScoreSubtraction()
+    {
+        var text = CorrelationPlotViewModel.BuildPointTooltip(
+            Point(xSeries: "Q1", ySeries: "Total", corrected: true,
+                  xValue: 12, yValue: 73, yRaw: 85));
+
+        Assert.Contains("Q1 = 12", text);
+        Assert.Contains("Total − Q1 = 85 − 12 = 73", text);
+    }
+
+    [Fact]
+    public void DecimalValues_DropTrailingZeros()
+    {
+        var text = CorrelationPlotViewModel.BuildPointTooltip(
+            Point(xSeries: "Q1", ySeries: "Total", corrected: true,
+                  xValue: 12.5, yValue: 72.5, yRaw: 85));
+
+        Assert.Contains("Total − Q1 = 85 − 12.5 = 72.5", text);
     }
 }

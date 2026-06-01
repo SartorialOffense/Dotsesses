@@ -83,6 +83,10 @@ public class CorrelationDebiasTests
             var expectedRest = row.Q2 + row.Q3;          // Total − Q1
             Assert.Equal(expectedRest, p.YValue, precision: 6);
             Assert.Equal(row.Q1, p.XValue, precision: 6); // component axis untouched
+            // YRaw carries the un-subtracted Total so the tooltip can spell out
+            // the subtraction: Total(YRaw) − Q1(XValue) = rest(YValue).
+            Assert.Equal(row.Q1 + row.Q2 + row.Q3, p.YRaw, precision: 6);
+            Assert.True(p.Corrected);
         }
     }
 

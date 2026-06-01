@@ -208,11 +208,12 @@ public partial class CorrelationPlotViewModel : ViewModelBase
 
     /// <summary>
     /// Builds the hover tooltip text for a correlation cell from one of its
-    /// data points (ADR-0018 slice 3). Surfaces the effect-size headline (r²),
-    /// the coefficient + method (Pearson r / Spearman ρ), the raw p and N as
-    /// supporting detail, and a "corrected" note when the cell used the
-    /// rest-score de-bias. Pure/static so the formatting is unit-testable
-    /// independent of the Avalonia control that attaches it.
+    /// data points (ADR-0018 slice 3). Surfaces the dot's own x/y values — with
+    /// the rest-score subtraction spelled out for a corrected dot — then the
+    /// effect-size headline (r²), the coefficient + method (Pearson r /
+    /// Spearman ρ), the raw p and N as supporting detail, and a "corrected" note
+    /// when the cell used the rest-score de-bias. Pure/static so the formatting
+    /// is unit-testable independent of the Avalonia control that attaches it.
     /// </summary>
     public static string BuildPointTooltip(CorrelationDataPoint p)
     {
@@ -237,9 +238,23 @@ public partial class CorrelationPlotViewModel : ViewModelBase
         }
 
         var stars = SignificanceStars(p.PValue);
+
+        // Per-dot values (ADR-0018 slice 3 follow-up). The x value is always
+        // raw (x is never transformed); the y line shows the de-bias subtraction
+        // explicitly for a corrected dot — target − column = raw − column = rest
+        // — so you can see the de-bias actually happened. A non-corrected dot
+        // just shows its raw y. "0.##" drops trailing zeros (85, 12.5).
+        var xLine = $"{p.XSeries} = {p.XValue.ToString("0.##", ci)}";
+        var yLine = p.Corrected
+            ? $"{p.YSeries} − {p.XSeries} = {p.YRaw.ToString("0.##", ci)} − " +
+              $"{p.XValue.ToString("0.##", ci)} = {p.YValue.ToString("0.##", ci)}"
+            : $"{p.YSeries} = {p.YValue.ToString("0.##", ci)}";
+
         var lines = new List<string>
         {
             $"{p.XSeries} × {p.YSeries}",
+            xLine,
+            yLine,
             $"r²={rSquared.ToString("0.00", ci)}  ({methodName} {symbol}={p.R.ToString("0.00", ci)})",
             $"{pText}{(stars.Length > 0 ? " " + stars : "")}   N={p.N}",
         };

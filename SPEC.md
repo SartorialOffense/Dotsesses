@@ -219,9 +219,12 @@ tiers as the Significance Matrix. They are a soft "worth a closer look" flag,
 not a gate. (Exploratory screening — uncorrected; treat as leads, not
 confirmation.)
 
-**Hover tooltip**: hovering a dot shows that cell's stats — `r²` (headline),
-the coefficient + method (Pearson r / Spearman ρ), the raw `p` + stars, the
-sample size `N`, and a "corrected (rest score)" note when the cell was
+**Hover tooltip**: hovering a dot shows that dot's own values — `column = value`
+for the x-axis and, for the y-axis, either `column = value` or, when the cell is
+de-biased, the rest-score subtraction spelled out (`target − column = raw −
+column = rest`, e.g. `Total − Q1 = 85 − 12 = 73`). Then the cell's stats — `r²`
+(headline), the coefficient + method (Pearson r / Spearman ρ), the raw `p` +
+stars, the sample size `N`, and a "corrected (rest score)" note when the cell was
 de-biased.
 
 **Rest-score de-bias** (ADR-0018): a cell relating a column flagged **Bias
@@ -238,7 +241,9 @@ can be de-biased without being summed into the aggregate. It **seeds on for
 numeric columns before Total** at load (Total and post-Total columns off). The
 de-bias is applied transparently: the dots, fitted line, coefficient, and r²
 color all reflect the corrected values, with no special cell marker — the
-corrected fact surfaces only in the tooltip's "corrected" note. An Ordinal
+corrected fact surfaces in the tooltip, both as a "corrected" note and as the
+per-dot subtraction (`target − column = raw − column = rest`) so the de-bias is
+visible value-by-value. An Ordinal
 column feeding a target is de-biased first, then ranked (Spearman). A degenerate
 rest score (`target − column ≡ 0`) renders that cell blank. `Exam` is matched by
 name like `Total`; red styling stays Total-only.

@@ -17,6 +17,10 @@ namespace Dotsesses.Models;
 /// <param name="N">Number of common students the coefficient was computed over.</param>
 /// <param name="Method">"pearson" or "spearman" (Spearman for any Ordinal-touching cell).</param>
 /// <param name="Corrected">True when the cell used the rest-score de-bias (slice 2).</param>
+/// <param name="YRaw">Raw target value before de-bias (Total/Exam). Equals
+/// <see cref="YValue"/> when the cell is not corrected; otherwise
+/// <c>YValue = YRaw - XValue</c> (the rest score). Lets the tooltip show the
+/// subtraction explicitly.</param>
 public record CorrelationDataPoint(
     int CellRow,
     int CellCol,
@@ -33,4 +37,5 @@ public record CorrelationDataPoint(
     int N = 0,
     string Method = "pearson",
     bool Corrected = false,
-    string MuppetName = "");
+    string MuppetName = "",
+    double YRaw = 0.0);
