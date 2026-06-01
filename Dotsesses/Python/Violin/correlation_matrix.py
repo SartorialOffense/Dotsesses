@@ -389,20 +389,23 @@ def create_correlation_matrix(
                         except Exception:
                             pass
 
-                    # Show the coefficient + raw-p significance stars (ADR-0018
-                    # slice 3). Label is 'r=' for Pearson, 'ρ=' for Spearman.
-                    # Stars are the soft "worth a closer look" flag, computed
-                    # from raw p; all cells are shown regardless.
+                    # Effect-size-led annotation in the upper-left corner
+                    # (ADR-0018): the variance-explained headline r² (Pearson)
+                    # or ρ² (Spearman) — matching the cell color and the
+                    # Significance tab's η²/ε² — plus the raw-p significance
+                    # stars (soft "worth a closer look" flag; all cells shown).
+                    # The sign of the relationship is still read from the fitted
+                    # line and the hover tooltip's signed coefficient.
                     if show_correlation_coefficients and len(x_vals) > 1:
                         stats = cell_stats.get((i, j), {})
                         coef = stats.get('r', 0.0)
                         stars = stats.get('stars', '')
-                        symbol = 'ρ' if stats.get('method') == 'spearman' else 'r'
-                        label = f'{symbol}={coef:.2f}'
+                        symbol = 'ρ²' if stats.get('method') == 'spearman' else 'r²'
+                        label = symbol + '=' + f'{coef ** 2:.2f}'.lstrip('0')  # '.64' style
                         if stars:
                             label += stars
-                        ax.annotate(label, xy=(0.95, 0.05),
-                                   xycoords='axes fraction', ha='right',
+                        ax.annotate(label, xy=(0.05, 0.95),
+                                   xycoords='axes fraction', ha='left', va='top',
                                    fontsize=8, color=stat_label_color)
 
             # Labels only on edges

@@ -206,12 +206,14 @@ against its own components would be misleading.
 
 **Coefficient & method** (ADR-0018): a cell uses **Pearson r** for a
 Numeric×Numeric pair and **Spearman ρ** for any cell touching an **Ordinal**
-column (rank-based, since an Ordinal's value is a rank). The in-cell label
-reads `r=…` or `ρ=…` accordingly, and the cell color encodes the effect-size
-headline **r²** (= r²/ρ²) on a 0–1 scale. Every cell is shown — none is hidden
-for being weak or non-significant.
+column (rank-based, since an Ordinal's value is a rank). The cell color encodes
+the effect-size headline **r²** (= r²/ρ²) on a 0–1 scale, and the **upper-left**
+in-cell label states it — `r²=…` (Pearson) or `ρ²=…` (Spearman) — matching the
+Significance tab's η²/ε² headline. The *sign* of the relationship is read from
+the fitted line's slope and the hover tooltip's signed coefficient. Every cell
+is shown — none is hidden for being weak or non-significant.
 
-**Significance stars**: appended to the in-cell coefficient from the **raw**
+**Significance stars**: appended to the in-cell r² label from the **raw**
 (uncorrected) p — `*` p<.05, `**` p<.01, `***` p<.001 — the same universal
 tiers as the Significance Matrix. They are a soft "worth a closer look" flag,
 not a gate. (Exploratory screening — uncorrected; treat as leads, not
