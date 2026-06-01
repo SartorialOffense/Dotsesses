@@ -577,12 +577,13 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             var seriesName = s.Index.HasValue ? $"{s.Name} {s.Index}" : s.Name;
             var isTotal = s.Index == null &&
-                string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase);
+                string.Equals(s.Name.Trim(), "Total", StringComparison.OrdinalIgnoreCase);
             // De-bias targets: Total (always) and Exam (an additional anchor,
             // matched by name — ADR-0018). A bias-correct column is corrected
             // against a target only when it precedes the target in sheet order.
+            // Names are trimmed so stray spreadsheet whitespace still matches.
             var isExam = s.Index == null &&
-                string.Equals(s.Name, "Exam", StringComparison.OrdinalIgnoreCase);
+                string.Equals(s.Name.Trim(), "Exam", StringComparison.OrdinalIgnoreCase);
             // De-bias is driven by the explicit BiasCorrect flag, not aggregate
             // membership (ADR-0018). Guard to Numeric non-Total defensively — the
             // Settings UI already only lets those rows carry the flag. Exam stays

@@ -143,4 +143,28 @@ public class BuildCorrelationColumnMetadataTests
         Assert.False(map["Q1"].IsDebiasTarget);    // plain component
         Assert.False(map["Total"].IsDebiasTarget); // Total target rides on IsTotal, not this flag
     }
+
+    [Fact]
+    public void TargetNames_AreTrimmed_SoStrayWhitespaceStillMatches()
+    {
+        // Spreadsheet headers sometimes carry stray spaces; "Total"/"Exam" are
+        // matched case-insensitively AND trimmed.
+        var students = new List<StudentAssessment>
+        {
+            new(1, new List<Score> { new(" Exam ", null, 40), new("  total", null, 90) },
+                new List<StudentAttribute>(), "m1"),
+        };
+        var ca = new ClassAssessment(students, new List<CutoffCountRange>(),
+            new Dictionary<int, MuppetNameInfo>(), new Dictionary<string, string>());
+        ca.ScoreSelections = new List<ScoreSelection>
+        {
+            new(" Exam ", null, ScoreColumnType.Numeric, Display: true, Aggregate: true, Correlation: true, Significance: true, BiasCorrect: true),
+            new("  total", null, ScoreColumnType.Numeric, Display: true, Aggregate: false, Correlation: true, Significance: true, BiasCorrect: false),
+        };
+
+        var map = MainWindowViewModel.BuildCorrelationColumnMetadata(ca, s => s.Correlation);
+
+        Assert.True(map[" Exam "].IsDebiasTarget);  // " Exam " → Exam
+        Assert.True(map["  total"].IsTotal);        // "  total" → Total
+    }
 }

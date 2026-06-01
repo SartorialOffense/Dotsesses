@@ -72,10 +72,12 @@ public class CorrelationPlotService
             {
                 columnTypes.Add("numeric");
                 biasCorrect.Add(false);
-                var isTotalByName = name.Equals("Total", StringComparison.OrdinalIgnoreCase);
+                // Trim so stray spreadsheet whitespace still matches Total/Exam.
+                var trimmed = name.Trim();
+                var isTotalByName = trimmed.Equals("Total", StringComparison.OrdinalIgnoreCase);
                 isTotal.Add(isTotalByName);
                 isDebiasTarget.Add(isTotalByName ||
-                    name.Equals("Exam", StringComparison.OrdinalIgnoreCase));
+                    trimmed.Equals("Exam", StringComparison.OrdinalIgnoreCase));
             }
         }
 

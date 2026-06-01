@@ -47,7 +47,7 @@ public static class ScoreSelectionDefaults
         var passedTotal = false;
         foreach (var score in scores)
         {
-            var isTotalColumn = string.Equals(score.Name, "Total", StringComparison.OrdinalIgnoreCase);
+            var isTotalColumn = string.Equals(score.Name.Trim(), "Total", StringComparison.OrdinalIgnoreCase);
             result.Add(new ScoreSelection(
                 Name: score.Name,
                 Index: score.Index,
