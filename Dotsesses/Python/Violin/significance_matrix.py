@@ -539,8 +539,11 @@ def create_significance_matrix(
 
             # Box per subgroup (median / IQR / whiskers), N>=2 (ADR-0019). The
             # box is non-interactive SVG decoration; fliers off (we show every
-            # point) and means off (the optional CI overlay covers that). Fill
-            # is translucent so the jittered points read through it.
+            # point) and means off (the optional CI overlay covers that). The
+            # structural lines (box edge, median, whiskers, caps) are drawn in
+            # the theme-contrast color (white on dark, near-black on light) so
+            # they stand out against the colored fill and points; the fill keeps
+            # the subgroup color (translucent) so groups stay identifiable.
             for (sg, mean_val, sem, n, values) in stats:
                 if n < 2:
                     continue
@@ -548,11 +551,11 @@ def create_significance_matrix(
                 color = get_subgroup_color(slot)
                 bp = ax.boxplot(
                     [values], positions=[slot], widths=0.25,
-                    showfliers=False, showmeans=False, patch_artist=True, zorder=2,
-                    medianprops=dict(color=color, linewidth=1.4),
-                    whiskerprops=dict(color=color, linewidth=1.0, alpha=0.8),
-                    capprops=dict(color=color, linewidth=1.0, alpha=0.8),
-                    boxprops=dict(edgecolor=color, linewidth=1.0),
+                    showfliers=False, showmeans=False, patch_artist=True, zorder=4,
+                    medianprops=dict(color=sig_text_color, linewidth=1.6),
+                    whiskerprops=dict(color=sig_text_color, linewidth=1.1),
+                    capprops=dict(color=sig_text_color, linewidth=1.1),
+                    boxprops=dict(edgecolor=sig_text_color, linewidth=1.1),
                 )
                 for patch in bp['boxes']:
                     patch.set_facecolor(color)
@@ -574,7 +577,7 @@ def create_significance_matrix(
                     ys.append(value)
                     pt_colors.append(get_subgroup_color(slot))
                 ax.scatter(xs, ys, s=(dot_size * 0.8) ** 2, c=pt_colors,
-                           edgecolors='none', alpha=0.65, zorder=3)
+                           edgecolors='none', alpha=0.75, zorder=3)
                 scatter_cells.append((i, j))
 
             # Optional mean ± 95% CI overlay (never SEM). Drawn with vlines /
