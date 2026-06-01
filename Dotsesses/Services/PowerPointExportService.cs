@@ -254,12 +254,10 @@ public class PowerPointExportService
         var effectSymbol = testFamily == SignificanceTestFamily.Nonparametric ? "ε²" : "η²";
 
         var statsLine =
-            $"Stats — per-cell test: {testName};  effect size {effectSymbol} = " +
-            "variance explained (0–1, the headline);  stars: * p<.05  ** p<.01  *** p<.001;  " +
-            "raw, uncorrected p (exploratory screening).";
+            $"Per-cell test: {testName}.  Effect size {effectSymbol} = variance explained (0–1).  " +
+            "Stars: * p<.05  ** p<.01  *** p<.001.  Raw, uncorrected p (exploratory).";
         var symbolsLine =
-            "Symbols — per subgroup: box = IQR (middle 50%), centre line = median, " +
-            "dots = individual students.";
+            "Box = IQR (middle 50%), centre line = median, dots = individual students.";
 
         return statsLine + "\n" + symbolsLine;
     }
