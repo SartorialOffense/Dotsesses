@@ -472,7 +472,16 @@ def create_significance_matrix(
     # bold), faint grey for non-significant / untestable cells.
     sig_text_color = '#111111' if theme == 'light' else '#FFFFFF'
     faint_text_color = '#999999'
-    anno_bbox_color = '#FFFFFF' if theme == 'light' else '#202020'
+
+    # Annotation gutter knobs (ADR-0018): the effect-size + p annotation is
+    # drawn just outside each cell's right edge so it never overlaps the dots.
+    # ANNO_GUTTER_PAD = how far past the right edge the text starts (axes
+    # fraction). COL_GUTTER_WSPACE / RIGHT_MARGIN reserve the horizontal space
+    # for it between columns and after the last column. Tune these together if
+    # the text crowds the next column or clips at the figure edge.
+    ANNO_GUTTER_PAD = 0.04
+    COL_GUTTER_WSPACE = 0.40
+    RIGHT_MARGIN = 0.88
 
     # Track which (i, j) cells actually got a scatter call so we can map
     # SVG PathCollection groups back to them in order.
@@ -541,19 +550,19 @@ def create_significance_matrix(
             eff_val = cell_effects.get((i, j))
             if stats:
                 anno_label, anno_sig = _format_cell_annotation(p_val, eff_val, test_family)
+                # Draw the annotation in the gutter just OUTSIDE the cell's
+                # right edge (x > 1 in axes coords, clip_on=False) so it never
+                # overlaps the dots. The widened wspace / right margin below
+                # reserves the space for it. Left-justified stack (ma='left').
                 ax.text(
-                    0.97, 0.95, anno_label,
+                    1.0 + ANNO_GUTTER_PAD, 0.98, anno_label,
                     transform=ax.transAxes,
-                    # Block stays anchored top-right (ha='right'), but the two
-                    # lines (effect size + p) are left-aligned with each other
-                    # (ma='left') so they read as a tidy left-justified stack.
-                    ha='right', va='top', ma='left',
+                    ha='left', va='top', ma='left',
                     fontsize=6.5,
                     fontweight='bold' if anno_sig else 'normal',
                     color=sig_text_color if anno_sig else faint_text_color,
                     zorder=5,
-                    bbox=dict(facecolor=anno_bbox_color, alpha=0.55,
-                              edgecolor='none', pad=1.0),
+                    clip_on=False,
                 )
 
             # Cell axes
@@ -589,6 +598,12 @@ def create_significance_matrix(
     # tight_layout with h_pad=0 keeps the perimeter trim but preserves the
     # zero inter-row gap we asked gridspec for above.
     plt.tight_layout(h_pad=0)
+    # Then force horizontal gutters between columns and a right margin so the
+    # per-cell annotations (drawn just outside each cell's right edge) have
+    # room and never overlap the next column or clip at the figure edge
+    # (ADR-0018). Applied after tight_layout, which would otherwise reset
+    # wspace. hspace stays 0 to keep rows flush.
+    fig.subplots_adjust(wspace=COL_GUTTER_WSPACE, hspace=0, right=RIGHT_MARGIN)
     t_rendering = time.perf_counter()
 
     # ----- Save SVG -----

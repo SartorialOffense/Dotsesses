@@ -290,9 +290,11 @@ test families, when to prefer each, and citations for papers — lives at
   raw p + stars and test name (e.g. `p=.003 ** · Welch ANOVA`). Untestable
   cells say `not testable (< 2 groups with N ≥ 2)`; a dropped dot says
   `excluded from test: N < 2`.
-- **Cell annotation** (top-right corner): **effect-size-led** (ADR-0018). The
-  headline is the variance-explained effect size — `η²=.42` (parametric) or
-  `ε²=.30` (non-parametric) — with the raw p + tiered stars (`*` p<.05,
+- **Cell annotation** (in the gutter just **outside** each cell's right edge,
+  so it never overlaps the dots — the columns are spaced apart to make room):
+  **effect-size-led** (ADR-0018). The headline is the variance-explained effect
+  size — `η²=.42` (parametric) or `ε²=.30` (non-parametric) — with the raw p +
+  tiered stars (`*` p<.05,
   `**` p<.01, `***` p<.001) demoted to a line beneath. Significant cells render
   **bold** in a strong color; non-significant cells faint/grey; untestable
   cells show a lone em-dash (`—`). Cells with no dots get no annotation.
