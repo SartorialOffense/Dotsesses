@@ -250,12 +250,13 @@ this in Settings.
 ## Significance matrix
 
 Third tab in the bottom-right surface, after Distribution and
-Correlation. A matrix of small scatter cells — one row per Numeric
+Correlation. A matrix of small cells — one row per Numeric
 column with **Significance**=true, one column per Categorical *or*
 Ordinal column with **Significance**=true (an Ordinal column — one whose
 every value carries a `~N` suffix — acts as a matrix column, never a
-row; see ADR-0017). Each cell answers: *does subgroup membership in this
-categorical column materially shift the average of this numeric column?*
+row; see ADR-0017). Each cell shows each subgroup's **distribution** (box +
+jittered student points; ADR-0019) and answers: *does subgroup membership in
+this categorical column shift this numeric column — enough to be worth a look?*
 
 **Default selection** (fresh load, see ADR-0016): using Welch's ANOVA
 p-values, a categorical column qualifies when its smallest p across the
@@ -269,41 +270,41 @@ A plain-language guide for instructors — what the p-value means, the two
 test families, when to prefer each, and citations for papers — lives at
 [`docs/significance-guide.md`](docs/significance-guide.md).
 
-- Each cell plots one dot per **Subgroup** of its categorical column.
-  Dot x-position: subgroup label, ordered by **SortOrder** — values with
-  a `~N` suffix come first in `N` order, then unsuffixed values
-  alphabetically (a column with no suffixes stays fully alphabetical;
-  see ADR-0017). Dot y-position: mean of the cell's numeric column within
-  that subgroup. Vertical line: ±SEM error bar (N ≥ 2 only; N=1 dots
-  render with no whisker).
+- Each cell shows, per **Subgroup** of its categorical column, a **box plot**
+  (median / IQR / whiskers) with the **individual student scores jittered on
+  top** (ADR-0019) — so the reader sees spread and overlap, not just a centre
+  point. Subgroup x-position is ordered by **SortOrder** — values with a `~N`
+  suffix come first in `N` order, then unsuffixed values alphabetically (a
+  column with no suffixes stays fully alphabetical; see ADR-0017). A point's
+  y-position is that student's score. Small-N: N=0 omits the subgroup; N=1 shows
+  the lone point (no box); N≥2 box + points; a genuinely narrow cell degrades to
+  **box-only**.
 - Coloring: per-subgroup, from the same `CYCLING_PALETTE` as the
   violin plot, indexed positionally within each categorical column
   (the index resets per column, so "Yes" in *Hat* and "Yes" in
   *Submitted Outline* may be different colors).
-- Y-scale: shared per row using
-  `[min(mean − SEM), max(mean + SEM)] × 5% padding` across the row.
-- Hover tooltip on each dot:
+- Y-scale: shared per row, spanning the actual student-value min/max across the
+  row (× 5% padding) so every box / point / whisker fits.
+- **Mean ± 95% CI toggle** (top-right, "Mean ± 95% CI"): an opt-in overlay
+  drawing each subgroup's mean ± 95% confidence interval on top of the box —
+  **never SEM**. Session-only (not persisted), off by default.
+- Hover tooltip on each **student point** (ADR-0019) — the point is one student:
 
   ```
   Hat = Yes   (N = 42)
-  Q1: mean 78.3 ± 1.2 (SEM)
+  Q1: 78
   ```
 
-  N=1 collapses to `Q1: 78.3 (N = 1)` (no ± since SEM is undefined).
-  The tooltip is **effect-size-led** (ADR-0018): it leads with the cell's
-  variance-explained headline — `η²=.42 variance explained` (Welch path) or
-  `ε²=.30 variance explained` (Kruskal path) — then a supporting line with the
-  raw p + stars and test name (e.g. `p=.003 ** · Welch ANOVA`). Untestable
-  cells say `not testable (< 2 groups with N ≥ 2)`; a dropped dot says
-  `excluded from test: N < 2`.
+  i.e. the subgroup + its N, and that student's score. The cell's effect size
+  and p are not repeated here — they live in the annotation below.
 - **Cell annotation** (in the gutter just **outside** each cell's right edge,
-  so it never overlaps the dots — the columns are spaced apart to make room):
+  so it never overlaps the plot — the columns are spaced apart to make room):
   **effect-size-led** (ADR-0018). The headline is the variance-explained effect
   size — `η²=.42` (parametric) or `ε²=.30` (non-parametric) — with the raw p +
   tiered stars (`*` p<.05,
   `**` p<.01, `***` p<.001) demoted to a line beneath. Significant cells render
   **bold** in a strong color; non-significant cells faint/grey; untestable
-  cells show a lone em-dash (`—`). Cells with no dots get no annotation.
+  cells show a lone em-dash (`—`). Cells with no data get no annotation.
   p-values are **raw / uncorrected** — the effect size is the headline because
   at class-sized N the p mostly reports sample size, not whether the
   relationship matters; both are leads for an exploratory screening view, not a

@@ -15,7 +15,7 @@ public class SignificanceTooltipEffectSizeTests
         double? p = 0.01, double? effect = 0.42,
         SignificanceTestFamily family = SignificanceTestFamily.Parametric,
         int n = 12, bool excluded = false)
-        => new(0, 0, 0, 0, "Group", "Score", "A", Mean: 5, Sem: 1, N: n, Color: "#fff",
+        => new(0, 0, 0, 0, "Group", "Score", "A", StudentId: 1, Value: 82, N: n, Color: "#fff",
                PValue: p, EffectSize: effect, TestFamily: family, Excluded: excluded);
 
     [Fact]
@@ -24,6 +24,10 @@ public class SignificanceTooltipEffectSizeTests
         var text = SignificancePlotViewModel.BuildTooltip(Point(p: 0.002, effect: 0.42,
             family: SignificanceTestFamily.Parametric));
 
+        // Per-student head (ADR-0019): subgroup + N + this student's score.
+        Assert.Contains("Group = A", text);
+        Assert.Contains("Score: 82", text);
+        // Cell stats still in the supporting line.
         Assert.Contains("η²=.42 variance explained", text);
         Assert.Contains("Welch ANOVA", text);
         Assert.Contains("p=.002", text);

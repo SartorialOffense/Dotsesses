@@ -70,24 +70,25 @@ manual type override.
 **Subgroup**: The set of Students sharing a particular
 **StudentAttribute** value — e.g. the Students who answered `"Yes"` to
 *Submitted Outline* form one Subgroup. Each cell of the
-**Significance Matrix** plots one dot per Subgroup of the cell's
-categorical column, positioned at (subgroup label, mean of the cell's
-continuous column within that subgroup) with a ±SEM error bar. Subgroups
-are ordered left-to-right by their **SortOrder** (suffixed labels by
+**Significance Matrix** shows each Subgroup's **distribution** — a box plot
+(median / IQR / whiskers) with the individual student scores jittered on top
+(ADR-0019) — so spread and overlap are visible, not just central tendency.
+Subgroups are ordered left-to-right by their **SortOrder** (suffixed labels by
 `~N` rank, then unsuffixed alphabetically) rather than purely
 alphabetically; this ordering is computed in C# and the Python renderer
 consumes it verbatim (see ADR-0017).
 
-**Significance Matrix**: A matrix of small scatter cells — one row per
+**Significance Matrix**: A matrix of small cells — one row per
 Numeric column with `Significance=true`, one column per **Categorical**
 *or* **Ordinal** column with `Significance=true` (an Ordinal column acts
 as a Significance Matrix column, never a row — see **Ordinal**,
 ADR-0017). Each
-cell answers: "does subgroup membership in this categorical column
-materially shift the average of this numeric column?" The descriptive
-layer plots mean + SEM dots per Subgroup; the inferential layer
-(slice 4) overlays each cell's **Significance Test** p-value and stars.
-The matrix is an *exploratory screening* view — p-values are raw
+cell answers: "does subgroup membership in this categorical column shift
+this numeric column — enough to be worth a look?" The descriptive layer
+shows each Subgroup's distribution (box + jittered student points; ADR-0019,
+replacing the earlier mean ± SEM dot); the inferential layer overlays each
+cell's **Significance Test** p-value, stars, and η²/ε² effect-size headline
+(ADR-0018). The matrix is an *exploratory screening* view — p-values are raw
 (uncorrected for the many cells tested). See ADR-0014.
 
 **Significance Test**: The per-cell omnibus test the Significance Matrix

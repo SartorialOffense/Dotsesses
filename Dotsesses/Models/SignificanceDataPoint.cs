@@ -1,19 +1,18 @@
 namespace Dotsesses.Models;
 
 /// <summary>
-/// One dot in the Significance Matrix plot. Each dot represents a
-/// <c>Subgroup</c> of a Categorical column averaged against a Numeric column
-/// (see CONTEXT.md). Unlike <see cref="CorrelationDataPoint"/>, the dot does
-/// not represent an individual student — it summarises the subgroup's
-/// students. Slice 4 (ADR-0014) layers in the inferential test: every dot
-/// in a cell carries that cell's omnibus <see cref="PValue"/> (null when the
-/// cell is untestable) and a flag for whether its subgroup was
-/// <see cref="Excluded"/> from the test for being too small (N&lt;2).
+/// One point in the Significance Matrix plot. As of ADR-0019 each cell shows a
+/// box plot + jittered points per Subgroup, so a point now represents an
+/// **individual student's score** (<see cref="StudentId"/> / <see cref="Value"/>),
+/// not a subgroup mean — the box (drawn in the SVG) conveys median/IQR/whiskers.
+/// <see cref="Subgroup"/> and <see cref="N"/> (the student's subgroup size) carry
+/// the group context for the hover tooltip.
 ///
-/// ADR-0018 adds <see cref="EffectSize"/> — the cell's variance-explained
-/// effect size (η² parametric / ε² non-parametric) on a 0–1 scale, comparable
-/// to r² on the correlation tab. It is the headline; p is supporting detail.
-/// Also repeated on every dot in the cell; null when untestable.
+/// The inferential fields are cell-level and repeated on every point in the cell:
+/// the omnibus <see cref="PValue"/> (null when untestable), the variance-explained
+/// <see cref="EffectSize"/> (η² parametric / ε² non-parametric, null when
+/// untestable — ADR-0018), the <see cref="TestFamily"/>, and <see cref="Excluded"/>
+/// (true when the student's subgroup was dropped from the test for N&lt;2).
 /// </summary>
 public record SignificanceDataPoint(
     int CellRow,
@@ -23,8 +22,8 @@ public record SignificanceDataPoint(
     string CategoricalColumn,
     string NumericColumn,
     string Subgroup,
-    double Mean,
-    double Sem,
+    int StudentId,
+    double Value,
     int N,
     string Color,
     double? PValue = null,

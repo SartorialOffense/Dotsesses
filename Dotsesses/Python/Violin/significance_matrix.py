@@ -1,10 +1,12 @@
 """
 Significance Matrix plot.
 
-Matrix of small scatter cells: one row per Numeric column, one column per
-Categorical column. Each cell plots one dot per Subgroup (distinct value of
-the categorical column), positioned at x = subgroup_index, y = mean of the
-numeric values within that subgroup, with a vertical SEM error bar.
+Matrix of small cells: one row per Numeric column, one column per Categorical
+column. Each cell shows, per Subgroup (distinct value of the categorical
+column), a **box plot** (median / IQR / whiskers) with the **individual student
+scores jittered on top**, at x = subgroup_index (ADR-0019). This shows spread
+and overlap — what an exploratory "do these groups differ?" view needs — rather
+than the old mean ± SEM dot, which hid the spread and overstated separation.
 
 Coloring: per-subgroup, indexed positionally within each categorical column
 using CYCLING_PALETTE (the same palette violin/correlation use). The index
@@ -14,13 +16,17 @@ resets per categorical matrix-column, so "Yes" in `Hat` and "Yes" in
 Subgroup ordering within a column: caller-supplied via `ordered_subgroups`
 (ADR-0017) — suffixed labels by their ~N rank, then unsuffixed alphabetical.
 
-Y-axis scale: shared per row using [min(mean - SEM), max(mean + SEM)] across
-all cells in the row, padded by 5%.
+Y-axis scale: shared per row, spanning the actual student-value min/max across
+all cells in the row, padded by 5% (so every box/point/whisker fits).
 
 Small-N handling:
-- N=0 → omit the dot entirely.
-- N=1 → render dot, no error bar.
-- N≥2 → render dot + SEM error bar.
+- N=0 → subgroup omitted entirely.
+- N=1 → the single student point, no box.
+- N≥2 → box + jittered points.
+Narrow cells degrade to box-only (the jitter is skipped) so a point cloud is
+never forced into an unreadable space.
+
+An optional mean ± 95% CI overlay (`show_ci`) can be drawn on top — never SEM.
 
 Inferential layer (ADR-0014, "slice 4"): each cell runs ONE omnibus test
 over its subgroups and prints the resulting p-value + tiered significance
@@ -35,13 +41,16 @@ the cell is testable only if ≥2 valid groups remain, otherwise it shows
 an em-dash. p-values are RAW (uncorrected) — the matrix is an exploratory
 screening view, not a confirmatory multiple-comparison procedure.
 
-Returns: (timing_dict, svg_string, point_data_list). Each point dict has
-{cell_row, cell_col, x, y, cat_col, num_col, subgroup, mean, sem, n, color,
-p_value, effect_size, test_family, excluded}. `p_value` is the cell's omnibus
-p (NaN when untestable) and `effect_size` is the cell's variance-explained
-effect size (η² parametric / ε² non-parametric, NaN when untestable, ADR-0018);
-both are repeated on every dot in the cell. `excluded` flags a dot whose
-subgroup was dropped from the test (N<2).
+Returns: (timing_dict, svg_string, point_data_list). Each point dict is now ONE
+PER STUDENT (ADR-0019): {cell_row, cell_col, x, y, cat_col, num_col, subgroup,
+student_id, value, n, color, p_value, effect_size, test_family, excluded}.
+`value` is that student's score; `n` is the student's subgroup size. `p_value`
+is the cell's omnibus p (NaN when untestable) and `effect_size` is the cell's
+variance-explained effect size (η² parametric / ε² non-parametric, NaN when
+untestable, ADR-0018); both are cell-level and repeated on every point.
+`excluded` flags a point whose subgroup was dropped from the test (N<2). The box
+itself stays in the SVG (decoration); only the student points are extracted for
+the C# hover overlay.
 """
 import math
 import time
@@ -329,9 +338,16 @@ def create_significance_matrix(
     theme: str = 'dark',
     dot_size: float = 5.0,
     test_family: str = 'parametric',
+    show_ci: bool = False,
 ) -> Tuple[Dict[str, int], str, List[Dict]]:
     """
     Build the significance matrix.
+
+    Each cell shows, per subgroup, a box plot (median / IQR / whiskers) with the
+    individual student scores jittered on top — so a reader sees spread and
+    overlap, not just central tendency (ADR-0019, replacing the old mean ± SEM
+    dot). The per-cell η²/ε² + p annotation and the exploratory caveat are
+    unchanged.
 
     Parameters
     ----------
@@ -348,6 +364,8 @@ def create_significance_matrix(
     test_family : 'parametric' (Welch's ANOVA) or 'nonparametric'
         (Kruskal–Wallis) — the omnibus test run per cell for the in-cell
         p-value annotation.
+    show_ci : when True, overlay each subgroup's mean ± 95% CI (never SEM).
+        Drawn as plain lines (no markers) so it doesn't pollute point extraction.
 
     Returns
     -------
@@ -379,9 +397,15 @@ def create_significance_matrix(
         return ({'TOTAL': int((time.perf_counter() - t_start) * 1000)}, svg_output, [])
 
     # ----- Subgroup stats per cell -----
-    # cell_stats[(i, j)] = list of (subgroup_label, mean, sem, n) in canonical
-    # (caller-supplied) subgroup order — ADR-0017.
-    cell_stats: Dict[Tuple[int, int], List[Tuple[str, float, float, int]]] = {}
+    # cell_stats[(i, j)] = list of (subgroup_label, mean, sem, n, values) in
+    # canonical (caller-supplied) subgroup order — ADR-0017. `values` is the
+    # subgroup's raw scores, used to draw the box (ADR-0019).
+    cell_stats: Dict[Tuple[int, int], List[Tuple[str, float, float, int, List[float]]]] = {}
+    # cell_points[(i, j)] = flat list of (subgroup, student_id, value) for every
+    # student in the cell, in canonical-subgroup then student-id order — the
+    # exact order the jittered scatter is drawn and the SVG <use> elements are
+    # extracted (ADR-0019).
+    cell_points: Dict[Tuple[int, int], List[Tuple[str, str, float]]] = {}
     # cell_pvalues[(i, j)] = (p_value_or_None, excluded_subgroup_labels) from
     # the per-cell omnibus test (see compute_cell_pvalue / ADR-0014 slice 4).
     cell_pvalues: Dict[Tuple[int, int], Tuple[Optional[float], set]] = {}
@@ -408,19 +432,24 @@ def create_significance_matrix(
 
     for i, (num_name, num_data) in enumerate(numeric_series):
         for j, (cat_name, cat_data) in enumerate(categorical_series):
-            subgroup_to_values: Dict[str, List[float]] = {}
-            # Join: student must have both a categorical value and a numeric value
+            # Join: student must have both a categorical value and a numeric
+            # value. Keep the student id paired with the value so each point is
+            # identifiable on hover (ADR-0019).
+            subgroup_to_pairs: Dict[str, List[Tuple[str, float]]] = {}
             common_ids = set(cat_data.keys()) & set(num_data.keys())
             for sid in common_ids:
-                subgroup_to_values.setdefault(cat_data[sid], []).append(num_data[sid])
+                subgroup_to_pairs.setdefault(cat_data[sid], []).append((sid, num_data[sid]))
 
             row_stats = []
+            flat_points: List[Tuple[str, str, float]] = []
             # Walk subgroups in the column's canonical order (ADR-0017) rather
-            # than alphabetically, so dot/SVG point order matches the x layout.
+            # than alphabetically; within a subgroup order by student id, so the
+            # scatter draw order matches the SVG <use> extraction order.
             col_idx = column_subgroup_index[j]
-            for sg in sorted(subgroup_to_values.keys(),
+            for sg in sorted(subgroup_to_pairs.keys(),
                              key=lambda s: col_idx.get(s, len(col_idx))):
-                values = subgroup_to_values[sg]
+                pairs = sorted(subgroup_to_pairs[sg], key=lambda p: p[0])
+                values = [v for _, v in pairs]
                 n = len(values)
                 if n == 0:
                     continue
@@ -429,28 +458,30 @@ def create_significance_matrix(
                     sem = float(np.std(values, ddof=1) / math.sqrt(n))
                 else:
                     sem = float('nan')  # undefined for N=1
-                row_stats.append((sg, mean_val, sem, n))
+                row_stats.append((sg, mean_val, sem, n, values))
+                for sid, v in pairs:
+                    flat_points.append((sg, sid, v))
             cell_stats[(i, j)] = row_stats
+            cell_points[(i, j)] = flat_points
+
+            subgroup_to_values = {sg: [v for _, v in pairs]
+                                  for sg, pairs in subgroup_to_pairs.items()}
             cell_pvalues[(i, j)] = compute_cell_pvalue(subgroup_to_values, test_family)
             cell_effects[(i, j)] = compute_cell_effect_size(subgroup_to_values, test_family)
 
-    # ----- Per-row y-limits: [min(m-SEM), max(m+SEM)] +/- 5% padding -----
+    # ----- Per-row y-limits: span the actual student values +/- 5% padding -----
+    # The box + jittered points must all fit, so the row scale is driven by the
+    # real data range (not mean ± SEM as before) — ADR-0019.
     row_ylims: Dict[int, Tuple[float, float]] = {}
     for i in range(n_rows):
-        lows: List[float] = []
-        highs: List[float] = []
+        vals: List[float] = []
         for j in range(n_cols):
-            for (_sg, mean_val, sem, n) in cell_stats.get((i, j), []):
-                if n >= 2 and not math.isnan(sem):
-                    lows.append(mean_val - sem)
-                    highs.append(mean_val + sem)
-                else:
-                    lows.append(mean_val)
-                    highs.append(mean_val)
-        if not lows or not highs:
+            for (_sg, _mean, _sem, _n, values) in cell_stats.get((i, j), []):
+                vals.extend(values)
+        if not vals:
             row_ylims[i] = (-1.0, 1.0)  # arbitrary fallback for an empty row
             continue
-        y_lo, y_hi = min(lows), max(highs)
+        y_lo, y_hi = min(vals), max(vals)
         if y_hi == y_lo:
             # Single dot or perfectly tied values — give a small visual span.
             pad = max(abs(y_hi) * 0.05, 0.5)
@@ -483,6 +514,15 @@ def create_significance_matrix(
     COL_GUTTER_WSPACE = 0.40
     RIGHT_MARGIN = 0.88
 
+    # Box + jitter knobs (ADR-0019). JITTER_HALF_WIDTH spreads the per-student
+    # points horizontally within their subgroup's x-slot (slot width 1.0).
+    # Box-only fallback: when columns get too narrow to read a point cloud,
+    # draw the box alone. cell_w_in is the approximate per-cell width in inches.
+    JITTER_HALF_WIDTH = 0.22
+    MIN_CELL_WIDTH_IN_FOR_POINTS = 0.8
+    cell_w_in = fig_size[0] / max(n_cols, 1)
+    draw_points = cell_w_in >= MIN_CELL_WIDTH_IN_FOR_POINTS
+
     # Track which (i, j) cells actually got a scatter call so we can map
     # SVG PathCollection groups back to them in order.
     scatter_cells: List[Tuple[int, int]] = []
@@ -491,56 +531,63 @@ def create_significance_matrix(
         for j, (cat_name, _) in enumerate(categorical_series):
             ax = axes[i, j]
             stats = cell_stats.get((i, j), [])
+            points = cell_points.get((i, j), [])
             sg_to_idx = column_subgroup_index[j]
 
-            # X positions: integer ticks per subgroup that appears in this cell
-            xs: List[int] = []
-            ys: List[float] = []
-            colors: List[str] = []
-            err_lower: List[float] = []
-            err_upper: List[float] = []
-            subgroup_labels: List[str] = []
+            # Box per subgroup (median / IQR / whiskers), N>=2 (ADR-0019). The
+            # box is non-interactive SVG decoration; fliers off (we show every
+            # point) and means off (the optional CI overlay covers that). Fill
+            # is translucent so the jittered points read through it.
+            for (sg, mean_val, sem, n, values) in stats:
+                if n < 2:
+                    continue
+                slot = sg_to_idx.get(sg, 0)
+                color = get_subgroup_color(slot)
+                bp = ax.boxplot(
+                    [values], positions=[slot], widths=0.5,
+                    showfliers=False, showmeans=False, patch_artist=True, zorder=2,
+                    medianprops=dict(color=color, linewidth=1.4),
+                    whiskerprops=dict(color=color, linewidth=1.0, alpha=0.8),
+                    capprops=dict(color=color, linewidth=1.0, alpha=0.8),
+                    boxprops=dict(edgecolor=color, linewidth=1.0),
+                )
+                for patch in bp['boxes']:
+                    patch.set_facecolor(color)
+                    patch.set_alpha(0.25)
 
-            for (sg, mean_val, sem, n) in stats:
-                color_idx = sg_to_idx.get(sg, 0)
-                # Use the column-canonical index (ADR-0017 caller order) so
-                # identical subgroups keep the same x slot/color across rows.
-                x_pos = color_idx
-                xs.append(x_pos)
-                ys.append(mean_val)
-                colors.append(get_subgroup_color(color_idx))
-                subgroup_labels.append(sg)
-                if n >= 2 and not math.isnan(sem):
-                    err_lower.append(sem)
-                    err_upper.append(sem)
-                else:
-                    err_lower.append(0.0)
-                    err_upper.append(0.0)
+            # Jittered student points — ONE scatter call per cell over all
+            # students, so there's exactly one PathCollection to extract back.
+            # Deterministic jitter (fixed seed) keeps points stable across
+            # re-renders/resizes. Skipped for genuinely narrow cells (box-only
+            # fallback) so we never force an unreadable cloud.
+            if draw_points and points:
+                rng = np.random.RandomState(0)
+                xs: List[float] = []
+                ys: List[float] = []
+                pt_colors: List[str] = []
+                for (sg, _sid, value) in points:
+                    slot = sg_to_idx.get(sg, 0)
+                    xs.append(slot + float(rng.uniform(-JITTER_HALF_WIDTH, JITTER_HALF_WIDTH)))
+                    ys.append(value)
+                    pt_colors.append(get_subgroup_color(slot))
+                ax.scatter(xs, ys, s=(dot_size * 0.8) ** 2, c=pt_colors,
+                           edgecolors='none', alpha=0.7, zorder=3)
+                scatter_cells.append((i, j))
 
-            # Error bars via ax.errorbar so capsize lives in *points* (sized to
-            # match the dot), not axis units (which scale with cell width). One
-            # call per subgroup so each bar can get its own color.
-            for k, (x_pos, y_val, e_lo, e_hi, n_val) in enumerate(
-                    zip(xs, ys, err_lower, err_upper,
-                        [s[3] for s in stats])):
-                if n_val >= 2 and (e_lo > 0 or e_hi > 0):
-                    ax.errorbar(
-                        [x_pos], [y_val],
-                        yerr=[[e_lo], [e_hi]],
-                        fmt='none',
-                        ecolor=colors[k],
-                        elinewidth=1.2,
-                        capsize=dot_size,
-                        capthick=1.0,
-                        alpha=0.8,
-                        zorder=2,
-                    )
-
-            # Scatter dots — always issue the call even with empty arrays so
-            # the SVG PathCollection ordering stays predictable per scatter_cells.
-            ax.scatter(xs, ys, s=dot_size ** 2, c=colors,
-                       edgecolors='none', alpha=0.9, zorder=3)
-            scatter_cells.append((i, j))
+            # Optional mean ± 95% CI overlay (never SEM). Drawn with vlines /
+            # hlines only — NO markers — so it produces no <use> elements that
+            # would pollute the per-student point extraction below (ADR-0019).
+            if show_ci:
+                for (sg, mean_val, sem, n, values) in stats:
+                    if n < 2 or math.isnan(sem):
+                        continue
+                    slot = sg_to_idx.get(sg, 0)
+                    half = float(_stats.t.ppf(0.975, n - 1)) * sem
+                    ax.vlines(slot, mean_val - half, mean_val + half,
+                              color=sig_text_color, linewidth=1.3, alpha=0.9, zorder=4)
+                    for yy in (mean_val - half, mean_val, mean_val + half):
+                        ax.hlines(yy, slot - 0.12, slot + 0.12,
+                                  color=sig_text_color, linewidth=1.3, alpha=0.9, zorder=4)
 
             # In-cell significance annotation (top-right corner). Significant
             # cells render bold + tiered stars in a strong color; non-sig /
@@ -627,11 +674,13 @@ def create_significance_matrix(
 
     point_data_list: List[Dict] = []
 
-    # Each ax.scatter call adds one PathCollection (even if empty). Their order
-    # is the order of the scatter calls we issued (one per cell).
+    # Each ax.scatter call adds one PathCollection. Their document order matches
+    # the order of the scatter calls we issued (one per cell that drew points;
+    # box-only cells aren't in scatter_cells). Within a cell, the <use> order
+    # matches cell_points (canonical subgroup, then student id) — ADR-0019.
     for cell_idx, (i, j) in enumerate(scatter_cells):
-        stats = cell_stats.get((i, j), [])
-        if not stats:
+        points = cell_points.get((i, j), [])
+        if not points:
             continue
         if cell_idx >= len(path_collections):
             continue
@@ -651,8 +700,10 @@ def create_significance_matrix(
 
         cell_p, cell_excluded = cell_pvalues.get((i, j), (None, set()))
         cell_eff = cell_effects.get((i, j))
-        if len(svg_points) == len(stats):
-            for k, (sg, mean_val, sem, n) in enumerate(stats):
+        # Subgroup sizes for the per-point N (the subgroup the student is in).
+        sg_sizes = {sg: n for (sg, _m, _s, n, _v) in cell_stats.get((i, j), [])}
+        if len(svg_points) == len(points):
+            for k, (sg, sid, value) in enumerate(points):
                 color_idx = sg_to_idx.get(sg, 0)
                 point_data_list.append({
                     'cell_row': i,
@@ -662,16 +713,16 @@ def create_significance_matrix(
                     'cat_col': cat_name,
                     'num_col': num_name,
                     'subgroup': sg,
-                    'mean': float(mean_val),
-                    'sem': float(sem) if not math.isnan(sem) else float('nan'),
-                    'n': int(n),
+                    'student_id': sid,
+                    'value': float(value),
+                    'n': int(sg_sizes.get(sg, 0)),
                     'color': get_subgroup_color(color_idx),
-                    # Cell-level omnibus p, repeated on every dot in the cell
-                    # (NaN when untestable); `excluded` flags a dot dropped
-                    # from the test for N<2. See ADR-0014 slice 4.
+                    # Cell-level omnibus p, repeated on every point in the cell
+                    # (NaN when untestable); `excluded` flags a point whose
+                    # subgroup was dropped from the test for N<2. See ADR-0014.
                     'p_value': float(cell_p) if cell_p is not None else float('nan'),
                     # Variance-explained effect size (η²/ε²) — the headline; NaN
-                    # when untestable. Repeated on every dot (ADR-0018 slice 4).
+                    # when untestable. Repeated on every point (ADR-0018).
                     'effect_size': float(cell_eff) if cell_eff is not None else float('nan'),
                     'test_family': test_family,
                     'excluded': bool(sg in cell_excluded),

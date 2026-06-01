@@ -36,7 +36,8 @@ public class SignificancePlotService
         double dotSize = 5.0,
         ThemeName theme = ThemeName.DarkMode,
         SignificanceTestFamily testFamily = SignificanceTestFamily.Parametric,
-        List<(string Name, List<string> Order)>? subgroupOrders = null)
+        List<(string Name, List<string> Order)>? subgroupOrders = null,
+        bool showCi = false)
     {
         var pyNumeric = numericSeries
             .Select(s => (s.Name, (IReadOnlyDictionary<string, double>)s.Values.AsReadOnly()))
@@ -69,7 +70,8 @@ public class SignificancePlotService
             pyOrdered,
             themeStr,
             dotSize,
-            testFamilyStr);
+            testFamilyStr,
+            showCi);
 
         string svgContent = result.Item2;
         var pointDataList = result.Item3;
@@ -83,6 +85,9 @@ public class SignificancePlotService
             var pValueRaw = d["p_value"].As<double>();
             // effect_size arrives as NaN when the cell was untestable (ADR-0018).
             var effectRaw = d["effect_size"].As<double>();
+            // Student id arrives as "S001"; parse to int like the correlation path.
+            var idStr = d["student_id"].As<string>();
+            int studentId = int.Parse(idStr.TrimStart('S'));
             dataPoints.Add(new SignificanceDataPoint(
                 CellRow: d["cell_row"].As<int>(),
                 CellCol: d["cell_col"].As<int>(),
@@ -91,8 +96,8 @@ public class SignificancePlotService
                 CategoricalColumn: d["cat_col"].As<string>(),
                 NumericColumn: d["num_col"].As<string>(),
                 Subgroup: d["subgroup"].As<string>(),
-                Mean: d["mean"].As<double>(),
-                Sem: d["sem"].As<double>(),
+                StudentId: studentId,
+                Value: d["value"].As<double>(),
                 N: d["n"].As<int>(),
                 Color: d["color"].As<string>(),
                 PValue: double.IsNaN(pValueRaw) ? null : pValueRaw,

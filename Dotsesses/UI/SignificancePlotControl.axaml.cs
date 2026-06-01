@@ -141,6 +141,22 @@ public partial class SignificancePlotControl : UserControl
         }
     }
 
+    private void OnConfidenceIntervalChanged(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is not SignificancePlotViewModel vm) return;
+
+        var show = ConfidenceIntervalCheck.IsChecked == true;
+        if (vm.ShowConfidenceInterval == show) return;
+
+        vm.ShowConfidenceInterval = show;
+
+        var b = SignificancePlotArea.Bounds;
+        if (b.Width > 0 && b.Height > 0 && !string.IsNullOrEmpty(vm.SvgContent))
+        {
+            vm.RegeneratePlot(b.Width, b.Height, _currentTheme);
+        }
+    }
+
     private void OnRenderWithThemeMessage(object recipient, RenderWithThemeMessage message)
     {
         _currentTheme = message.Theme;
@@ -223,30 +239,31 @@ public partial class SignificancePlotControl : UserControl
             var p = points[i];
             var (dx, dy) = vm.SvgToDisplayWithSize(p.X, p.Y, displayW, displayH);
 
-            // Transparent hit area sized for forgiving hover.
+            // Transparent hit area — smaller than before since points are now
+            // per-student and densely jittered (ADR-0019).
             var hit = new Ellipse
             {
-                Width = 18,
-                Height = 18,
+                Width = 12,
+                Height = 12,
                 Fill = Brushes.Transparent,
                 Tag = i,
             };
             ToolTip.SetTip(hit, SignificancePlotViewModel.BuildTooltip(p));
-            Canvas.SetLeft(hit, dx - 9);
-            Canvas.SetTop(hit, dy - 9);
+            Canvas.SetLeft(hit, dx - 6);
+            Canvas.SetTop(hit, dy - 6);
             PointsOverlay.Children.Add(hit);
 
-            // Visible dot (matches the matplotlib scatter dot size visually).
+            // Visible dot (matches the matplotlib jittered point size visually).
             var dot = new Ellipse
             {
-                Width = 8,
-                Height = 8,
+                Width = 6,
+                Height = 6,
                 Fill = new SolidColorBrush(Color.Parse(p.Color)),
-                Opacity = 0.9,
+                Opacity = 0.75,
                 Tag = i,
             };
-            Canvas.SetLeft(dot, dx - 4);
-            Canvas.SetTop(dot, dy - 4);
+            Canvas.SetLeft(dot, dx - 3);
+            Canvas.SetTop(dot, dy - 3);
             PointsOverlay.Children.Add(dot);
         }
     }

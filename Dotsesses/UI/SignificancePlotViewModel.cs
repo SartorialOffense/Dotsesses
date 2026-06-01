@@ -47,6 +47,15 @@ public partial class SignificancePlotViewModel : ViewModelBase
     private SignificanceTestFamily _testFamily = SignificanceTestFamily.Parametric;
 
     /// <summary>
+    /// Whether each cell overlays a mean ± 95% CI marker on top of the box +
+    /// points (never SEM — ADR-0019). Session-only view preference (NOT
+    /// persisted, mirroring the Correlation diagonal toggle); the control
+    /// regenerates on change.
+    /// </summary>
+    [ObservableProperty]
+    private bool _showConfidenceInterval;
+
+    /// <summary>
     /// Scoped messenger for this VM's workspace (see ADR-0012). Exposed for
     /// the View code-behind even though Significance has no cross-view sync —
     /// keeping the symmetric shape lets future features (e.g. theme-render
@@ -99,7 +108,8 @@ public partial class SignificancePlotViewModel : ViewModelBase
             dotSize,
             theme,
             TestFamily,
-            _subgroupOrders);
+            _subgroupOrders,
+            showCi: ShowConfidenceInterval);
 
         SvgContent = svgContent;
         _dataPoints = dataPoints;
@@ -169,11 +179,12 @@ public partial class SignificancePlotViewModel : ViewModelBase
     /// </summary>
     public static string BuildTooltip(SignificanceDataPoint p)
     {
-        var head = p.N <= 1
-            ? $"{p.CategoricalColumn} = {p.Subgroup}   (N = {p.N})\n" +
-              $"{p.NumericColumn}: {p.Mean:0.##}"
-            : $"{p.CategoricalColumn} = {p.Subgroup}   (N = {p.N})\n" +
-              $"{p.NumericColumn}: mean {p.Mean:0.##} ± {p.Sem:0.##} (SEM)";
+        // Per-student point (ADR-0019): show this student's score and the
+        // subgroup context. The cell's spread/centre is read from the box; its
+        // effect size + p live in the in-cell annotation.
+        var ci = System.Globalization.CultureInfo.InvariantCulture;
+        var head = $"{p.CategoricalColumn} = {p.Subgroup}   (N = {p.N})\n" +
+                   $"{p.NumericColumn}: {p.Value.ToString("0.##", ci)}";
 
         var testName = p.TestFamily == SignificanceTestFamily.Nonparametric
             ? "Kruskal–Wallis"
@@ -196,7 +207,6 @@ public partial class SignificancePlotViewModel : ViewModelBase
         {
             // Effect-size-led (ADR-0018): the variance-explained headline first,
             // raw p + test demoted to a supporting line beneath.
-            var ci = System.Globalization.CultureInfo.InvariantCulture;
             var headline = p.EffectSize is double e
                 ? $"{effectSymbol}={e.ToString("0.00", ci).TrimStart('0')} variance explained"
                 : $"{effectSymbol}=—";
