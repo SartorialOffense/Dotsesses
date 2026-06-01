@@ -253,14 +253,14 @@ public partial class SignificancePlotControl : UserControl
             Canvas.SetTop(hit, dy - 6);
             PointsOverlay.Children.Add(hit);
 
-            // Visible dot (matches the matplotlib jittered point: small + 25%
-            // transparent, ADR-0019).
+            // Visible dot (matches the matplotlib jittered point: small + 75%
+            // transparent so the cloud sits well in the background, ADR-0019).
             var dot = new Ellipse
             {
                 Width = 6,
                 Height = 6,
                 Fill = new SolidColorBrush(Color.Parse(p.Color)),
-                Opacity = 0.75,
+                Opacity = 0.25,
                 Tag = i,
             };
             Canvas.SetLeft(dot, dx - 3);

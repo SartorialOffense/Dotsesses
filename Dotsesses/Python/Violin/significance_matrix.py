@@ -577,7 +577,7 @@ def create_significance_matrix(
                     ys.append(value)
                     pt_colors.append(get_subgroup_color(slot))
                 ax.scatter(xs, ys, s=(dot_size * 0.8) ** 2, c=pt_colors,
-                           edgecolors='none', alpha=0.75, zorder=3)
+                           edgecolors='none', alpha=0.25, zorder=3)
                 scatter_cells.append((i, j))
 
             # Optional mean ± 95% CI overlay (never SEM). Drawn with vlines /
