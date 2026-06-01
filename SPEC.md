@@ -378,6 +378,12 @@ columns: **Type** (Numeric / Categorical combobox), **Display**,
 The five checkbox columns have per-column All/None toggles in the header;
 Type does not (bulk-flipping column kinds is almost certainly user error).
 
+> **Temporary (TD010):** while `FeatureFlags.UseSpreadsheetTotal` is on, the
+> **Aggregate** column is **hidden** and the AggregateScore (hence the dotplot
+> and grades) is taken from the spreadsheet's `Total` column verbatim rather
+> than summed from components. Reverting the flag restores the column and
+> summed aggregation.
+
 When a row's Type is **Categorical**, Display / Aggregate / Correlation /
 Bias Correct disable — those flags are meaningless for categorical columns
 (the data lives in StudentAttributes and bypasses the violin / correlation /

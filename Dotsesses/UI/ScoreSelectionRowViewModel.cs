@@ -202,6 +202,17 @@ public partial class ScoreSelectionRowViewModel : ViewModelBase
     /// </summary>
     public bool IsBiasCorrectEditable => IsNumeric && !IsAggregateLocked;
 
+    /// <summary>
+    /// TEMPORARY (TD010): whether the Aggregate column is shown — mirrors
+    /// <see cref="FeatureFlags.UseSpreadsheetTotal"/>. Exposed on the row VM so
+    /// the per-row template can bind without walking up to the parent VM.
+    /// </summary>
+    public bool ShowAggregateColumn => !FeatureFlags.UseSpreadsheetTotal;
+
+    /// <summary>Width of the Aggregate grid column (0 when hidden, TD010).</summary>
+    public Avalonia.Controls.GridLength AggregateColumnWidth =>
+        ShowAggregateColumn ? new Avalonia.Controls.GridLength(100) : new Avalonia.Controls.GridLength(0);
+
     public ScoreSelectionRowViewModel(
         ScoreSelection selection,
         Func<bool> canClearAggregate,

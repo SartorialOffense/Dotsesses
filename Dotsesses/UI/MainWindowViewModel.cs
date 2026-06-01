@@ -1672,11 +1672,30 @@ public partial class MainWindowViewModel : ViewModelBase
     /// Only Numeric entries with <see cref="ScoreSelection.Aggregate"/> == true contribute —
     /// Categorical columns have no numeric value to sum, so a stray
     /// <c>Aggregate=true, Type=Categorical</c> row is filtered out defensively.
+    ///
+    /// TEMPORARY (TD010): when <see cref="FeatureFlags.UseSpreadsheetTotal"/> is on,
+    /// the aggregate set is just the Total column, so <c>RecalculateAggregate</c>
+    /// takes the score from the spreadsheet Total verbatim (and leaves its value
+    /// untouched) instead of summing components.
     /// </summary>
     private static List<(string Name, int? Index)> BuildAggregateSet(IReadOnlyList<ScoreSelection> selections)
-        => selections.Where(s => s.Aggregate && s.Type == ScoreColumnType.Numeric)
-                     .Select(s => (s.Name, s.Index))
-                     .ToList();
+        => FeatureFlags.UseSpreadsheetTotal
+            ? SpreadsheetTotalKeys(selections)
+            : selections.Where(s => s.Aggregate && s.Type == ScoreColumnType.Numeric)
+                        .Select(s => (s.Name, s.Index))
+                        .ToList();
+
+    /// <summary>
+    /// The single Total key, derived from the selections so its Name casing matches
+    /// the spreadsheet (falling back to "Total"). Used only by the temporary
+    /// spreadsheet-Total mode (TD010).
+    /// </summary>
+    private static List<(string Name, int? Index)> SpreadsheetTotalKeys(IReadOnlyList<ScoreSelection> selections)
+    {
+        var total = selections.FirstOrDefault(s => s.Index == null &&
+            string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase));
+        return new List<(string Name, int? Index)> { (total?.Name ?? "Total", null) };
+    }
 
     /// <summary>
     /// Builds an unordered, equality-comparable set of (Name, Index?) keys for the
@@ -1691,9 +1710,11 @@ public partial class MainWindowViewModel : ViewModelBase
     /// flips this key set and triggers the ADR-0005 reseed.
     /// </summary>
     private static HashSet<(string Name, int? Index)> BuildAggregateKeySet(IReadOnlyList<ScoreSelection> selections)
-        => selections.Where(s => s.Aggregate && s.Type == ScoreColumnType.Numeric)
-                     .Select(s => (s.Name, s.Index))
-                     .ToHashSet();
+        => FeatureFlags.UseSpreadsheetTotal
+            ? SpreadsheetTotalKeys(selections).ToHashSet()
+            : selections.Where(s => s.Aggregate && s.Type == ScoreColumnType.Numeric)
+                        .Select(s => (s.Name, s.Index))
+                        .ToHashSet();
 
     /// <summary>
     /// For every column whose <see cref="ScoreSelection.Type"/> differs between the old

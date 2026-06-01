@@ -3,6 +3,7 @@ namespace Dotsesses.Tests.ViewModels;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Dotsesses;
 using Dotsesses.Models;
 using Dotsesses.UI;
 
@@ -503,6 +504,23 @@ public class SettingsViewModelTests
         vm.Rows[0].Type = ScoreColumnType.Numeric;
 
         Assert.Equal(ScoreColumnType.Categorical, vm.Rows[0].Type);
+    }
+
+    // ===== Aggregate column visibility (TD010, temporary) =====
+
+    [Fact]
+    public void ShowAggregateColumn_TracksFeatureFlag()
+    {
+        // Documents the wiring + catches an accidental decouple if the temporary
+        // UseSpreadsheetTotal flag is flipped back. When the column is hidden its
+        // grid width collapses to 0 so no empty gap remains.
+        var (vm, _) = MakeVm();
+
+        Assert.Equal(!FeatureFlags.UseSpreadsheetTotal, vm.ShowAggregateColumn);
+        if (!vm.ShowAggregateColumn)
+        {
+            Assert.Equal(0.0, vm.AggregateColumnWidth.Value);
+        }
     }
 
     // ===== BiasCorrect column (ADR-0018) =====

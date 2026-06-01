@@ -18,8 +18,17 @@
                     <!-- Header row: column titles + per-column All/None bulk-toggle buttons.
                          Column widths must match the row DataTemplate's columns below. -->
                     <Grid Grid.Row="0"
-                          ColumnDefinitions="*,130,100,100,100,100,110"
                           Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="130"/>
+                            <ColumnDefinition Width="100"/>
+                            <!-- Aggregate column — collapses to 0 when hidden (TD010). -->
+                            <ColumnDefinition Width="{Binding AggregateColumnWidth}"/>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="110"/>
+                        </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0"
                                    Text="Score"
                                    FontWeight="SemiBold"
@@ -58,7 +67,8 @@
 
                         <StackPanel Grid.Column="3"
                                     Orientation="Vertical"
-                                    HorizontalAlignment="Center">
+                                    HorizontalAlignment="Center"
+                                    IsVisible="{Binding ShowAggregateColumn}"><!-- hidden in spreadsheet-Total mode (TD010) -->
                             <TextBlock Text="Aggregate"
                                        FontWeight="SemiBold"
                                        HorizontalAlignment="Center"/>
@@ -157,8 +167,17 @@
                         <ItemsControl ItemsSource="{Binding Rows}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ScoreSelectionRowViewModel">
-                                    <Grid ColumnDefinitions="*,130,100,100,100,100,110"
-                                          Margin="0,2">
+                                    <Grid Margin="0,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="130"/>
+                                            <ColumnDefinition Width="100"/>
+                                            <!-- Aggregate column — collapses to 0 when hidden (TD010). -->
+                                            <ColumnDefinition Width="{Binding AggregateColumnWidth}"/>
+                                            <ColumnDefinition Width="100"/>
+                                            <ColumnDefinition Width="100"/>
+                                            <ColumnDefinition Width="110"/>
+                                        </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0"
                                                    Text="{Binding DisplayName}"
                                                    VerticalAlignment="Center"/>
@@ -177,6 +196,7 @@
                                         <CheckBox Grid.Column="3"
                                                   IsChecked="{Binding Aggregate}"
                                                   IsEnabled="{Binding IsAggregateEditable}"
+                                                  IsVisible="{Binding ShowAggregateColumn}"
                                                   HorizontalAlignment="Center"
                                                   VerticalAlignment="Center"/>
                                         <CheckBox Grid.Column="4"

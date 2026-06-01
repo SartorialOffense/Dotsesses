@@ -106,6 +106,10 @@ p<.001.
 is in the active ScoreSelection aggregate set. Used for x-axis position
 in the dotplot. Cached on StudentAssessment.
 _Avoid_: AggregateGrade (legacy code-side name; see `TECH_DEBT.md` TD001).
+_Temporary (TD010):_ while `FeatureFlags.UseSpreadsheetTotal` is on, the
+AggregateScore is taken from the spreadsheet's `Total` column verbatim
+rather than summed from components, and the Settings Aggregate column is
+hidden.
 
 **Rest score / corrected item-total correlation**: When the correlation
 matrix relates a column whose value is *contained in* Total against Total

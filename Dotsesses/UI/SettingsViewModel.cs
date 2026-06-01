@@ -103,6 +103,21 @@ public sealed class SettingsViewModel : ViewModelBase
 
     public IRelayCommand BiasCorrectNoneCommand { get; }
 
+    /// <summary>
+    /// TEMPORARY (TD010): whether the Aggregate column is shown. Hidden while
+    /// <see cref="FeatureFlags.UseSpreadsheetTotal"/> is on (Total comes from the
+    /// spreadsheet, so per-column aggregation isn't editable). Bound by the
+    /// header cell; the row cell reads the same off its row VM.
+    /// </summary>
+    public bool ShowAggregateColumn => !FeatureFlags.UseSpreadsheetTotal;
+
+    /// <summary>
+    /// Width of the Aggregate grid column — collapsed to 0 when the column is
+    /// hidden so no empty gap remains (TD010).
+    /// </summary>
+    public Avalonia.Controls.GridLength AggregateColumnWidth =>
+        ShowAggregateColumn ? new Avalonia.Controls.GridLength(100) : new Avalonia.Controls.GridLength(0);
+
     public SettingsViewModel(
         IReadOnlyList<ScoreSelection> initialSelections,
         Action<IReadOnlyList<ScoreSelection>> onApply,

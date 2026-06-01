@@ -178,6 +178,26 @@ public class StudentAssessmentTests
     }
 
     [Fact]
+    public void RecalculateAggregate_TotalOnlySelection_TakesSpreadsheetTotalNotComponentSum()
+    {
+        // TD010 spreadsheet-Total mode: the aggregate set is exactly {Total}, so
+        // AggregateGrade must equal the spreadsheet Total (100) — NOT the sum of
+        // the components (70) — and Total's Value is left untouched.
+        var scores = new List<Score>
+        {
+            new("Q", 1, 40.0),
+            new("Q", 2, 30.0),
+            new("Total", null, 100.0)  // deliberately ≠ component sum (70)
+        };
+        var sa = new StudentAssessment(1, scores, NoAttributes(), "Kermit");
+
+        sa.RecalculateAggregate(new[] { ("Total", (int?)null) });
+
+        Assert.Equal(100, sa.AggregateGrade);
+        Assert.Equal(100.0, scores.First(s => s.Name == "Total").Value);
+    }
+
+    [Fact]
     public void RecalculateAggregate_PreservesTotalScoreComment_WhenMirroring()
     {
         // Total Score carries the student-level comment in this codebase. Mirroring

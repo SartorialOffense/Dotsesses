@@ -174,3 +174,32 @@ what the η²/ε² number means. Cheap to fold in.
 **Touches:** `docs/significance-guide.md` — add an effect-size section
 (what η²/ε²/r² mean, the 0–1 "variance explained" reading, why it leads
 over p at class N); cross-reference ADR-0018.
+
+---
+
+### TD010 — Aggregation temporarily bypassed; Total taken from the spreadsheet
+
+**Why it's debt:** The AggregateScore is normally **computed** by summing
+the columns flagged `Aggregate`. As a stopgap (the owner needed results
+immediately, ahead of a more sophisticated column-relationship model), the
+app instead takes the score straight from the spreadsheet's `Total` column
+and **hides** the Aggregate column in Settings. This is gated by the single
+constant `FeatureFlags.UseSpreadsheetTotal` (currently `true`). While on,
+the per-column `Aggregate` flags are inert (but still persist, so reverting
+needs no data migration); Bias Correct / the correlation de-bias are
+unaffected. Seven `MainWindowViewModelTests` aggregate-engine tests
+early-return on the `SummedAggregationSuspended` guard and resume on revert.
+
+**Trigger:** the column-relationship model arrives, or the stopgap is no
+longer needed.
+
+**Revert:** set `FeatureFlags.UseSpreadsheetTotal = false` (or delete the
+flag and the branches reading it). Re-check: `BuildAggregateSet` /
+`BuildAggregateKeySet` in `MainWindowViewModel.cs`; the hidden Aggregate
+column in `SettingsWindow.axaml` + `ShowAggregateColumn` /
+`AggregateColumnWidth` on `SettingsViewModel` / `ScoreSelectionRowViewModel`;
+the 7 guarded tests turn back on automatically.
+
+**Touches:** `Dotsesses/FeatureFlags.cs`, `Dotsesses/UI/MainWindowViewModel.cs`,
+`Dotsesses/UI/SettingsWindow.axaml`, `Dotsesses/UI/SettingsViewModel.cs`,
+`Dotsesses/UI/ScoreSelectionRowViewModel.cs`.
