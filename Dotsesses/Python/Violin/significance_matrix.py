@@ -469,9 +469,12 @@ def create_significance_matrix(
             cell_pvalues[(i, j)] = compute_cell_pvalue(subgroup_to_values, test_family)
             cell_effects[(i, j)] = compute_cell_effect_size(subgroup_to_values, test_family)
 
-    # ----- Per-row y-limits: span the actual student values +/- 5% padding -----
+    # ----- Per-row y-limits: span the actual student values +/- padding -----
     # The box + jittered points must all fit, so the row scale is driven by the
-    # real data range (not mean ± SEM as before) — ADR-0019.
+    # real data range (not mean ± SEM as before) — ADR-0019. The padding is
+    # generous (Y_PAD_FRACTION) so the symbols get vertical breathing room and
+    # extreme points aren't jammed against the cell frame.
+    Y_PAD_FRACTION = 0.15
     row_ylims: Dict[int, Tuple[float, float]] = {}
     for i in range(n_rows):
         vals: List[float] = []
@@ -484,9 +487,9 @@ def create_significance_matrix(
         y_lo, y_hi = min(vals), max(vals)
         if y_hi == y_lo:
             # Single dot or perfectly tied values — give a small visual span.
-            pad = max(abs(y_hi) * 0.05, 0.5)
+            pad = max(abs(y_hi) * Y_PAD_FRACTION, 0.5)
         else:
-            pad = (y_hi - y_lo) * 0.05
+            pad = (y_hi - y_lo) * Y_PAD_FRACTION
         row_ylims[i] = (y_lo - pad, y_hi + pad)
 
     # ----- Render -----
@@ -571,7 +574,7 @@ def create_significance_matrix(
                     ys.append(value)
                     pt_colors.append(get_subgroup_color(slot))
                 ax.scatter(xs, ys, s=(dot_size * 0.8) ** 2, c=pt_colors,
-                           edgecolors='none', alpha=0.5, zorder=3)
+                           edgecolors='none', alpha=0.65, zorder=3)
                 scatter_cells.append((i, j))
 
             # Optional mean ± 95% CI overlay (never SEM). Drawn with vlines /
