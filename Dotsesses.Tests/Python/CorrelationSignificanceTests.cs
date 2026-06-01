@@ -34,7 +34,7 @@ public class CorrelationSignificanceTests
     }
 
     private static CorrelationColumnInfo Numeric =>
-        new(ScoreColumnType.Numeric, IsAggregateComponent: false, IsTotal: false);
+        new(ScoreColumnType.Numeric, BiasCorrect: false, IsTotal: false);
 
     [Fact]
     public void NumericPair_UsesPearson_WithKnownPValue()
@@ -71,7 +71,7 @@ public class CorrelationSignificanceTests
         var meta = new Dictionary<string, CorrelationColumnInfo>
         {
             ["A"] = Numeric,
-            ["Rank"] = new(ScoreColumnType.Ordinal, IsAggregateComponent: false, IsTotal: false),
+            ["Rank"] = new(ScoreColumnType.Ordinal, BiasCorrect: false, IsTotal: false),
         };
 
         var p = Generate(series, meta).First();
@@ -97,7 +97,7 @@ public class CorrelationSignificanceTests
         var ordinalMeta = new Dictionary<string, CorrelationColumnInfo>
         {
             ["Cube"] = Numeric,
-            ["Rank"] = new(ScoreColumnType.Ordinal, IsAggregateComponent: false, IsTotal: false),
+            ["Rank"] = new(ScoreColumnType.Ordinal, BiasCorrect: false, IsTotal: false),
         };
         var rho = Generate(ordinalSeries, ordinalMeta).First().R;
 
@@ -144,9 +144,9 @@ public class CorrelationSignificanceTests
         };
         var meta = new Dictionary<string, CorrelationColumnInfo>
         {
-            ["Q1"] = new(ScoreColumnType.Numeric, IsAggregateComponent: true, IsTotal: false),
-            ["Q2"] = new(ScoreColumnType.Numeric, IsAggregateComponent: true, IsTotal: false),
-            ["Total"] = new(ScoreColumnType.Numeric, IsAggregateComponent: false, IsTotal: true),
+            ["Q1"] = new(ScoreColumnType.Numeric, BiasCorrect: true, IsTotal: false),
+            ["Q2"] = new(ScoreColumnType.Numeric, BiasCorrect: true, IsTotal: false),
+            ["Total"] = new(ScoreColumnType.Numeric, BiasCorrect: false, IsTotal: true),
         };
 
         var points = Generate(series, meta);

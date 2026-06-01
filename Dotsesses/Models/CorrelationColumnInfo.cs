@@ -9,11 +9,12 @@ namespace Dotsesses.Models;
 /// The column's <see cref="ScoreColumnType"/> — drives the Pearson/Spearman
 /// split (slice 3): an Ordinal-touching cell uses Spearman.
 /// </param>
-/// <param name="IsAggregateComponent">
-/// True iff this column is a Numeric column summed into the AggregateScore
-/// (<c>Aggregate == true &amp;&amp; Type == Numeric</c>) and is not Total itself.
-/// A Total × aggregate-component cell is the one the rest-score de-bias
-/// corrects (slice 2).
+/// <param name="BiasCorrect">
+/// True iff this column should be rest-score de-biased against Total — i.e. the
+/// user set its <see cref="ScoreSelection.BiasCorrect"/> flag (Numeric, non-Total).
+/// The sole trigger for the correction, decoupled from aggregate membership so a
+/// composite column (e.g. <c>Q1-Q4</c>) can be de-biased without being aggregated
+/// (ADR-0018).
 /// </param>
 /// <param name="IsTotal">
 /// True for the Total series (a Score named "Total", case-insensitive, with no
@@ -22,5 +23,5 @@ namespace Dotsesses.Models;
 /// </param>
 public record CorrelationColumnInfo(
     ScoreColumnType Type,
-    bool IsAggregateComponent,
+    bool BiasCorrect,
     bool IsTotal);

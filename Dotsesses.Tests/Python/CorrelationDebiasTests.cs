@@ -46,11 +46,11 @@ public class CorrelationDebiasTests
         };
         var meta = new Dictionary<string, CorrelationColumnInfo>
         {
-            ["Q1"] = new(ScoreColumnType.Numeric, IsAggregateComponent: true, IsTotal: false),
-            ["Q2"] = new(ScoreColumnType.Numeric, IsAggregateComponent: true, IsTotal: false),
-            ["Q3"] = new(ScoreColumnType.Numeric, IsAggregateComponent: true, IsTotal: false),
-            ["Extra"] = new(ScoreColumnType.Numeric, IsAggregateComponent: false, IsTotal: false),
-            ["Total"] = new(ScoreColumnType.Numeric, IsAggregateComponent: false, IsTotal: true),
+            ["Q1"] = new(ScoreColumnType.Numeric, BiasCorrect: true, IsTotal: false),
+            ["Q2"] = new(ScoreColumnType.Numeric, BiasCorrect: true, IsTotal: false),
+            ["Q3"] = new(ScoreColumnType.Numeric, BiasCorrect: true, IsTotal: false),
+            ["Extra"] = new(ScoreColumnType.Numeric, BiasCorrect: false, IsTotal: false),
+            ["Total"] = new(ScoreColumnType.Numeric, BiasCorrect: false, IsTotal: true),
         };
         return (series, meta);
     }
@@ -132,8 +132,8 @@ public class CorrelationDebiasTests
         };
         var meta = new Dictionary<string, CorrelationColumnInfo>
         {
-            ["Q1"] = new(ScoreColumnType.Numeric, IsAggregateComponent: true, IsTotal: false),
-            ["Total"] = new(ScoreColumnType.Numeric, IsAggregateComponent: false, IsTotal: true),
+            ["Q1"] = new(ScoreColumnType.Numeric, BiasCorrect: true, IsTotal: false),
+            ["Total"] = new(ScoreColumnType.Numeric, BiasCorrect: false, IsTotal: true),
         };
 
         var points = Generate(series, meta);

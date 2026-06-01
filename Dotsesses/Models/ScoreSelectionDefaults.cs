@@ -6,7 +6,9 @@ namespace Dotsesses.Models;
 ///
 /// Numeric defaults: Display=true and Correlation=true; Aggregate=true except for "Total"
 /// (case-insensitive), which is excluded so the aggregate is not double-counted with a
-/// pre-summed Total column.
+/// pre-summed Total column. BiasCorrect seeds the same as Aggregate (true for numeric
+/// non-Total, false for Total) — the correlation rest-score de-bias starts on for the
+/// usual components but is then independently toggleable (ADR-0018).
 ///
 /// Categorical defaults: Display=true (so the drill-down's Attributes section is populated),
 /// Aggregate=false, Correlation=false — those flags are meaningless for categorical columns.
@@ -46,7 +48,11 @@ public static class ScoreSelectionDefaults
                 Display: true,
                 Aggregate: !isTotalColumn,
                 Correlation: true,
-                Significance: true));
+                Significance: true,
+                // De-bias seeds from aggregate membership (ADR-0018): a numeric
+                // non-Total component is corrected against Total by default, then
+                // independently toggleable. Total isn't corrected against itself.
+                BiasCorrect: !isTotalColumn));
         }
 
         foreach (var attribute in attributes)

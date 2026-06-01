@@ -83,6 +83,16 @@ public partial class ScoreSelectionRowViewModel : ViewModelBase
     private bool _significance;
 
     /// <summary>
+    /// Whether this column is rest-score de-biased against Total in the correlation
+    /// matrix (ADR-0018) — correlated against <c>Total − this column</c>. The sole
+    /// trigger for the correction, independent of <see cref="Aggregate"/>, so a
+    /// composite column can be de-biased without being aggregated. Meaningful only
+    /// for Numeric non-Total rows (gated by <see cref="IsBiasCorrectEditable"/>).
+    /// </summary>
+    [ObservableProperty]
+    private bool _biasCorrect;
+
+    /// <summary>
     /// Aggregate flag for this score. Hand-rolled (not [ObservableProperty]) so the
     /// guards can reject the change without raising PropertyChanged.
     /// </summary>
@@ -165,6 +175,7 @@ public partial class ScoreSelectionRowViewModel : ViewModelBase
             {
                 OnPropertyChanged(nameof(IsNumeric));
                 OnPropertyChanged(nameof(IsAggregateEditable));
+                OnPropertyChanged(nameof(IsBiasCorrectEditable));
             }
         }
     }
@@ -183,6 +194,14 @@ public partial class ScoreSelectionRowViewModel : ViewModelBase
     /// </summary>
     public bool IsAggregateEditable => IsNumeric && !IsAggregateLocked;
 
+    /// <summary>
+    /// True when the Bias Correct checkbox should be editable: row is Numeric AND
+    /// not the locked Total row (Total can't be de-biased against itself; the flag
+    /// is meaningless for Categorical/Ordinal columns). Same condition as
+    /// <see cref="IsAggregateEditable"/> but a distinct binding target.
+    /// </summary>
+    public bool IsBiasCorrectEditable => IsNumeric && !IsAggregateLocked;
+
     public ScoreSelectionRowViewModel(
         ScoreSelection selection,
         Func<bool> canClearAggregate,
@@ -198,6 +217,7 @@ public partial class ScoreSelectionRowViewModel : ViewModelBase
         _aggregate = selection.Aggregate;
         _correlation = selection.Correlation;
         _significance = selection.Significance;
+        _biasCorrect = selection.BiasCorrect;
         _canClearAggregate = canClearAggregate;
         // Default-allow when no validator is supplied (e.g. row VM unit tests that don't
         // exercise the type-switch path). Production callers always pass a real closure.
@@ -209,5 +229,5 @@ public partial class ScoreSelectionRowViewModel : ViewModelBase
     /// Used by the parent VM at Apply time.
     /// </summary>
     public ScoreSelection ToScoreSelection() =>
-        new(Name, Index, Type, Display, Aggregate, Correlation, Significance);
+        new(Name, Index, Type, Display, Aggregate, Correlation, Significance, BiasCorrect);
 }

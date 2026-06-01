@@ -135,27 +135,27 @@ def _rest_score_debias(
     y_data: Dict[str, float],
     x_is_total: bool,
     y_is_total: bool,
-    x_is_component: bool,
-    y_is_component: bool,
+    x_is_bias_correct: bool,
+    y_is_bias_correct: bool,
 ) -> Tuple[Dict[str, float], Dict[str, float], bool]:
     """
-    Apply the corrected item-total (rest-score) de-bias to a Total × aggregate-
-    component cell (ADR-0018 slice 2).
+    Apply the corrected item-total (rest-score) de-bias to a Total × bias-correct
+    cell (ADR-0018).
 
-    Correlating a component X against a Total that *contains* X correlates X
-    partly with itself, inflating r. The classical-test-theory fix is to
-    correlate X against the rest score Total − X (per common student). We
-    correct ONLY when exactly one axis is Total and the other is an aggregate
-    component; every other cell (component-vs-component, Total-vs-non-component,
-    ordinal, etc.) is returned unchanged.
+    Correlating a column X against a Total that *contains* X correlates X partly
+    with itself, inflating r. The classical-test-theory fix is to correlate X
+    against the rest score Total − X (per common student). We correct ONLY when
+    exactly one axis is Total and the other is flagged for bias correction (its
+    BiasCorrect flag — e.g. an aggregate component, or a composite column whose
+    value is contained in Total); every other cell is returned unchanged.
 
     Returns (eff_x_data, eff_y_data, corrected).
     """
-    if x_is_total and y_is_component:
+    if x_is_total and y_is_bias_correct:
         common = set(x_data) & set(y_data)
         rest = {sid: x_data[sid] - y_data[sid] for sid in common}
         return (rest, y_data, True)
-    if y_is_total and x_is_component:
+    if y_is_total and x_is_bias_correct:
         common = set(x_data) & set(y_data)
         rest = {sid: y_data[sid] - x_data[sid] for sid in common}
         return (x_data, rest, True)
@@ -197,7 +197,7 @@ def create_correlation_matrix(
     fig_size: Tuple[float, float],
     series: List[Tuple[str, Dict[str, float]]],
     column_types: List[str],
-    is_aggregate_component: List[bool],
+    is_bias_correct: List[bool],
     is_total: List[bool],
     theme: str = 'dark',
     dot_size: float = 3.0,
@@ -212,10 +212,11 @@ def create_correlation_matrix(
     - series: list of tuples (series_name, {id: value})
     - column_types: per-series column kind aligned with `series`, one of
         'numeric' / 'categorical' / 'ordinal'. Drives the Pearson/Spearman
-        split (slice 3); unused for rendering in slice 1.
-    - is_aggregate_component: per-series flag aligned with `series`, True iff
-        the column is a Numeric AggregateScore component (not Total). Marks the
-        cells the rest-score de-bias corrects (slice 2); unused in slice 1.
+        split (an Ordinal-touching cell uses Spearman).
+    - is_bias_correct: per-series flag aligned with `series`, True iff the
+        column should be rest-score de-biased against Total (its BiasCorrect
+        flag). Marks the cells the rest-score de-bias corrects (ADR-0018),
+        decoupled from aggregate membership.
     - is_total: per-series flag aligned with `series`, True for the Total
         column. Replaces the old 'Total is the last series' assumption — the
         red Total styling keys off this flag (ADR-0018 slice 1).
@@ -240,8 +241,8 @@ def create_correlation_matrix(
     # is safe even if a caller under-supplies (defensive — C# sends aligned
     # lists of length n).
     is_total = [bool(is_total[k]) if k < len(is_total) else False for k in range(n)]
-    is_aggregate_component = [
-        bool(is_aggregate_component[k]) if k < len(is_aggregate_component) else False
+    is_bias_correct = [
+        bool(is_bias_correct[k]) if k < len(is_bias_correct) else False
         for k in range(n)
     ]
     column_types = [
@@ -288,7 +289,7 @@ def create_correlation_matrix(
             eff_x, eff_y, corrected = _rest_score_debias(
                 x_data, y_data,
                 is_total[j], is_total[i],
-                is_aggregate_component[j], is_aggregate_component[i])
+                is_bias_correct[j], is_bias_correct[i])
 
             # Spearman for any Ordinal-touching cell; Pearson otherwise. De-bias
             # already happened above, so an ordinal component feeding Total is

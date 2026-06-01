@@ -60,23 +60,35 @@ Untestable cells render `—` (mirrors ADR-0015).
 ρ / ρ² identically. Spearman's p comes straight from `spearmanr` — not a
 reused Pearson t-formula.
 
-**5. Rest-score de-bias for component-vs-Total cells.** For any cell
-where one axis is `Total` and the other is an **aggregate component**
-(`Aggregate == true && Type == Numeric`), correlate the component `X`
-against the **rest score** `Total − X` per student (the corrected
-item-total correlation from classical test theory) before computing r,
-r², and the fitted line. Scope is narrow on purpose:
+**5. Rest-score de-bias driven by an explicit `BiasCorrect` flag.** For
+any cell where one axis is `Total` and the other carries the per-column
+**`BiasCorrect`** flag ("Bias Correct" in Settings; Numeric, non-Total),
+correlate that column `X` against the **rest score** `Total − X` per
+student (the corrected item-total correlation from classical test theory)
+before computing r, r², and the fitted line.
 
-- Component-vs-component cells: unchanged.
-- `Total` vs a column *not* in the aggregate (Ordinal, or
-  displayed-but-excluded): unchanged — no bias exists there.
-- Diagonal: unchanged.
-- **Guard:** a single-component Total makes `Total − X ≡ 0` → undefined
-  → the cell is blanked.
+The trigger is the explicit flag — **not** aggregate membership.
+*(Amendment, 2026: this slice originally keyed the correction on
+`Aggregate == true && Type == Numeric`. That was too narrow — a
+**composite column** like `Q1-Q4 = Q1+Q2+Q3+Q4` overlaps Total and needs
+de-biasing, but the user must keep it **out** of the aggregate or its
+parts are double-counted. Tying de-bias to `Aggregate` made that
+impossible. `BiasCorrect` decouples the two: it **seeds** from the old
+rule (`Numeric && Aggregate && !Total`) so existing projects correct the
+same cells, then is independently toggleable — a composite gets
+`Aggregate` off + `BiasCorrect` on.)* Scope:
+
+- Only `Total × BiasCorrect` cells are corrected; every other cell
+  (component-vs-component, `Total` vs an un-flagged column, ordinal, the
+  diagonal) is unchanged.
+- **Guard:** a single-component Total (or any flagged column equal to
+  Total) makes `Total − X ≡ 0` → undefined → the cell is blanked.
+- We do **not** validate that a `BiasCorrect` column's value is actually
+  contained in Total — `Total − X` trusts the user's assertion.
 
 Correction is rendered **transparently** — no special cell marker. The
 "corrected" fact surfaces only in the tooltip (and SPEC), because the
-unmarked r is the honest value to read. When an *ordinal* component
+unmarked r is the honest value to read. When an *ordinal* flagged column
 feeds Total, de-bias the axis first (`Total − X`), then Spearman the
 pair.
 
@@ -106,11 +118,18 @@ problem — the decisions above don't depend on the sequencing.)
 ## Consequences
 
 - The correlation C#→Python payload must carry **column type**,
-  **isAggregateComponent**, and an **explicit Total identity**. This
+  **is_bias_correct**, and an **explicit Total identity**. This
   retires `correlation_matrix.py`'s fragile "Total is the last series"
   positional assumption — the red Total styling keys off the new flag,
   not position. `BuildSeriesData`, `CorrelationPlotService.GeneratePlot`,
   and the CSnakes call all change. (Coordinate: shared hot spot.)
+- A new per-column **`BiasCorrect`** flag joins `Display` / `Aggregate` /
+  `Correlation` / `Significance` on `ScoreSelection` (see decision 5), with
+  a "Bias Correct" column in the Settings dialog (Numeric non-Total rows
+  only). `SavedState.Version` bumps **6 → 7**; `SavedScoreSelection.BiasCorrect`
+  is **nullable** so pre-v7 files migrate by deriving the old aggregate-based
+  behavior on load (a plain `false` would silently disable de-bias
+  everywhere). Seeded from `Numeric && Aggregate && !Total` at fresh load.
 - A shared `stats_common.py` extracts `significance_stars(p)` from
   `significance_matrix.py`'s inline `_format_pvalue_annotation`, so both
   tabs star identically (resolves that inline duplication —

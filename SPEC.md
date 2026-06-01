@@ -224,17 +224,21 @@ the coefficient + method (Pearson r / Spearman ρ), the raw `p` + stars, the
 sample size `N`, and a "corrected (rest score)" note when the cell was
 de-biased.
 
-**Rest-score de-bias** (ADR-0018): a cell relating an aggregate component
-against the **Total** column is de-biased automatically — the component is
-correlated against the rest score `Total − component` instead of the full
-Total (which contains the component and would inflate the correlation). The
-de-bias is applied transparently: the dots, fitted line, coefficient, and r²
-color all reflect the corrected values, with no special cell marker — the
-corrected fact surfaces only in the tooltip's "corrected" note. An Ordinal
-component feeding Total is de-biased first, then ranked (Spearman). A
-single-component Total makes the rest score identically zero, so that one cell
-renders blank. Component-vs-component and Total-vs-non-component cells are
-unaffected.
+**Rest-score de-bias** (ADR-0018): a cell relating a column flagged **Bias
+Correct** against the **Total** column is de-biased — that column is correlated
+against the rest score `Total − column` instead of the full Total (which
+contains it and would inflate the correlation). Bias Correct is a per-column
+toggle in Settings (Numeric, non-Total), independent of Aggregate, so a
+**composite column** (e.g. `Q1-Q4 = Q1+Q2+Q3+Q4`) can be de-biased without
+being summed into the aggregate — set its Aggregate off and Bias Correct on.
+The flag seeds from aggregate membership at load, so by default the usual
+components are de-biased exactly as before. The de-bias is applied
+transparently: the dots, fitted line, coefficient, and r² color all reflect the
+corrected values, with no special cell marker — the corrected fact surfaces
+only in the tooltip's "corrected" note. An Ordinal column feeding Total is
+de-biased first, then ranked (Spearman). A single-component Total makes the rest
+score identically zero, so that one cell renders blank. Cells not involving a
+Bias-Correct column (or not involving Total) are unaffected.
 
 **Default selection** (fresh load, see ADR-0016): the columns appearing
 in the **4 highest-r² pairs** among non-Total numerics, plus the **Total**
@@ -368,17 +372,20 @@ dotplot and the violin plot. Collapses to a rotated "Size" label.
 Modeless dialog (single-instance, owner = MainWindow) launched from
 the toolbar, the application menu, or `Cmd+,`. Contains a sectioned
 surface designed to grow; the only category today is **Score
-Selection** — a table with one row per column and five control
+Selection** — a table with one row per column and six control
 columns: **Type** (Numeric / Categorical combobox), **Display**,
-**Aggregate**, **Correlation**, and **Significance**. The four
-checkbox columns have per-column All/None toggles in the header; Type
-does not (bulk-flipping column kinds is almost certainly user error).
+**Aggregate**, **Correlation**, **Significance**, and **Bias Correct**.
+The five checkbox columns have per-column All/None toggles in the header;
+Type does not (bulk-flipping column kinds is almost certainly user error).
 
-When a row's Type is **Categorical**, Display / Aggregate / Correlation
-disable — those flags are meaningless for categorical columns (the
-data lives in StudentAttributes and bypasses the violin / correlation /
-aggregate paths). The Display / Aggregate / Correlation bulk All/None
-commands skip Categorical rows for the same reason.
+When a row's Type is **Categorical**, Display / Aggregate / Correlation /
+Bias Correct disable — those flags are meaningless for categorical columns
+(the data lives in StudentAttributes and bypasses the violin / correlation /
+aggregate paths). Those bulk All/None commands skip Categorical rows for
+the same reason. **Bias Correct** (correlation rest-score de-bias against
+Total — see *Correlation matrix*) is editable only on Numeric, non-Total
+rows; its All/None skip the rest, and unlike Aggregate it has no
+"at least one" constraint, so None is always allowed.
 
 A row whose Type is **Ordinal** (auto-detected from the `~N` suffix
 convention — ADR-0017) shows `Ordinal` in the Type combobox but the

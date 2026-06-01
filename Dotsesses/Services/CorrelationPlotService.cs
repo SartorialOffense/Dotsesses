@@ -23,10 +23,10 @@ public class CorrelationPlotService
     /// <param name="figSize">Figure size in inches (width, height)</param>
     /// <param name="seriesData">List of (series name, student ID to score mapping)</param>
     /// <param name="columnMetadata">
-    /// Per-series column metadata keyed by series name (type / aggregate-component
-    /// / Total flag). Lets Python key behavior off explicit flags rather than
-    /// series position (ADR-0018 slice 1). Series absent from the map default to
-    /// Numeric / not-a-component, with Total inferred by name as a fallback.
+    /// Per-series column metadata keyed by series name (type / bias-correct / Total
+    /// flag). Lets Python key behavior off explicit flags rather than series
+    /// position (ADR-0018). Series absent from the map default to Numeric /
+    /// not-bias-corrected, with Total inferred by name as a fallback.
     /// </param>
     /// <param name="muppetNameMap">Map of student ID to muppet name</param>
     /// <param name="dotSize">Size of scatter dots</param>
@@ -50,24 +50,24 @@ public class CorrelationPlotService
             .ToList();
 
         // Per-series metadata as parallel lists aligned with pySeriesList order
-        // (ADR-0018 slice 1). A series with no metadata entry falls back to a
-        // Numeric non-component; Total is still detected by name so the red
+        // (ADR-0018). A series with no metadata entry falls back to a Numeric
+        // non-corrected column; Total is still detected by name so the red
         // styling survives the no-selection passthrough path.
         var columnTypes = new List<string>(seriesData.Count);
-        var isAggregateComponent = new List<bool>(seriesData.Count);
+        var biasCorrect = new List<bool>(seriesData.Count);
         var isTotal = new List<bool>(seriesData.Count);
         foreach (var (name, _) in seriesData)
         {
             if (columnMetadata.TryGetValue(name, out var info))
             {
                 columnTypes.Add(ColumnTypeToPython(info.Type));
-                isAggregateComponent.Add(info.IsAggregateComponent);
+                biasCorrect.Add(info.BiasCorrect);
                 isTotal.Add(info.IsTotal);
             }
             else
             {
                 columnTypes.Add("numeric");
-                isAggregateComponent.Add(false);
+                biasCorrect.Add(false);
                 isTotal.Add(name.Equals("Total", StringComparison.OrdinalIgnoreCase));
             }
         }
@@ -75,12 +75,13 @@ public class CorrelationPlotService
         // Convert theme enum to Python string
         var themeStr = theme == ThemeName.LightMode ? "light" : "dark";
 
-        // Call Python module
+        // Call Python module (the bias-correct list is passed positionally as
+        // the renderer's is_bias_correct parameter).
         var result = _correlationModule.CreateCorrelationMatrix(
             (figSize.Width, figSize.Height),
             pySeriesList,
             columnTypes,
-            isAggregateComponent,
+            biasCorrect,
             isTotal,
             themeStr,
             dotSize,

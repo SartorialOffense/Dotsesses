@@ -108,15 +108,17 @@ in the dotplot. Cached on StudentAssessment.
 _Avoid_: AggregateGrade (legacy code-side name; see `TECH_DEBT.md` TD001).
 
 **Rest score / corrected item-total correlation**: When the correlation
-matrix relates an aggregate component (a Numeric Score summed into Total)
-against Total itself, Total *contains* the component, so a naive
-correlation correlates the component partly with itself and inflates `r`.
-The classical-test-theory fix is to correlate the component against the
-**rest score** — `Total − component`, per Student — yielding the
-**corrected item-total correlation**. Applied only to Total ×
-aggregate-component cells; a single-component Total makes the rest score
-identically zero (undefined correlation), so that cell is blanked. See
-ADR-0018.
+matrix relates a column whose value is *contained in* Total against Total
+itself, Total contains that column, so a naive correlation correlates it
+partly with itself and inflates `r`. The classical-test-theory fix is to
+correlate the column against the **rest score** — `Total − column`, per
+Student — yielding the **corrected item-total correlation**. Applied to
+`Total × BiasCorrect` cells, where **BiasCorrect** is an explicit
+per-column flag (see ScoreSelection) — *not* aggregate membership, so a
+**composite column** (e.g. `Q1-Q4 = Q1+Q2+Q3+Q4`) can be de-biased
+without being summed into the aggregate (which would double-count its
+parts). A single-component Total makes the rest score identically zero
+(undefined correlation), so that cell is blanked. See ADR-0018.
 
 **Effect size / variance explained**: The headline both exploratory-stats
 tabs lead with — the fraction of variation in the Score a variable
@@ -147,9 +149,9 @@ GradeCurve's target ranges. The Compliance panel shows current count vs
 target range per Grade.
 
 **ScoreSelection**: A user-toggleable record per column with a Type
-discriminator (`Numeric` / `Categorical` / `Ordinal`) plus four
-booleans — Display, Aggregate, Correlation, Significance — that
-determine where the column participates. For `Numeric`, all four are
+discriminator (`Numeric` / `Categorical` / `Ordinal`) plus five
+booleans — Display, Aggregate, Correlation, Significance, BiasCorrect —
+that determine where the column participates. For `Numeric`, all are
 meaningful. For `Categorical`, only Significance is meaningful; the data
 lives in StudentAttributes and bypasses the violin / correlation /
 aggregate paths. For `Ordinal`, Display, Correlation, and Significance
@@ -158,6 +160,9 @@ rank, never a graded points component, so it is never summed into
 AggregateScore. Significance is meaningful for all Types — Numeric
 columns become Significance Matrix rows; Categorical *and* Ordinal
 columns become Significance Matrix columns (an Ordinal is never a row).
+BiasCorrect (Numeric, non-Total only) opts the column into the
+correlation rest-score de-bias against Total (see *Rest score* above);
+it seeds from aggregate membership but is independently toggleable.
 Persisted on ClassAssessment (see ADR-0013, ADR-0014, ADR-0017). At
 fresh load the flags are seeded **data-driven** per plot rather than
 all-on — Total + 10 leftmost for Display (Ordinals are *not* seeded on;

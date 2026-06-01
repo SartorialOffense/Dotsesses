@@ -37,9 +37,9 @@ public class CorrelationPlotServiceTests
         };
         var metadata = new Dictionary<string, CorrelationColumnInfo>
         {
-            ["Total"] = new(ScoreColumnType.Numeric, IsAggregateComponent: false, IsTotal: true),
-            ["Q1"] = new(ScoreColumnType.Numeric, IsAggregateComponent: true, IsTotal: false),
-            ["Q2"] = new(ScoreColumnType.Numeric, IsAggregateComponent: true, IsTotal: false),
+            ["Total"] = new(ScoreColumnType.Numeric, BiasCorrect: false, IsTotal: true),
+            ["Q1"] = new(ScoreColumnType.Numeric, BiasCorrect: true, IsTotal: false),
+            ["Q2"] = new(ScoreColumnType.Numeric, BiasCorrect: true, IsTotal: false),
         };
         var muppetNames = new Dictionary<int, string>
         {

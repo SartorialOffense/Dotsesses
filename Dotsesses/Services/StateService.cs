@@ -61,7 +61,7 @@ public class StateService
 
         var state = new SavedState
         {
-            Version = 6,
+            Version = 7,
             SavedAt = DateTime.UtcNow,
             SourceFile = sourceFile,
             SignificanceTestFamily = significanceTestFamily,
@@ -94,7 +94,8 @@ public class StateService
                 Display = s.Display,
                 Aggregate = s.Aggregate,
                 Correlation = s.Correlation,
-                Significance = s.Significance
+                Significance = s.Significance,
+                BiasCorrect = s.BiasCorrect
             }).ToList()
         };
 
@@ -161,11 +162,21 @@ public class StateService
 
     /// <summary>
     /// Converts saved score selections back to domain models.
+    ///
+    /// BiasCorrect migration (ADR-0018, v7): a pre-v7 file lacks the field, so
+    /// it deserializes to <c>null</c> — we then derive the old behavior, where
+    /// de-bias was driven by aggregate membership (<c>Numeric &amp;&amp; Aggregate &amp;&amp;
+    /// !Total</c>), so existing projects keep correcting exactly the same cells.
+    /// A non-null value is an explicit v7 choice and is taken verbatim.
     /// </summary>
     public IReadOnlyList<ScoreSelection> ConvertToScoreSelections(SavedState state)
     {
         return state.ScoreSelections
-            .Select(s => new ScoreSelection(s.Name, s.Index, s.Type, s.Display, s.Aggregate, s.Correlation, s.Significance))
+            .Select(s => new ScoreSelection(
+                s.Name, s.Index, s.Type, s.Display, s.Aggregate, s.Correlation, s.Significance,
+                BiasCorrect: s.BiasCorrect ?? (
+                    s.Type == ScoreColumnType.Numeric && s.Aggregate &&
+                    !(s.Index == null && string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase)))))
             .ToList();
     }
 

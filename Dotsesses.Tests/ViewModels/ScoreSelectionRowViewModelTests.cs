@@ -353,4 +353,47 @@ public class ScoreSelectionRowViewModelTests
         Assert.Equal(ScoreColumnType.Categorical, vm.Type);
         Assert.Equal(0, fires);
     }
+
+    // ===== BiasCorrect flag (ADR-0018) =====
+
+    [Fact]
+    public void BiasCorrect_RoundTripsThroughToScoreSelection()
+    {
+        var selection = MakeSelection("Q#", 1, aggregate: false) with { BiasCorrect = true };
+        var vm = new ScoreSelectionRowViewModel(selection, () => true);
+
+        Assert.True(vm.BiasCorrect);
+        Assert.True(vm.ToScoreSelection().BiasCorrect);
+
+        vm.BiasCorrect = false;
+        Assert.False(vm.ToScoreSelection().BiasCorrect);
+    }
+
+    [Fact]
+    public void IsBiasCorrectEditable_NumericNonTotal_True()
+    {
+        var vm = new ScoreSelectionRowViewModel(MakeSelection("Q#", 1), () => true);
+        Assert.True(vm.IsBiasCorrectEditable);
+    }
+
+    [Theory]
+    [InlineData("Total")]
+    [InlineData("total")]
+    public void IsBiasCorrectEditable_TotalRow_False(string totalName)
+    {
+        // Total can't be de-biased against itself.
+        var vm = new ScoreSelectionRowViewModel(MakeSelection(totalName, null, aggregate: false), () => true);
+        Assert.False(vm.IsBiasCorrectEditable);
+    }
+
+    [Fact]
+    public void IsBiasCorrectEditable_FalseForCategorical_AndTracksTypeChange()
+    {
+        var vm = new ScoreSelectionRowViewModel(MakeSelection("Mid-Term", null, aggregate: false), () => true);
+        Assert.True(vm.IsBiasCorrectEditable);
+
+        vm.Type = ScoreColumnType.Categorical;
+
+        Assert.False(vm.IsBiasCorrectEditable);
+    }
 }

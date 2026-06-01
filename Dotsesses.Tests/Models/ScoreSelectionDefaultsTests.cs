@@ -183,6 +183,29 @@ public class ScoreSelectionDefaultsTests
     }
 
     [Fact]
+    public void GenerateDefaults_SeedsBiasCorrect_FromAggregateMembership()
+    {
+        // ADR-0018: BiasCorrect seeds the same as Aggregate — on for numeric
+        // non-Total components, off for Total / Categorical / Ordinal — so the
+        // de-bias starts where it did before, then becomes independently toggleable.
+        var scores = new List<Score>
+        {
+            new("Q1", null, 10),
+            new("Total", null, 30),
+        };
+        var attributes = new List<StudentAttribute>
+        {
+            new("Hat", null, "Yes"),
+        };
+
+        var result = ScoreSelectionDefaults.GenerateDefaults(scores, attributes);
+
+        Assert.True(result.First(s => s.Name == "Q1").BiasCorrect);     // numeric component
+        Assert.False(result.First(s => s.Name == "Total").BiasCorrect); // not corrected vs itself
+        Assert.False(result.First(s => s.Name == "Hat").BiasCorrect);   // categorical
+    }
+
+    [Fact]
     public void DetectOrdinalColumns_AllCellsSuffixed_QualifiesAsOrdinal()
     {
         // ADR-0017: a column where every present cell carries a SortOrder is Ordinal.

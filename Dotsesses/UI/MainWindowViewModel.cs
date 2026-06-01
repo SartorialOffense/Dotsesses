@@ -556,13 +556,14 @@ public partial class MainWindowViewModel : ViewModelBase
     /// Builds per-series metadata for the correlation matrix, keyed by the same
     /// formatted series name <see cref="BuildSeriesData"/> emits (so lookups are
     /// order-independent). Each entry records the column's
-    /// <see cref="ScoreColumnType"/>, whether it is an AggregateScore component,
-    /// and whether it is Total — letting the Python renderer key behavior off
-    /// explicit flags instead of series position (ADR-0018 slice 1).
+    /// <see cref="ScoreColumnType"/>, whether it should be rest-score de-biased
+    /// against Total, and whether it is Total — letting the Python renderer key
+    /// behavior off explicit flags instead of series position (ADR-0018).
     ///
-    /// Total = a Score named "Total" (case-insensitive) with no Index. An
-    /// aggregate component = a Numeric column with <c>Aggregate == true</c> that
-    /// is not Total itself. Ordinals (ADR-0017) are never components.
+    /// Total = a Score named "Total" (case-insensitive) with no Index. De-bias is
+    /// gated on the explicit <see cref="ScoreSelection.BiasCorrect"/> flag (Numeric,
+    /// non-Total), decoupled from aggregate membership so a composite column can be
+    /// corrected without being summed into the aggregate.
     /// </summary>
     public static Dictionary<string, CorrelationColumnInfo> BuildCorrelationColumnMetadata(
         ClassAssessment classAssessment,
@@ -577,9 +578,12 @@ public partial class MainWindowViewModel : ViewModelBase
             var seriesName = s.Index.HasValue ? $"{s.Name} {s.Index}" : s.Name;
             var isTotal = s.Index == null &&
                 string.Equals(s.Name, "Total", StringComparison.OrdinalIgnoreCase);
-            var isAggregateComponent =
-                s.Type == ScoreColumnType.Numeric && s.Aggregate && !isTotal;
-            map[seriesName] = new CorrelationColumnInfo(s.Type, isAggregateComponent, isTotal);
+            // De-bias is driven by the explicit BiasCorrect flag, not aggregate
+            // membership (ADR-0018). Guard to Numeric non-Total defensively — the
+            // Settings UI already only lets those rows carry the flag.
+            var biasCorrect =
+                s.Type == ScoreColumnType.Numeric && s.BiasCorrect && !isTotal;
+            map[seriesName] = new CorrelationColumnInfo(s.Type, biasCorrect, isTotal);
         }
         return map;
     }

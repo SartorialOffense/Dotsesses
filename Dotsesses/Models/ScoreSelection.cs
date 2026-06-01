@@ -32,4 +32,5 @@ public enum ScoreColumnType
 /// <param name="Aggregate">Whether this score contributes to the computed aggregate</param>
 /// <param name="Correlation">Whether this score participates in the correlation matrix</param>
 /// <param name="Significance">Whether this column participates in the Significance Matrix (Numeric rows / Categorical + Ordinal columns). Unlike the other flags, meaningful for all Types.</param>
-public record ScoreSelection(string Name, int? Index, ScoreColumnType Type, bool Display, bool Aggregate, bool Correlation, bool Significance = true);
+/// <param name="BiasCorrect">Whether this column is rest-score de-biased against Total in the correlation matrix — i.e. correlated against <c>Total − this column</c> rather than the full Total (ADR-0018). The sole trigger for that correction, decoupled from <paramref name="Aggregate"/>: a composite column (e.g. <c>Q1-Q4 = Q1+Q2+Q3+Q4</c>) can be de-biased without being summed into the aggregate. Meaningful only for Numeric, non-Total columns. Seeded from <c>Numeric &amp;&amp; Aggregate &amp;&amp; !Total</c> at load, then independently toggleable.</param>
+public record ScoreSelection(string Name, int? Index, ScoreColumnType Type, bool Display, bool Aggregate, bool Correlation, bool Significance = true, bool BiasCorrect = false);

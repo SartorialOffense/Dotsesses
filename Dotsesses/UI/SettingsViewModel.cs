@@ -99,6 +99,10 @@ public sealed class SettingsViewModel : ViewModelBase
 
     public IRelayCommand SignificanceNoneCommand { get; }
 
+    public IRelayCommand BiasCorrectAllCommand { get; }
+
+    public IRelayCommand BiasCorrectNoneCommand { get; }
+
     public SettingsViewModel(
         IReadOnlyList<ScoreSelection> initialSelections,
         Action<IReadOnlyList<ScoreSelection>> onApply,
@@ -151,6 +155,12 @@ public sealed class SettingsViewModel : ViewModelBase
 
         SignificanceAllCommand = new RelayCommand(() => SetAllSignificance(true));
         SignificanceNoneCommand = new RelayCommand(() => SetAllSignificance(false));
+
+        // Bias Correct: both All and None are allowed (no "at least one" invariant,
+        // unlike Aggregate). Only Numeric non-Total rows are editable, so the bulk
+        // toggle skips the rest (ADR-0018).
+        BiasCorrectAllCommand = new RelayCommand(() => SetAllBiasCorrect(true));
+        BiasCorrectNoneCommand = new RelayCommand(() => SetAllBiasCorrect(false));
     }
 
     private void ExecuteApply()
@@ -158,7 +168,7 @@ public sealed class SettingsViewModel : ViewModelBase
         // Reconstruct fresh records in row (= input) order so the callback receives
         // an independent snapshot the caller can persist or feed downstream.
         var snapshot = Rows
-            .Select(r => new ScoreSelection(r.Name, r.Index, r.Type, r.Display, r.Aggregate, r.Correlation, r.Significance))
+            .Select(r => r.ToScoreSelection())
             .ToList();
         _onApply(snapshot);
 
@@ -214,6 +224,17 @@ public sealed class SettingsViewModel : ViewModelBase
         foreach (var row in Rows)
         {
             row.Significance = value;
+        }
+    }
+
+    private void SetAllBiasCorrect(bool value)
+    {
+        // Only Numeric non-Total rows can be de-biased against Total (ADR-0018);
+        // skip the rest, mirroring how SetAllAggregate skips locked/non-numeric rows.
+        foreach (var row in Rows)
+        {
+            if (!row.IsBiasCorrectEditable) continue;
+            row.BiasCorrect = value;
         }
     }
 }

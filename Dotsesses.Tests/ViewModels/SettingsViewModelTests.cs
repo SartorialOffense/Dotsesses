@@ -504,4 +504,48 @@ public class SettingsViewModelTests
 
         Assert.Equal(ScoreColumnType.Categorical, vm.Rows[0].Type);
     }
+
+    // ===== BiasCorrect column (ADR-0018) =====
+
+    [Fact]
+    public void BiasCorrectAllCommand_SetsNumericNonTotalRows_SkipsTotalAndCategorical()
+    {
+        var (vm, _) = MakeVm(MakeMixedInput());  // Q#1, Q#2 (numeric), Outline (cat), Total
+
+        vm.BiasCorrectAllCommand.Execute(null);
+
+        Assert.True(vm.Rows[0].BiasCorrect);   // Numeric
+        Assert.True(vm.Rows[1].BiasCorrect);   // Numeric
+        Assert.False(vm.Rows[2].BiasCorrect);  // Categorical — skipped
+        Assert.False(vm.Rows[3].BiasCorrect);  // Total — skipped (locked)
+    }
+
+    [Fact]
+    public void BiasCorrectNoneCommand_ClearsTheEditableRows()
+    {
+        var (vm, _) = MakeVm(MakeMixedInput());
+        vm.BiasCorrectAllCommand.Execute(null);   // turns on numeric non-Total rows
+        Assert.True(vm.Rows[0].BiasCorrect);
+
+        vm.BiasCorrectNoneCommand.Execute(null);
+
+        // Every row ends false: the editable ones were cleared, the rest were
+        // never set (Total / Categorical are skipped by the bulk toggle).
+        Assert.All(vm.Rows, r => Assert.False(r.BiasCorrect));
+    }
+
+    [Fact]
+    public void ExecuteApply_IncludesBiasCorrectInSnapshot()
+    {
+        var input = MakeMixedInput()
+            .Select(s => s.Name == "Q#" && s.Index == 1 ? s with { BiasCorrect = true } : s)
+            .ToList();
+        var (vm, captures) = MakeVm(input);
+
+        vm.ApplyCommand.Execute(null);
+
+        var snapshot = captures.Single();
+        Assert.True(snapshot.First(s => s.Name == "Q#" && s.Index == 1).BiasCorrect);
+        Assert.False(snapshot.First(s => s.Name == "Q#" && s.Index == 2).BiasCorrect);
+    }
 }

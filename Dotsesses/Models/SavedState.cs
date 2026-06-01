@@ -7,7 +7,7 @@ namespace Dotsesses.Models;
 /// </summary>
 public class SavedState
 {
-    public int Version { get; set; } = 6;
+    public int Version { get; set; } = 7;
     public DateTime SavedAt { get; set; }
     public string? SourceFile { get; set; }
     public List<SavedStudent> Students { get; set; } = new();
@@ -92,4 +92,16 @@ public class SavedScoreSelection
     /// (Significance Matrix is a new plot — old files should show it by default).
     /// </summary>
     public bool Significance { get; set; } = true;
+
+    /// <summary>
+    /// Whether the column is rest-score de-biased against Total in the
+    /// correlation matrix (ADR-0018, v7). **Nullable on purpose**: pre-v7 files
+    /// lack the field and deserialize to <c>null</c>, which
+    /// <see cref="Services.StateService.ConvertToScoreSelections"/> migrates by
+    /// deriving the old behavior (<c>Numeric &amp;&amp; Aggregate &amp;&amp; !Total</c>) so
+    /// existing projects keep correcting the same cells. A non-null value is an
+    /// explicit v7 choice and is honored as-is. A plain <c>false</c> default
+    /// would instead silently disable de-bias everywhere on load.
+    /// </summary>
+    public bool? BiasCorrect { get; set; }
 }

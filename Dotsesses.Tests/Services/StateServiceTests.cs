@@ -74,7 +74,7 @@ public class StateServiceTests : IDisposable
 
         // Assert
         Assert.NotNull(loadedState);
-        Assert.Equal(6, loadedState.Version);
+        Assert.Equal(7, loadedState.Version);
         Assert.Equal("original_source.xlsx", loadedState.SourceFile);
         Assert.Equal(2, loadedState.Students.Count);
         // Slots are A, B, C (post-#18 fix: catch-all is F, lowest in
@@ -210,12 +210,12 @@ public class StateServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveAsync_WritesVersion6()
+    public async Task SaveAsync_WritesVersion7()
     {
-        var filePath = Path.Combine(_testDirectory, "v6_check.json");
+        var filePath = Path.Combine(_testDirectory, "v7_check.json");
         await _stateService.SaveAsync(filePath, CreateTestStudents(), TestFixtures.SessionForGrading(), Array.Empty<ScoreSelection>());
         var json = await File.ReadAllTextAsync(filePath);
-        Assert.Contains("\"version\": 6", json);
+        Assert.Contains("\"version\": 7", json);
     }
 
     [Fact]
@@ -390,6 +390,60 @@ public class StateServiceTests : IDisposable
 
         Assert.True(converted.First(s => s.Name == "Q").Significance);
         Assert.False(converted.First(s => s.Name == "Cat").Significance);
+    }
+
+    [Fact]
+    public async Task RoundTrip_PreservesBiasCorrect()
+    {
+        // ADR-0018 v7: BiasCorrect is explicit and decoupled from Aggregate. The
+        // composite case — Aggregate=false but BiasCorrect=true — must survive a
+        // round-trip verbatim (not be re-derived from aggregate membership).
+        var filePath = Path.Combine(_testDirectory, "biascorrect_roundtrip.json");
+        var originalSelections = new List<ScoreSelection>
+        {
+            new("Component", null, ScoreColumnType.Numeric, Display: true, Aggregate: true, Correlation: true, Significance: true, BiasCorrect: true),
+            new("AggOnly", null, ScoreColumnType.Numeric, Display: true, Aggregate: true, Correlation: true, Significance: true, BiasCorrect: false),
+            new("Composite", null, ScoreColumnType.Numeric, Display: true, Aggregate: false, Correlation: true, Significance: true, BiasCorrect: true),
+        };
+        await _stateService.SaveAsync(filePath, CreateTestStudents(), TestFixtures.SessionForGrading(), originalSelections);
+
+        var converted = _stateService.ConvertToScoreSelections(await _stateService.LoadAsync(filePath));
+
+        Assert.True(converted.First(s => s.Name == "Component").BiasCorrect);
+        Assert.False(converted.First(s => s.Name == "AggOnly").BiasCorrect);   // aggregated but explicitly off
+        Assert.True(converted.First(s => s.Name == "Composite").BiasCorrect);  // not aggregated but on
+    }
+
+    [Fact]
+    public async Task LoadAsync_PreV7File_DerivesBiasCorrectFromAggregate()
+    {
+        // ADR-0018 v7: pre-v7 files lack the biasCorrect field. The loader must
+        // derive the OLD behavior — de-bias was driven by aggregate membership
+        // (Numeric && Aggregate && !Total) — so existing projects keep correcting
+        // exactly the same cells rather than silently losing de-bias.
+        var filePath = Path.Combine(_testDirectory, "v6.dots");
+        var v6Content = """
+            {
+              "version": 6,
+              "savedAt": "2024-01-01T00:00:00Z",
+              "students": [],
+              "cursors": [],
+              "scoreSelections": [
+                { "name": "Q", "index": null, "type": 0, "display": true, "aggregate": true, "correlation": true, "significance": true },
+                { "name": "Total", "index": null, "type": 0, "display": true, "aggregate": true, "correlation": true, "significance": true },
+                { "name": "Extra", "index": null, "type": 0, "display": true, "aggregate": false, "correlation": true, "significance": true },
+                { "name": "Hat", "index": null, "type": 1, "display": true, "aggregate": false, "correlation": false, "significance": true }
+              ]
+            }
+            """;
+        await File.WriteAllTextAsync(filePath, v6Content);
+
+        var converted = _stateService.ConvertToScoreSelections(await _stateService.LoadAsync(filePath));
+
+        Assert.True(converted.First(s => s.Name == "Q").BiasCorrect);       // numeric aggregate component
+        Assert.False(converted.First(s => s.Name == "Total").BiasCorrect);  // Total never corrected against itself
+        Assert.False(converted.First(s => s.Name == "Extra").BiasCorrect);  // numeric, not aggregated
+        Assert.False(converted.First(s => s.Name == "Hat").BiasCorrect);    // categorical
     }
 
     [Fact]
