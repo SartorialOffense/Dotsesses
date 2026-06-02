@@ -113,6 +113,39 @@ public class StudentAssessmentTests
     }
 
     [Fact]
+    public void Constructor_WithUppercaseTotalColumn_AggregatesCaseInsensitively()
+    {
+        // ScoreReader detects the Total column case-insensitively, so a gradebook
+        // whose aggregate column is "TOTAL" never gets a synthesized "Total". The
+        // null/default aggregate must still pick it up — otherwise every student's
+        // AggregateGrade is 0 and the initial cursor layout collapses.
+        var scores = new List<Score>
+        {
+            new("Exam", null, 40),
+            new("TOTAL", null, 175)
+        };
+
+        var sa = new StudentAssessment(1, scores, NoAttributes(), "Kermit");
+
+        Assert.Equal(175, sa.AggregateGrade);
+    }
+
+    [Fact]
+    public void RecalculateAggregate_NullSelection_MatchesTotalCaseInsensitively()
+    {
+        var scores = new List<Score>
+        {
+            new("Q#", 1, 10),
+            new("total", null, 88)
+        };
+        var sa = new StudentAssessment(1, scores, NoAttributes(), "Kermit");
+
+        sa.RecalculateAggregate(null);
+
+        Assert.Equal(88, sa.AggregateGrade);
+    }
+
+    [Fact]
     public void RecalculateAggregate_NameCaseSensitive()
     {
         var scores = new List<Score>

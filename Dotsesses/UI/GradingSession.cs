@@ -112,6 +112,15 @@ public sealed class GradingSession : ObservableObject
 
         var (initialScores, initialCatchAllScore) = ComputeDefaultLayout(slotGrades);
 
+        // Same narrow-aggregate safety net as ReseedFromDefaults: a degenerate
+        // or very narrow aggregate range can make ComputeDefaultLayout interleave
+        // the targeted-slot positions with the fallback band, producing a
+        // non-monotonic-by-Order layout that GradeAssigner (via the
+        // CutoffCountCalculator call below) rejects with "Cutoffs are out of
+        // order". Rebalance to even spacing so construction always yields a valid
+        // state. (Issue: uppercase "TOTAL" columns collapsed every aggregate to 0.)
+        initialScores = EnsureMonotonicByGrade(slotGrades, initialScores);
+
         _slots = new ObservableCollection<CutoffSlot>(
             slotGrades.Select(g => new CutoffSlot(g, initialScores[g], isEnabled: true)));
 
@@ -211,16 +220,9 @@ public sealed class GradingSession : ObservableObject
         // EmitNewState would throw "Cutoffs are out of order". Detect
         // here and replace the layout with an even-spacing rebalance
         // across [minStudentScore, maxStudentScore] so the session
-        // always emits a valid state.
-        if (!AreScoresMonotonicByGrade(slotGrades, scores))
-        {
-            var minStudentScore = _classAssessment.Assessments.Min(a => a.AggregateGrade);
-            var maxStudentScore = _classAssessment.Assessments.Max(a => a.AggregateGrade);
-            var rebalanced = _cursorPlacement
-                .ResetToEvenSpacingMonotonic(slotGrades, minStudentScore, maxStudentScore);
-            scores = rebalanced.ToDictionary(c => c.Grade, c => c.Score);
-            // Catch-all stays at the fallback base position computed above.
-        }
+        // always emits a valid state. Catch-all stays at the fallback
+        // base position computed above.
+        scores = EnsureMonotonicByGrade(slotGrades, scores);
 
         foreach (var slot in _slots)
         {
@@ -230,6 +232,31 @@ public sealed class GradingSession : ObservableObject
         _catchAllScore = catchAllScore;
 
         EmitNewState(originator);
+    }
+
+    /// <summary>
+    /// Returns <paramref name="scores"/> unchanged when it is already monotonic
+    /// non-increasing by <see cref="Grade.Order"/>; otherwise rebalances every slot
+    /// grade to even spacing across the student aggregate range so the resulting
+    /// cutoffs never trip <see cref="GradeAssigner"/>'s ordering check. Shared by the
+    /// constructor and <see cref="ReseedFromDefaults"/> so both layout paths are
+    /// guaranteed valid. The catch-all is left to its caller-computed fallback base
+    /// (it sits below every slot and is exempt from the ordering check anyway).
+    /// </summary>
+    private Dictionary<Grade, int> EnsureMonotonicByGrade(
+        IReadOnlyList<Grade> slotGrades,
+        Dictionary<Grade, int> scores)
+    {
+        if (AreScoresMonotonicByGrade(slotGrades, scores))
+        {
+            return scores;
+        }
+
+        var minStudentScore = _classAssessment.Assessments.Min(a => a.AggregateGrade);
+        var maxStudentScore = _classAssessment.Assessments.Max(a => a.AggregateGrade);
+        return _cursorPlacement
+            .ResetToEvenSpacingMonotonic(slotGrades, minStudentScore, maxStudentScore)
+            .ToDictionary(c => c.Grade, c => c.Score);
     }
 
     private static bool AreScoresMonotonicByGrade(

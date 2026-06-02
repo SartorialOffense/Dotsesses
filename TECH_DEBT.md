@@ -203,3 +203,29 @@ the 7 guarded tests turn back on automatically.
 **Touches:** `Dotsesses/FeatureFlags.cs`, `Dotsesses/UI/MainWindowViewModel.cs`,
 `Dotsesses/UI/SettingsWindow.axaml`, `Dotsesses/UI/SettingsViewModel.cs`,
 `Dotsesses/UI/ScoreSelectionRowViewModel.cs`.
+
+---
+
+### TD011 — `InitialCutoffCalculator` indexes `[-1]` when a grade's target count is 0
+
+**Why it's debt:** `DefaultCurveGenerator` derives each grade's target
+count from rounded class-size percentages, and `CutoffCount.Midpoint`
+floors with integer division. For small classes a leading grade can round
+to a midpoint of 0 (e.g. at 10 students, A = `(round(0.5)=0 + round(1.0)=1)/2
+= 0`). `InitialCutoffCalculator.Calculate` then enters its first iteration
+with `targetCount == 0`, sets `endIndex = currentIndex = 0`, and the
+tie-handling branch reads `sortedStudents[endIndex - 1]` → `[-1]` →
+`ArgumentOutOfRangeException`. Surfaced while fixing the uppercase-`TOTAL`
+load crash: once aggregates were no longer all-zero, a 12-student fixture
+was fine but a 10-student one threw. The owner's real file (25 students)
+never hits it, so this is latent, not the reported bug.
+
+**Trigger:** a real class small enough that a targeted grade's midpoint
+rounds to 0 (roughly ≤ ~10 students), or any work in
+`InitialCutoffCalculator` / `DefaultCurveGenerator`.
+
+**Touches:** `Dotsesses/Calculators/InitialCutoffCalculator.cs` (guard
+`endIndex > currentIndex` / `endIndex > 0` before the tie look-back, and
+decide the semantics of a zero-target grade); possibly
+`Dotsesses/Models/CutoffCount.cs` (`Midpoint` rounding). Add a small-class
+regression test alongside `InitialCutoffCalculatorTests`.
