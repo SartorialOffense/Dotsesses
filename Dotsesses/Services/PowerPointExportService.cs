@@ -74,7 +74,7 @@ public class PowerPointExportService
 
             pres.Slides.Add(1);
             ClearPlaceholders(pres, 3);
-            await AddPlotSlideAsync(pres, 3, $"{className} - Score Correlations", correlationPlotControl, messenger, restoreTheme: false);
+            await AddPlotSlideAsync(pres, 3, $"{className} - Associations", correlationPlotControl, messenger, restoreTheme: false);
 
             // Slide 4: SignificanceMatrix - switch to significance tab first
             await Dispatcher.UIThread.InvokeAsync(() =>
@@ -92,7 +92,7 @@ public class PowerPointExportService
 
             pres.Slides.Add(1);
             ClearPlaceholders(pres, 4);
-            await AddPlotSlideAsync(pres, 4, $"{className} - Subgroup Significance", significancePlotControl, messenger, restoreTheme: false,
+            await AddPlotSlideAsync(pres, 4, $"{className} - Group Differences", significancePlotControl, messenger, restoreTheme: false,
                 footer: BuildSignificanceFooter(testFamily));
 
             // Slide 5: Grade Table (no rendering needed)

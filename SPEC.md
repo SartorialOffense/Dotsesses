@@ -59,8 +59,9 @@ Left to right with a vertical splitter:
 1. **Drill-down panel** (left, 300px initial width) — currently-hovered
    Student's record.
 2. **Plot tabs** (right, fills remaining) — tabbed surface containing
-   the violin plot, the correlation matrix, and the significance
-   matrix.
+   the violin plot (**Distribution**), the **Associations** view
+   (correlation matrix), and the **Group Differences** view
+   (significance matrix).
 
 All collapsible panels use a hamburger icon and rotated text in the
 collapsed state.
@@ -197,9 +198,12 @@ with swarm overlay.
   dependency, etc.) the failure is shown in a dialog naming the plot
   and the underlying error; the rest of the UI stays usable.
 
-## Correlation matrix
+## Associations (correlation matrix)
 
-Sibling tab in the bottom-right surface. Correlation between every pair of
+The **Associations** view — labelled **Associations** in the tab strip
+and PowerPoint export — answers *do two continuous measures move
+together?* It is rendered as the correlation matrix. Sibling tab in the
+bottom-right surface. Correlation between every pair of
 Scores whose **Correlation** ScoreSelection flag is on. No synthetic
 AggregateScore series is added to the matrix — correlating an aggregate
 against its own components would be misleading.
@@ -209,7 +213,7 @@ Numeric×Numeric pair and **Spearman ρ** for any cell touching an **Ordinal**
 column (rank-based, since an Ordinal's value is a rank). The cell color encodes
 the effect-size headline **r²** (= r²/ρ²) on a 0–1 scale, and the **upper-left**
 in-cell label states it — `r²=…` (Pearson) or `ρ²=…` (Spearman) — matching the
-Significance tab's η²/ε² headline. The *sign* of the relationship is read from
+Group Differences view's η²/ε² headline. The *sign* of the relationship is read from
 the fitted line's slope and the hover tooltip's signed coefficient. Every cell
 is shown — none is hidden for being weak or non-significant.
 
@@ -255,10 +259,13 @@ components and would otherwise win every slot — but is included so the
 matrix opens with the overall-score column present.) The user can change
 this in Settings.
 
-## Significance matrix
+## Group Differences (significance matrix)
 
-Third tab in the bottom-right surface, after Distribution and
-Correlation. A matrix of small cells — one row per Numeric
+The **Group Differences** view — labelled **Group Differences** in the
+tab strip and PowerPoint export — answers *does a continuous measure
+differ across groups?* It is rendered as the significance matrix. Third
+tab in the bottom-right surface, after Distribution and
+Associations. A matrix of small cells — one row per Numeric
 column with **Significance**=true, one column per Categorical *or*
 Ordinal column with **Significance**=true (an Ordinal column — one whose
 every value carries a `~N` suffix — acts as a matrix column, never a
@@ -316,7 +323,7 @@ test families, when to prefer each, and citations for papers — lives at
   confirmatory multiple-comparison procedure.
 - **Exploratory caveat** (ADR-0018): a faint bottom-left note — *"Exploratory —
   uncorrected; treat as leads, not confirmation"* — sits on both this tab and
-  the Correlation tab, so the framing is visible without hovering.
+  the Associations tab, so the framing is visible without hovering.
 - **Test family selector** (top-right combo box): switches every cell between
   *Parametric* (Welch's ANOVA — reduces to Welch's t for 2 subgroups) and
   *Non-parametric* (Kruskal–Wallis — reduces to Mann–Whitney for 2). One
@@ -326,7 +333,7 @@ test families, when to prefer each, and citations for papers — lives at
   branching. Default: Parametric.
 - **Copy button** (top-right, beside the selector): copies a print-friendly
   (light-inverted) PNG of the plot to the clipboard, matching the Distribution
-  and Correlation tabs.
+  and Associations tabs.
 - **Small-N test policy**: subgroups with N<2 are dropped from the test
   (their dots still render); the cell is tested only if ≥2 valid subgroups
   remain, otherwise the annotation is `—`.
@@ -376,7 +383,10 @@ the toolbar, the application menu, or `Cmd+,`. Contains a sectioned
 surface designed to grow; the only category today is **Score
 Selection** — a table with one row per column and six control
 columns: **Type** (Numeric / Categorical combobox), **Display**,
-**Aggregate**, **Correlation**, **Significance**, and **Bias Correct**.
+**Aggregate**, **Associations**, **Group Differences**, and **Bias
+Correct**. (The **Associations** and **Group Differences** headers
+toggle the `Correlation` and `Significance` ScoreSelection flags
+respectively — the flag's code name predates the view rename.)
 The five checkbox columns have per-column All/None toggles in the header;
 Type does not (bulk-flipping column kinds is almost certainly user error).
 
@@ -391,7 +401,7 @@ Bias Correct disable — those flags are meaningless for categorical columns
 (the data lives in StudentAttributes and bypasses the violin / correlation /
 aggregate paths). Those bulk All/None commands skip Categorical rows for
 the same reason. **Bias Correct** (correlation rest-score de-bias against
-Total — see *Correlation matrix*) is editable only on Numeric, non-Total
+Total — see *Associations*) is editable only on Numeric, non-Total
 rows; its All/None skip the rest, and unlike Aggregate it has no
 "at least one" constraint, so None is always allowed.
 
@@ -499,10 +509,11 @@ single combined dialog lists each one. The categories it flags:
 - **Excel** export with columns for Student Id, AggregateScore, individual
   Scores, StudentAttributes, and assigned letter Grade.
 - **PowerPoint** export — one slide each for the dotplot, violin plot,
-  correlation matrix, and significance matrix, plus a grade-breakdown
+  the **Associations** view (correlation matrix), and the **Group
+  Differences** view (significance matrix), plus a grade-breakdown
   table. Plots render in the light theme (dark text on white) while the
-  bright `CYCLING_PALETTE` dot colors are preserved. The significance
-  slide carries a two-line footer: a **stats** line (per-cell test —
+  bright `CYCLING_PALETTE` dot colors are preserved. The Group
+  Differences slide carries a two-line footer: a **stats** line (per-cell test —
   Welch's ANOVA / Kruskal–Wallis; effect size η²/ε² = variance explained;
   star tiers; raw, uncorrected p) and a **symbols** line (box = IQR,
   centre line = median, dots = individual students).

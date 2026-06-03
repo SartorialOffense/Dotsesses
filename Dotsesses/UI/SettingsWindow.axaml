@@ -93,7 +93,7 @@
                         <StackPanel Grid.Column="4"
                                     Orientation="Vertical"
                                     HorizontalAlignment="Center">
-                            <TextBlock Text="Correlation"
+                            <TextBlock Text="Associations"
                                        FontWeight="SemiBold"
                                        HorizontalAlignment="Center"/>
                             <!-- Special-case: tiny column-header bulk-toggle buttons, intentionally compact. Inline styling preserved. -->
@@ -115,7 +115,7 @@
                         <StackPanel Grid.Column="5"
                                     Orientation="Vertical"
                                     HorizontalAlignment="Center">
-                            <TextBlock Text="Significance"
+                            <TextBlock Text="Group Differences"
                                        FontWeight="SemiBold"
                                        HorizontalAlignment="Center"/>
                             <!-- Special-case: tiny column-header bulk-toggle buttons, intentionally compact. Inline styling preserved. -->

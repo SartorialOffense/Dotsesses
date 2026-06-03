@@ -3,6 +3,26 @@
 Dotsesses is a desktop tool for visualizing a Class's exam scores and
 assigning letter Grades against the school's GradeCurve.
 
+## The two exploratory views
+
+Relationships in Class data are explored through two complementary
+views, each named for the **question it answers** rather than the
+statistic it leads with (both report a significance p-value *and* an
+effect size, which made the older "Correlation" / "Significance" labels
+confusing). See
+`design_history/exploratory-statistics-for-classroom-methods.md`.
+
+| View name | Question it answers | Rendered as |
+|---|---|---|
+| **Associations** | Do two continuous measures move together? | the **correlation matrix** |
+| **Group Differences** | Does a continuous measure differ across groups? | the **Significance Matrix** |
+
+These are the user-facing tab and slide names. The structural/mechanism
+terms below — **correlation matrix**, **Significance Matrix**,
+**Significance Test** — and the `ScoreSelection` flags `Correlation` /
+`Significance` keep their code-side names so docs and code stay
+reconcilable; treat them as the rendering of the named view.
+
 ## Language
 
 **Course**: An educational subject taught across multiple semesters or
@@ -78,7 +98,8 @@ Subgroups are ordered left-to-right by their **SortOrder** (suffixed labels by
 alphabetically; this ordering is computed in C# and the Python renderer
 consumes it verbatim (see ADR-0017).
 
-**Significance Matrix**: A matrix of small cells — one row per
+**Significance Matrix**: The rendering of the **Group Differences**
+view. A matrix of small cells — one row per
 Numeric column with `Significance=true`, one column per **Categorical**
 *or* **Ordinal** column with `Significance=true` (an Ordinal column acts
 as a Significance Matrix column, never a row — see **Ordinal**,
@@ -128,10 +149,12 @@ columns before *it* (Exam itself is corrected against Total). `BiasCorrect`
 seeds on for numeric columns before Total. A degenerate rest score
 (`target − column ≡ 0`) blanks the cell. See ADR-0018.
 
-**Effect size / variance explained**: The headline both exploratory-stats
-tabs lead with — the fraction of variation in the Score a variable
-explains, on a 0–1 scale. The correlation matrix reports **r²** (or **ρ²**
-for Spearman); the Significance Matrix reports **η²** (Welch ANOVA path) /
+**Effect size / variance explained**: The headline both exploratory
+views (**Associations** and **Group Differences**) lead with — the
+fraction of variation in the Score a variable explains, on a 0–1 scale.
+The Associations view (correlation matrix) reports **r²** (or **ρ²**
+for Spearman); the Group Differences view (Significance Matrix) reports
+**η²** (Welch ANOVA path) /
 **ε²** (Kruskal–Wallis path). The p-value and per-cell N are supporting
 detail, not the headline, and p is always **raw** (no multiple-comparison
 correction) — the matrices are exploratory *screening* views, treated as
